@@ -1,0 +1,310 @@
+/* ── About — raw editorial layout matching reference ── */
+
+.section {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  min-height: 640px;
+  background: #06021a;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* No clip-path — slide-from-right is handled by GSAP translateX */
+}
+
+/* ── Background layers ── */
+.bgLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.terminalLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0.45;
+}
+
+/* Crosshair "+" markers at column junction */
+.cross {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  z-index: 2;
+  pointer-events: none;
+}
+.cross::before,
+.cross::after {
+  content: "";
+  position: absolute;
+  background: rgba(255,255,255,.35);
+}
+.cross::before {
+  width: 1px;
+  height: 100%;
+  left: 50%;
+  top: 0;
+}
+.cross::after {
+  height: 1px;
+  width: 100%;
+  top: 50%;
+  left: 0;
+}
+
+/* ── Main body: two columns ── */
+.body {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Far-left label strip ── */
+.strip {
+  width: 36px;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(255,255,255,.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0 16px;
+}
+
+.stripBadge {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  display: block;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.stripLabel {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.28);
+}
+
+/* ── Left column: photo ── */
+.leftCol {
+  width: 275px;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(255,255,255,.08);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.photo {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: transparent;
+}
+
+/* Moody atmospheric CSS portrait — teal light from below */
+.photoInner {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 90% 60% at 35% 85%, rgba(82,39,255,.45) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 65% 20%, rgba(8,20,50,.7) 0%, transparent 70%),
+    linear-gradient(170deg, #06021a 0%, #0c0830 50%, #0a0540 100%);
+}
+
+/* Grain texture */
+.photoInner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.18;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+
+/* Script name overlay */
+.photoScript {
+  position: absolute;
+  bottom: 20px;
+  left: 16px;
+  right: 16px;
+  font-family: var(--font-script), cursive;
+  font-size: clamp(2.8rem, 5vw, 4.2rem);
+  line-height: 1;
+  color: #d4f53c;
+  /* pointer-events enabled so cursor-target and hover work */
+  pointer-events: auto;
+  cursor: none;
+  text-shadow: 0 2px 24px rgba(0,0,0,.6);
+  letter-spacing: -0.02em;
+  z-index: 2;
+}
+
+/* Logo shown only while hovering the yellow Techzilla text */
+.photoLogo {
+  position: absolute;
+  top: 28%;
+  left: 50%;
+  transform: translateX(-50%) scale(0.88);
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease, transform 0.28s ease;
+  z-index: 3;
+  filter: drop-shadow(0 0 18px rgba(212, 245, 60, 0.35));
+}
+
+/* Sibling combinator: logo appears when yellow text is hovered */
+.photoScript:hover ~ .photoLogo {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+/* Bottom meta under photo */
+.photoBtm {
+  padding: 14px 16px;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.32);
+  border-top: 1px solid rgba(255,255,255,.07);
+}
+
+/* ── Right column: text ── */
+.rightCol {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 60px 3vw 60px 3vw;
+  gap: 28px;
+}
+
+/* Primary headline — huge, heavy */
+.headline {
+  font-family: var(--font-geist-sans), var(--font-sans), sans-serif;
+  font-size: clamp(2rem, 4.2vw, 5rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+  margin: 0;
+  max-width: 860px;
+}
+
+/* DecryptedText — individual character states */
+.revealedChar {
+  color: #ffffff;
+  transition: color 0.08s ease;
+}
+.encryptedChar {
+  color: rgba(255, 255, 255, 0.14);
+}
+
+/* Secondary text — slightly lit so it holds its own under the headline */
+.sub {
+  font-family: var(--font-geist-sans), var(--font-sans), sans-serif;
+  /* Restored to original weight; wider column (leftCol 240px + 3vw padding)
+     gives enough room for the 3 explicit lines without browser re-wrapping. */
+  font-size: clamp(1.15rem, 2.1vw, 2.4rem);
+  font-weight: 400;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.52);
+  margin: 0;
+  max-width: 100%;
+  letter-spacing: -0.015em;
+  text-shadow: 0 0 28px rgba(180, 151, 207, 0.18);
+}
+
+/* Legacy underline helper (kept for any other usage) */
+.ul {
+  text-decoration: underline;
+  text-decoration-color: rgba(255,255,255,.45);
+  text-underline-offset: 4px;
+  color: rgba(255,255,255,.55);
+}
+
+/* ── Bottom bar ── */
+.bottomBar {
+  position: relative;
+  z-index: 3;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px 0 52px;
+  border-top: 1px solid rgba(255,255,255,.07);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.3);
+  flex-shrink: 0;
+}
+
+.btmCoords {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.btmGlobe {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.35);
+  position: relative;
+  flex-shrink: 0;
+}
+.btmGlobe::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255,255,255,.35);
+}
+.btmGlobe::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255,255,255,.35);
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .leftCol { width: 220px; }
+  .rightCol { padding: 40px 5vw; }
+  .headline { font-size: clamp(1.8rem, 5.5vw, 3.2rem); }
+  .sub { font-size: clamp(1rem, 3vw, 1.8rem); }
+}
+
+@media (max-width: 640px) {
+  .body { flex-direction: column; }
+  .strip { width: 100%; height: 36px; flex-direction: row; border-right: none; border-bottom: 1px solid rgba(255,255,255,.08); padding: 0 16px; }
+  .stripLabel { writing-mode: horizontal-tb; transform: none; }
+  .leftCol { width: 100%; height: 220px; border-right: none; border-bottom: 1px solid rgba(255,255,255,.08); }
+  .rightCol { padding: 32px 5vw 24px; }
+  .bottomBar { padding: 0 5vw; }
+  .btmCoords { display: none; }
+}

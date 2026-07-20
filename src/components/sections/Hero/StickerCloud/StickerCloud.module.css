@@ -1,0 +1,18 @@
+.sticker{
+    position:absolute;
+    z-index:5;
+    will-change:transform;
+    transform-style:preserve-3d;
+
+    transition:
+        filter .3s ease;
+}
+
+.sticker img{
+    user-select:none;
+    -webkit-user-drag:none;
+}
+.image{
+    object-fit:contain;
+    user-select:none;
+}

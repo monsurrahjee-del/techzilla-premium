@@ -1,0 +1,21 @@
+.cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #ffffff;
+  pointer-events: none;
+  z-index: 999999;
+  will-change: transform;
+  box-shadow:
+    0 0 6px rgba(255, 255, 255, 0.9),
+    0 0 14px rgba(180, 220, 255, 0.5);
+}
+
+@media (pointer: coarse) {
+  .cursor {
+    display: none;
+  }
+}

@@ -1,0 +1,40 @@
+/* ── ServicesIntro — star mask reveal overlay ── */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.overlay.fade {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.85s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* DotGrid background — always fills the full overlay */
+.bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* SVG star mask — sits above DotGrid, below vapour text */
+.svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+  pointer-events: none;
+  /* Prevent SVG from collapsing — it must always fill the viewport */
+  display: block;
+}

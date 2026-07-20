@@ -1,0 +1,134 @@
+.main {
+  /* 400vh = 300vh of scrollable range on top of the 100vh viewport.
+     Scroll lives on the document root so sticky + CSS scroll-driven
+     animations are both handled by the browser compositor in the same
+     pass — no phase mismatch, no shake.
+
+     Sections:
+       0  →  33%  = 0  → 100vh  (about slides in from right, hero fades)
+      33% →  66%  = 100 → 200vh  (services scales in)
+      66% → 100%  = 200 → 300vh  (portfolio slides in from left)        */
+  min-height: 400vh;
+}
+
+.stickyPane {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Hero ───────────────────────────────────────────────────────────────────
+   Safari fallback: JS driveFrame sets opacity via inline style.
+   Chrome/Edge/Firefox: CSS animation-timeline takes over (see @supports). */
+.heroLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  will-change: opacity;
+}
+
+/* ── About ──────────────────────────────────────────────────────────────────
+   Starts off-screen right. Safari fallback initial state. */
+.aboutLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  transform: translateX(100%);
+  will-change: transform;
+}
+
+/* ── Services ───────────────────────────────────────────────────────────────
+   Starts tiny and blurred. Safari fallback initial state. */
+.servicesLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  transform: scale(0.06);
+  opacity: 0;
+  filter: blur(18px);
+  transform-origin: center center;
+  will-change: transform, opacity, filter;
+}
+
+/* ── Portfolio ──────────────────────────────────────────────────────────────
+   Slides in from the LEFT. Safari fallback initial state. */
+.portfolioLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  transform: translateX(-100%);
+  will-change: transform;
+}
+
+/* ── Keyframes ───────────────────────────────────────────────────────────── */
+@keyframes about-slide-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0%);   }
+}
+
+@keyframes hero-fade-out {
+  from { opacity: 1;    }
+  to   { opacity: 0.22; }
+}
+
+@keyframes services-scale-in {
+  from { transform: scale(0.06); opacity: 0; filter: blur(18px); }
+  to   { transform: scale(1);    opacity: 1; filter: blur(0px);  }
+}
+
+@keyframes portfolio-slide-in {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0%);    }
+}
+
+/* ── Scroll-driven animations (Chrome 115+, Edge 115+, Firefox 129+) ────────
+   scroll(root block) = the document root scroll container.
+   Root scroll is compositor-threaded in every modern browser.
+
+   Scrollable range: min-height 400vh − 100vh viewport = 300vh total.
+     0%  → 33.33% = 0   → 100vh  (about slides in, hero fades)
+    33.33% → 66.66% = 100 → 200vh  (services scales in)
+    66.66% → 100%   = 200 → 300vh  (portfolio slides in from left) */
+@supports (animation-timeline: scroll()) {
+  .aboutLayer {
+    transform: unset;
+    animation-name:            about-slide-in;
+    animation-duration:        auto;
+    animation-timing-function: linear;
+    animation-fill-mode:       both;
+    animation-timeline:        scroll(root block);
+    animation-range:           0% 33.33%;
+  }
+
+  .heroLayer {
+    animation-name:            hero-fade-out;
+    animation-duration:        auto;
+    animation-timing-function: linear;
+    animation-fill-mode:       both;
+    animation-timeline:        scroll(root block);
+    animation-range:           0% 33.33%;
+  }
+
+  .servicesLayer {
+    transform: unset;
+    opacity:   unset;
+    filter:    unset;
+    animation-name:            services-scale-in;
+    animation-duration:        auto;
+    animation-timing-function: linear;
+    animation-fill-mode:       both;
+    animation-timeline:        scroll(root block);
+    animation-range:           33.33% 66.66%;
+  }
+
+  .portfolioLayer {
+    transform: unset;
+    animation-name:            portfolio-slide-in;
+    animation-duration:        auto;
+    animation-timing-function: linear;
+    animation-fill-mode:       both;
+    animation-timeline:        scroll(root block);
+    animation-range:           66.66% 100%;
+  }
+}

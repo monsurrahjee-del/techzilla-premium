@@ -1,0 +1,45 @@
+/* ── Highlighted entity name (no link) ── */
+.highlight {
+  color: rgba(255, 255, 255, 0.96);
+  font-weight: 500;
+  white-space: nowrap;   /* keep multi-word names on one line */
+}
+
+/* ── Linked entity name ── */
+.entityLink {
+  color: rgba(255, 255, 255, 0.93);
+  font-weight: 500;
+  white-space: nowrap;   /* prevent mid-name line breaks */
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.28);
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+  transition:
+    color 0.2s ease,
+    text-decoration-color 0.2s ease,
+    text-shadow 0.2s ease;
+  cursor: pointer;
+}
+
+.entityLink:hover {
+  color: #ffffff;
+  text-decoration-color: rgba(255, 255, 255, 0.7);
+  text-shadow:
+    0 0 18px rgba(180, 151, 207, 0.6),
+    0 0 40px rgba(82, 39, 255, 0.3);
+}
+
+/* ── Blinking cursor ── */
+.cursor {
+  display: inline-block;
+  margin-left: 2px;
+  color: rgba(180, 151, 207, 0.85);
+  font-weight: 300;
+  animation: cursorBlink 0.65s ease-in-out infinite;
+  user-select: none;
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}

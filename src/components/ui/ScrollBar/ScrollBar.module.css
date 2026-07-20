@@ -1,0 +1,85 @@
+/* ── Custom scrollbar — matches the dark-track / thin-white-thumb reference ── */
+
+.track {
+  position: fixed;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  height: 54vh;
+  /* Wider hit area than visual width */
+  width: 10px;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: auto;
+  cursor: default !important;
+  /* Visual guide line down the centre */
+  display: flex;
+  justify-content: center;
+}
+
+/* Thin dark guide line — always rendered but barely visible */
+.track::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1px;
+  background: rgba(255 255 255 / 0.10);
+  border-radius: 9999px;
+  pointer-events: none;
+}
+
+.thumb {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform-origin: top left;
+  /* Visual width of the thumb bar */
+  width: 2px;
+  margin-left: -1px;
+  min-height: 40px;
+  border-radius: 9999px;
+  background: rgba(255 255 255 / 0.90);
+  box-shadow:
+    0 0 6px  rgba(255 255 255 / 0.50),
+    0 0 14px rgba(255 255 255 / 0.20);
+  will-change: transform, height;
+  /* No CSS transition — transform is set directly via JS for 1:1 scroll sync */
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.thumb:active {
+  cursor: grabbing;
+  background: #ffffff;
+  box-shadow:
+    0 0 8px  rgba(255 255 255 / 0.80),
+    0 0 20px rgba(255 255 255 / 0.40);
+}
+
+/* Expand hit area on hover without changing visual width */
+.thumb::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -6px;
+  right: -6px;
+}
+
+/* Small horizontal notch at centre of thumb */
+.thumb::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 1px;
+  border-radius: 1px;
+  background: rgba(255 255 255 / 0.95);
+  pointer-events: none;
+}

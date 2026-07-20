@@ -1,0 +1,79 @@
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 5vw;
+  height: 52px;
+
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.75);
+
+  background: rgba(8,12,20,.85);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  border-bottom: 1px solid rgba(255,255,255,.07);
+
+  /* Hidden by default — IntersectionObserver controls visibility */
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+
+  /* CSS transition for the show/hide — fast out, smooth in */
+  transition: transform 0.28s cubic-bezier(0.22,1,0.36,1),
+              opacity   0.22s ease;
+}
+
+.logo {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.24em;
+  color: #ffffff;
+}
+
+.links {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.links a {
+  color: rgba(255,255,255,.6);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.links a:hover { color: #fff; }
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.toggle {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,.6);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  transition: color 0.2s;
+  padding: 0;
+}
+.toggle:hover { color: #fff; }
+.toggle span { margin-left: 2px; opacity: 0.7; }
+
+@media (max-width: 640px) {
+  .links { display: none; }
+  .controls { gap: 14px; }
+}

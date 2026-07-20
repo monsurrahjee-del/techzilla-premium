@@ -1,0 +1,486 @@
+/* ── Section wrapper ──────────────────────────────────────────────────────── */
+.section {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  min-height: 640px;
+  overflow: hidden;
+  transition: background 0.5s ease;
+}
+.dark  { background: #050508; }
+.light { background: #c8e6f5; }
+
+/* ── Canvas fill ──────────────────────────────────────────────────────────── */
+.canvasWrap {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+/* ── Billboard iframe overlay ─────────────────────────────────────────────── */
+.billboardOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.billboardFrame {
+  position: absolute;
+  overflow: hidden;
+  border-radius: 4px;
+  border: 1.5px solid rgba(255,255,255,0.3);
+  box-shadow: 0 0 20px rgba(0,0,0,0.6);
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.billboardIframe {
+  width: 300%;
+  height: 300%;
+  transform: scale(0.3333);
+  transform-origin: 0 0;
+  border: none;
+  pointer-events: none;
+  display: block;
+}
+
+.billboardLabel {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #fff;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Geist Mono", monospace;
+}
+
+/* ── Top header bar ───────────────────────────────────────────────────────── */
+.header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 28px 40px 0;
+  pointer-events: none;
+}
+
+.sectionLabel {
+  font-family: "Geist Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.22em;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.sectionTitle {
+  font-family: "Geist", system-ui, sans-serif;
+  font-size: clamp(1.4rem, 3.5vw, 2.4rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.titleDark {
+  background: linear-gradient(120deg, #ffffff 0%, rgba(255,255,255,0.6) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.titleLight {
+  background: linear-gradient(120deg, #1a1a2e 0%, rgba(30,30,60,0.7) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Light / Dark toggle button ───────────────────────────────────────────── */
+.themeToggle {
+  position: absolute;
+  top: 22px;
+  right: 32px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 12px;
+  border-radius: 100px;
+  border: none;
+  cursor: pointer;
+  font-family: "Geist", system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: background 0.28s ease, color 0.28s ease, box-shadow 0.28s ease, transform 0.15s ease;
+  user-select: none;
+}
+.themeToggle:hover { transform: translateY(-1px); }
+.themeToggle:active { transform: scale(0.97); }
+
+.toggleDark {
+  background: rgba(255,255,255,0.10);
+  color: #ffe066;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.14), 0 4px 16px rgba(0,0,0,0.5);
+  backdrop-filter: blur(10px);
+}
+.toggleDark:hover {
+  background: rgba(255,255,255,0.16);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.22), 0 6px 22px rgba(0,0,0,0.55);
+}
+
+.toggleLight {
+  background: rgba(20,20,60,0.12);
+  color: #3b3b8a;
+  box-shadow: 0 0 0 1px rgba(30,30,80,0.18), 0 4px 16px rgba(0,0,0,0.1);
+  backdrop-filter: blur(10px);
+}
+.toggleLight:hover {
+  background: rgba(20,20,60,0.2);
+}
+
+.toggleLabel {
+  line-height: 1;
+}
+
+/* ── Project info card ────────────────────────────────────────────────────── */
+.projectCard {
+  position: absolute;
+  right: 32px;
+  top: 50%;
+  transform: translateY(-50%) translateX(24px);
+  z-index: 20;
+  width: min(340px, 90vw);
+  border-radius: 18px;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.4s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.projectCard.visible {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0px);
+  pointer-events: auto;
+}
+
+.cardDark {
+  background: rgba(8, 8, 18, 0.9);
+  border: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(22px) saturate(1.4);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+}
+.cardLight {
+  background: rgba(240, 244, 255, 0.92);
+  border: 1px solid rgba(80,80,180,0.12);
+  backdrop-filter: blur(22px) saturate(1.2);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2);
+}
+
+/* ── Live preview iframe inside card ─────────────────────────────────────── */
+.previewWrap {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  overflow: hidden;
+  border-bottom: 1.5px solid;
+  flex-shrink: 0;
+}
+
+.previewIframe {
+  width: 300%;
+  height: 300%;
+  transform: scale(0.3333);
+  transform-origin: 0 0;
+  border: none;
+  display: block;
+  pointer-events: none;
+}
+
+.previewOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.previewLiveChip {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: "Geist Mono", monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  padding: 4px 9px;
+  border-radius: 100px;
+  pointer-events: auto;
+  transition: opacity 0.2s ease;
+}
+.previewLiveChip:hover { opacity: 0.8; }
+
+.liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: pulse 1.8s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+/* ── Card body ────────────────────────────────────────────────────────────── */
+.cardBody {
+  padding: 18px 22px 18px;
+}
+
+.cardAccentBar {
+  width: 32px;
+  height: 3px;
+  border-radius: 2px;
+  margin-bottom: 11px;
+}
+
+.cardCategory {
+  font-family: "Geist Mono", monospace;
+  font-size: 0.63rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.catDark  { color: rgba(255,255,255,0.42); }
+.catLight { color: rgba(30,30,80,0.5); }
+
+.cardTitle {
+  font-family: "Geist", system-ui, sans-serif;
+  font-size: clamp(1.05rem, 2vw, 1.35rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  margin-bottom: 12px;
+}
+.cardTitleDark  { color: #ffffff; }
+.cardTitleLight { color: #12122a; }
+
+.techRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+
+.techPill {
+  font-family: "Geist Mono", monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
+  border-radius: 100px;
+  padding: 3px 9px;
+}
+.pillDark  { color: rgba(255,255,255,0.68); background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); }
+.pillLight { color: rgba(20,20,60,0.7); background: rgba(20,20,80,0.07); border: 1px solid rgba(20,20,80,0.12); }
+
+.cardDivider { height: 1px; margin-bottom: 14px; }
+.divDark     { background: rgba(255,255,255,0.08); }
+.divLight    { background: rgba(20,20,80,0.1); }
+
+.cardLink {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: "Geist", system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.cardLink:hover { opacity: 0.82; transform: translateY(-1px); }
+
+/* ── Progress dots ────────────────────────────────────────────────────────── */
+.progressBar {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.18);
+  transition: background 0.3s ease, transform 0.3s ease;
+}
+.activeDot { transform: scale(1.5); }
+
+/* ── Controls hint ────────────────────────────────────────────────────────── */
+.controlsHint {
+  position: absolute;
+  bottom: 30px;
+  right: 36px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  opacity: 1;
+  transition: opacity 0.6s ease;
+  pointer-events: none;
+}
+.controlsHint.hidden { opacity: 0; }
+.colorPanel          { transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+.colorPanel.hidden   { opacity: 0; pointer-events: none; transform: translateY(8px); }
+
+.keyGroup { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.keyRow   { display: flex; gap: 3px; }
+.key {
+  width: 26px; height: 26px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: "Geist Mono", monospace;
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.5);
+}
+.hintText {
+  font-family: "Geist Mono", monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.3);
+  text-transform: uppercase;
+}
+
+/* ── Mobile d-pad ─────────────────────────────────────────────────────────── */
+.dpad {
+  position: absolute;
+  bottom: 26px;
+  left: 28px;
+  z-index: 20;
+  display: none;
+  gap: 4px;
+  flex-direction: column;
+  align-items: center;
+  user-select: none;
+}
+.dpadRow { display: flex; gap: 4px; }
+.dpadBtn {
+  width: 50px; height: 50px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,0.65);
+  font-size: 1.1rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  transition: background 0.1s ease;
+}
+.dpadBtn:active,
+.dpadBtn.pressed { background: rgba(255,255,255,0.18); }
+
+/* ── Car colour picker panel ──────────────────────────────────────────────── */
+.colorPanel {
+  position: absolute;
+  bottom: 30px;
+  left: 28px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  pointer-events: auto;
+  user-select: none;
+}
+.colorPanelDark {
+  background: rgba(8, 8, 20, 0.72);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 4px 22px rgba(0,0,0,0.55);
+}
+.colorPanelLight {
+  background: rgba(240, 246, 255, 0.82);
+  border: 1px solid rgba(30,30,80,0.12);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.12);
+}
+
+.colorRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.colorLabel {
+  font-family: "Geist Mono", monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  width: 34px;
+  flex-shrink: 0;
+}
+.colorLabelDark  { color: rgba(255,255,255,0.38); }
+.colorLabelLight { color: rgba(20,20,60,0.48); }
+
+.swatches {
+  display: flex;
+  gap: 5px;
+}
+
+.swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  outline: none;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  flex-shrink: 0;
+}
+.swatch:hover { transform: scale(1.2); }
+.swatchActive {
+  border-color: #fff;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 0 8px rgba(255,255,255,0.5);
+  transform: scale(1.15);
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .header { padding: 18px 18px 0; }
+  .themeToggle { top: 14px; right: 16px; padding: 7px 12px 7px 10px; }
+  .projectCard {
+    right: 12px; left: 12px; width: auto;
+    top: auto; bottom: 136px;
+    transform: translateY(12px);
+  }
+  .projectCard.visible { transform: translateY(0px); }
+  .previewWrap { height: 120px; }
+  .dpad { display: flex; }
+  .controlsHint { display: none; }
+  .progressBar { bottom: 104px; }
+}
+@media (max-width: 480px) {
+  .projectCard { bottom: 148px; }
+}
