@@ -6,93 +6,74 @@ import { useGLTF, Html } from "@react-three/drei";
 import * as THREE from "three";
 import { projects } from "@/lib/projects";
 
-// ── Road surface Y (matches YUKA path y=20.75) ───────────────────────────────
+// ── Road surface Y ────────────────────────────────────────────────────────────
 const ROAD_Y = 20.75;
 
-// ── Project stations — every position is a confirmed road node ───────────────
-// Circles sit ON the road so the car never needs to leave it to reach them.
+// ── Recorded drive path — used as the autopilot route ────────────────────────
+// 226 waypoints captured from a manual drive that visits every station in order:
+// Party Place → Maser Travels → Loan Mgmt → YCT Microfinance → Malete Hostels → Zennyola Foods
+const RECORDED_PATH: { x: number; z: number }[] = [
+  {x:72,z:80},{x:72,z:75.59},{x:72,z:71.18},{x:72,z:66.35},{x:72,z:61.73},
+  {x:72,z:56.44},{x:72,z:52.03},{x:72,z:47.24},{x:72,z:42.2},{x:72,z:37.16},
+  {x:72,z:32.15},{x:72,z:27.11},{x:72,z:22.15},{x:72,z:17.23},{x:72,z:12.27},
+  {x:72,z:7.56},{x:72,z:3.08},{x:72,z:-1.36},{x:72,z:-5.97},{x:72,z:-10.33},
+  {x:72,z:-14.46},{x:72,z:-19.58},{x:72,z:-24.27},{x:72,z:-28.54},{x:72,z:-32.7},
+  {x:72,z:-28.34},{x:72,z:-24.14},{x:72,z:-19.83},{x:74.61,z:-23.03},{x:78.77,z:-23.09},
+  {x:83,z:-22.45},{x:87.15,z:-21.92},{x:91.49,z:-21.79},{x:95.54,z:-21.68},{x:99.67,z:-21.62},
+  {x:103.8,z:-21.62},{x:107.94,z:-21.61},{x:111.95,z:-21.69},{x:115.31,z:-23.93},{x:115.62,z:-28},
+  {x:114.97,z:-31.98},{x:115.43,z:-36.18},{x:115.6,z:-40.44},{x:115.2,z:-44.53},{x:115.06,z:-48.82},
+  {x:115.32,z:-52.93},{x:115.74,z:-57.18},{x:116.14,z:-61.36},{x:118.06,z:-64.91},{x:121.89,z:-66.27},
+  {x:125.9,z:-65.84},{x:130.27,z:-65.17},{x:134.65,z:-64.63},{x:138.64,z:-64.42},{x:142.78,z:-64.23},
+  {x:147.17,z:-64.11},{x:151.36,z:-64.22},{x:155.82,z:-64.36},{x:159.97,z:-64.49},{x:164.49,z:-64.64},
+  {x:168.7,z:-64.77},{x:172.89,z:-64.91},{x:176.97,z:-65.04},{x:181.11,z:-65.17},{x:185.44,z:-65.31},
+  {x:189.55,z:-65.39},{x:193.14,z:-63.51},{x:195.77,z:-60.3},{x:196.03,z:-56.13},{x:193.98,z:-52.5},
+  {x:192.5,z:-48.55},{x:191.51,z:-44.57},{x:191.86,z:-40.43},{x:192.25,z:-36.41},{x:192.5,z:-32.32},
+  {x:191.38,z:-28.29},{x:189.57,z:-24.64},{x:185.65,z:-23.12},{x:181.82,z:-24.48},{x:177.71,z:-24.94},
+  {x:173.41,z:-24.07},{x:169.25,z:-23.59},{x:164.63,z:-23.1},{x:160.16,z:-23.22},{x:155.71,z:-23.39},
+  {x:151.7,z:-23.1},{x:147.28,z:-22.64},{x:142.83,z:-22.29},{x:138.62,z:-21.95},{x:134.41,z:-21.73},
+  {x:130.14,z:-21.59},{x:125.83,z:-21.78},{x:121.61,z:-21.98},{x:116.99,z:-22.19},{x:112.68,z:-22.39},
+  {x:108.29,z:-22.37},{x:104.28,z:-22.14},{x:100.26,z:-21.91},{x:96.05,z:-21.78},{x:91.74,z:-21.65},
+  {x:86.99,z:-21.51},{x:82.44,z:-21.37},{x:77.21,z:-21.21},{x:72.85,z:-21.08},{x:68.12,z:-20.94},
+  {x:63.41,z:-20.8},{x:58.96,z:-20.91},{x:54.74,z:-21.01},{x:49.49,z:-21.14},{x:44.67,z:-21.25},
+  {x:40.29,z:-21.36},{x:36.12,z:-21.46},{x:31.42,z:-21.58},{x:27.11,z:-21.68},{x:22.66,z:-21.79},
+  {x:18.67,z:-22.77},{x:15.28,z:-25.41},{x:14.28,z:-29.38},{x:14.93,z:-33.37},{x:17.16,z:-36.86},
+  {x:16.07,z:-32.83},{x:15.77,z:-28.78},{x:17.01,z:-24.75},{x:20.63,z:-22.65},{x:16.49,z:-23.21},
+  {x:12.32,z:-23},{x:8.17,z:-22.57},{x:3.54,z:-22.33},{x:-0.83,z:-22.72},{x:-4.8,z:-23.27},
+  {x:-8.95,z:-23.51},{x:-13.17,z:-23.56},{x:-17.54,z:-23.62},{x:-22.02,z:-23.39},{x:-26.31,z:-23.13},
+  {x:-30.63,z:-22.86},{x:-35.04,z:-22.58},{x:-39.37,z:-22.31},{x:-43.41,z:-22.39},{x:-47.6,z:-22.67},
+  {x:-51.81,z:-22.94},{x:-56.1,z:-23.22},{x:-60.43,z:-23.5},{x:-64.66,z:-23.56},{x:-68.73,z:-23.47},
+  {x:-72.94,z:-23.36},{x:-77.14,z:-23.26},{x:-81.15,z:-23.34},{x:-84.57,z:-25.7},{x:-86.63,z:-29.34},
+  {x:-86.1,z:-25.28},{x:-87.25,z:-21.36},{x:-90.91,z:-19.31},{x:-94.95,z:-18.08},{x:-98.81,z:-19.21},
+  {x:-99.71,z:-15.02},{x:-100.5,z:-11.04},{x:-100.34,z:-6.49},{x:-100.17,z:-2.1},{x:-100.02,z:1.95},
+  {x:-100.38,z:6.29},{x:-100.95,z:10.37},{x:-100.62,z:14.53},{x:-100.27,z:18.66},{x:-100.38,z:22.81},
+  {x:-100.63,z:27.04},{x:-100.88,z:31.25},{x:-101.01,z:35.3},{x:-100.63,z:39.37},{x:-98.83,z:43.14},
+  {x:-96.29,z:46.24},{x:-92.4,z:47.39},{x:-88.45,z:48.03},{x:-84.22,z:48.04},{x:-79.69,z:47.91},
+  {x:-75.19,z:47.78},{x:-70.84,z:47.66},{x:-65.81,z:47.52},{x:-61.6,z:47.4},{x:-57.02,z:47.27},
+  {x:-52.07,z:47.13},{x:-47.03,z:47.29},{x:-41.99,z:47.35},{x:-36.96,z:47.21},{x:-31.92,z:47.06},
+  {x:-26.88,z:46.92},{x:-21.84,z:46.78},{x:-16.8,z:46.64},{x:-11.77,z:46.49},{x:-6.73,z:46.35},
+  {x:-1.69,z:46.21},{x:3.35,z:46.07},{x:8.39,z:45.92},{x:13.42,z:45.78},{x:18.46,z:45.64},
+  {x:23.5,z:45.5},{x:28.38,z:45.36},{x:33.01,z:45.23},{x:37.4,z:45.1},{x:41.55,z:44.99},
+  {x:46.71,z:44.84},{x:51.05,z:44.72},{x:55.42,z:44.59},{x:59.74,z:44.61},{x:64.09,z:45.22},
+  {x:67.05,z:47.93},{x:67.8,z:51.98},{x:66.79,z:56.04},{x:65.99,z:60.08},{x:65.54,z:64.13},
+  {x:66.9,z:68.06},{x:70.02,z:70.6},{x:74,z:72.36},{x:78.03,z:71.7},{x:82.12,z:70.95},
+  {x:86.26,z:71.16},{x:81.93,z:70.74},{x:77.87,z:70.61},{x:73.93,z:71.67},{x:71.6,z:75.05},
+  {x:72.46,z:70.99},{x:72.79,z:66.75},{x:72.77,z:62.74},{x:72.58,z:58.36},{x:72.38,z:53.94},
+  {x:72.29,z:49.89},
+];
+
+// ── Project stations ──────────────────────────────────────────────────────────
+// Positions are aligned with where the recorded drive path actually passes.
+// Station 3 (YCT) sits on the z≈-22 road that the recording uses.
 export const STATIONS: { x: number; z: number; icon: string }[] = [
-  { x:  75, z: -40, icon: "🎪" }, // 0 Party Place      — east highway
-  { x: 120, z: -40, icon: "✈️" }, // 1 Maser Travels    — east highway
-  { x: 188, z: -40, icon: "🏦" }, // 2 Loan Mgmt        — end of east highway
-  { x:  25, z: -40, icon: "💳" }, // 3 YCT Microfinance — west highway
-  { x: -88, z: -36, icon: "🏨" }, // 4 Malete Hostels   — near building on west side
-  { x:  92, z:  74, icon: "🍽️" }, // 5 Zennyola Foods   — near building on south road
+  { x:  72, z: -33, icon: "🎪" }, // 0 Party Place      — southbound turnaround
+  { x: 116, z: -40, icon: "✈️" }, // 1 Maser Travels    — east highway south dip
+  { x: 192, z: -40, icon: "🏦" }, // 2 Loan Mgmt        — east highway end
+  { x:  27, z: -22, icon: "💳" }, // 3 YCT Microfinance — z≈-22 road westbound
+  { x: -87, z: -29, icon: "🏨" }, // 4 Malete Hostels   — west side dip
+  { x:  86, z:  71, icon: "🍽️" }, // 5 Zennyola Foods   — south road return
 ];
 
-// ── Road-graph waypoints — every node is on a real city road ─────────────────
-// Branch nodes that were inside buildings / bushes have been removed entirely.
-type RoadNode = { x: number; z: number };
-
-const ROAD_NODES: RoadNode[] = [
-  { x:  72, z: -40 },  //  0  spawn / main junction
-  { x:  75, z: -40 },  //  1  Station 0  (Party Place)
-  { x: 120, z: -40 },  //  2  Station 1  (Maser Travels)
-  { x: 188, z: -40 },  //  3  Station 2  (Loan Mgmt)    — east highway end
-  { x:  25, z: -40 },  //  4  Station 3  (YCT)
-  { x:   0, z: -40 },  //  5  west highway junction
-  { x: -60, z: -40 },  //  6  west highway junction 2
-  { x: -88, z: -36 },  //  7  Station 4  (Malete Hostels) — near building west side
-  { x:  72, z:   0 },  //  8  south road junction 1
-  { x:  72, z:  74 },  //  9  south road junction 2
-  { x:  92, z:  74 },  // 10  Station 5  (Zennyola Foods) — near building south road
-];
-
-// Road edges — every segment travels along a real city road; no building entries
-const ROAD_EDGES: [number, number][] = [
-  // East highway at z = -40
-  [0, 1], [1, 2], [2, 3],
-  // West highway at z = -40
-  [0, 4], [4, 5], [5, 6], [6, 7],
-  // South road (x ≈ 72 → 92)
-  [0, 8], [8, 9], [9, 10],
-];
-
-// BFS to find waypoint path between nearest nodes
-function findRoadPath(
-  sx: number, sz: number,
-  tx: number, tz: number,
-): RoadNode[] {
-  // Nearest start / end node
-  let startN = 0, endN = 0;
-  let minS = Infinity, minE = Infinity;
-  for (let i = 0; i < ROAD_NODES.length; i++) {
-    const n = ROAD_NODES[i];
-    const ds = (sx - n.x) ** 2 + (sz - n.z) ** 2;
-    const de = (tx - n.x) ** 2 + (tz - n.z) ** 2;
-    if (ds < minS) { minS = ds; startN = i; }
-    if (de < minE) { minE = de; endN = i; }
-  }
-
-  if (startN === endN) return [ROAD_NODES[endN]];
-
-  // Build adjacency list
-  const adj: number[][] = ROAD_NODES.map(() => []);
-  for (const [a, b] of ROAD_EDGES) { adj[a].push(b); adj[b].push(a); }
-
-  // BFS
-  const prev = new Array<number>(ROAD_NODES.length).fill(-1);
-  const vis  = new Array<boolean>(ROAD_NODES.length).fill(false);
-  const q = [startN];
-  vis[startN] = true;
-  bfs: while (q.length) {
-    const cur = q.shift()!;
-    if (cur === endN) break bfs;
-    for (const nb of adj[cur]) {
-      if (!vis[nb]) { vis[nb] = true; prev[nb] = cur; q.push(nb); }
-    }
-  }
-
-  // Reconstruct
-  const idxPath: number[] = [];
-  let c = endN;
-  while (c !== -1) { idxPath.unshift(c); c = prev[c]; }
-
-  // All navigation targets are road nodes, so we return the graph path as-is.
-  return idxPath.map(i => ({ ...ROAD_NODES[i] }));
-}
-
-// ── Car colour types ─────────────────────────────────────────────────────────
+// ── Car colour types ──────────────────────────────────────────────────────────
 export type CarColors = {
   body:  string;
   rim:   string;
@@ -100,7 +81,7 @@ export type CarColors = {
   glassOpacity: number;
 };
 
-// ── Theme ────────────────────────────────────────────────────────────────────
+// ── Theme ─────────────────────────────────────────────────────────────────────
 export type Theme = "dark" | "light";
 
 export type ThemeColors = {
@@ -125,7 +106,7 @@ const THEMES: Record<Theme, ThemeColors> = {
   },
 } as const;
 
-// ── City + House GLB ─────────────────────────────────────────────────────────
+// ── City + House GLB ──────────────────────────────────────────────────────────
 function CityModel() {
   const { scene: cityScene  } = useGLTF("/models/city.glb");
   const { scene: houseScene } = useGLTF("/models/house.glb");
@@ -154,8 +135,8 @@ function GroundCircle({
 }: {
   index:   number;
   accent:  string;
-  isNear:  boolean;   // within 15 units — project card + ring brightness
-  isClose: boolean;   // within 30 units — hide floating label
+  isNear:  boolean;
+  isClose: boolean;
 }) {
   const { x, z, icon } = STATIONS[index];
   const project = projects[index];
@@ -173,7 +154,7 @@ function GroundCircle({
 
   return (
     <group>
-      {/* Filled circle — radius reduced to 3.0 so it stays clear of building edges */}
+      {/* Filled circle */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x, ROAD_Y + 0.01, z]}>
         <circleGeometry args={[3.0, 40]} />
         <meshBasicMaterial color={accent} transparent
@@ -186,7 +167,7 @@ function GroundCircle({
         <meshBasicMaterial color={accent} transparent opacity={0.4} depthWrite={false} />
       </mesh>
 
-      {/* Floating name label — hidden when car is close (blocks screen) */}
+      {/* Floating name label */}
       <Html position={[x, ROAD_Y + 8, z]} center distanceFactor={55}
         style={{ pointerEvents: "none" }} zIndexRange={[0, 10]}>
         <div style={{
@@ -209,7 +190,7 @@ function GroundCircle({
         </div>
       </Html>
 
-      {/* Glow light — only when near */}
+      {/* Glow light when near */}
       {isNear && (
         <pointLight position={[x, ROAD_Y + 4, z]} color={accent}
           intensity={40} distance={28} decay={2} />
@@ -350,83 +331,76 @@ const ACCEL       = 140, ACCEL_REV  = 50;
 const DECEL       = 90,  BRAKE_POW  = 8;
 const STEER_SPD   = 1.8, MAX_STEER  = 0.55;
 const TURN_RAD    = 20,  MOV_SCALE  = 0.12;
-const ARRIVE_DIST = 8;
+// Distance to station centre that counts as "arrived" — enough for all stations
+const ARRIVE_DIST = 12;
 const NEAR_DIST   = 15;
 const CLOSE_DIST  = 30;
-
-// Minimum distance (world-units) between consecutive recorded waypoints
-const RECORD_SAMPLE_DIST = 4;
+// Waypoint advance threshold — move to next waypoint when this close
+const WP_REACH_DIST = 3;
 
 const expEaseOut = (k: number) => (k === 1 ? 1 : -Math.pow(2, -10 * k) + 1);
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 // ── Main scene ────────────────────────────────────────────────────────────────
 interface SceneProps {
-  onNearProject:    (idx: number | null) => void;
-  onAtBoundary:     (at: boolean) => void;
-  onAutoArrived:    () => void;
-  onPositionSample?: (x: number, z: number) => void;
-  theme:            Theme;
-  carColors:        CarColors;
-  autopilotTarget:  number | null;
-  isManual:         boolean;
-  isRecording:      boolean;
+  onNearProject:   (idx: number | null) => void;
+  onAtBoundary:    (at: boolean) => void;
+  onAutoArrived:   () => void;
+  theme:           Theme;
+  carColors:       CarColors;
+  autopilotTarget: number | null;  // station index to stop at; null = idle/manual
+  autopilotTourId: number;         // increments each time "Start Tour" is pressed
+  isManual:        boolean;
 }
 
 function Scene({
-  onNearProject, onAtBoundary, onAutoArrived, onPositionSample,
-  theme, carColors, autopilotTarget, isManual, isRecording,
+  onNearProject, onAtBoundary, onAutoArrived,
+  theme, carColors, autopilotTarget, autopilotTourId, isManual,
 }: SceneProps) {
   const t = THEMES[theme];
 
   const carRef       = useRef<THREE.Group>(null!);
-  const posRef       = useRef({ x: 72, z: 80 });
+  const posRef       = useRef({ x: RECORDED_PATH[0].x, z: RECORDED_PATH[0].z });
   const carOrientRef = useRef(0);
   const speedRef     = useRef(0);
   const wheelOrRef   = useRef(0);
   const keysRef      = useRef({ up: false, down: false, left: false, right: false });
-  const camPosRef    = useRef(new THREE.Vector3(72, ROAD_Y + 8, 80 + 16));
-  const camLookRef   = useRef(new THREE.Vector3(72, ROAD_Y + 0.4, 80));
+  const camPosRef    = useRef(new THREE.Vector3(
+    RECORDED_PATH[0].x, ROAD_Y + 8, RECORDED_PATH[0].z + 16,
+  ));
+  const camLookRef   = useRef(new THREE.Vector3(
+    RECORDED_PATH[0].x, ROAD_Y + 0.4, RECORDED_PATH[0].z,
+  ));
   const curProjRef   = useRef<number | null>(null);
   const curCloseRef  = useRef<number | null>(null);
   const atBoundRef   = useRef(false);
   const arrivedRef   = useRef(false);
 
-  // Recording: track last sampled position to enforce minimum distance
-  const lastSampleRef = useRef<{ x: number; z: number } | null>(null);
-
-  // Autopilot waypoint state
-  const waypointPath  = useRef<RoadNode[]>([]);
-  const waypointIdx   = useRef(0);
-  const prevWpPos = useRef<{ x: number; z: number }>({ x: 72, z: 80 });
+  // Waypoint index along RECORDED_PATH — persists across station-to-station drives
+  const waypointIdx = useRef(0);
 
   const [nearIdx,  setNearIdx]  = useState<number | null>(null);
   const [closeIdx, setCloseIdx] = useState<number | null>(null);
 
-  // Compute road path whenever autopilot target changes
+  // Fresh tour start: teleport car to path start and reset waypoint index
   useEffect(() => {
-    arrivedRef.current = false;
-    if (autopilotTarget === null) {
-      waypointPath.current = [];
-      waypointIdx.current  = 0;
-      return;
-    }
-    const target = STATIONS[autopilotTarget];
-    const path = findRoadPath(
-      posRef.current.x, posRef.current.z,
-      target.x, target.z,
-    );
-    waypointPath.current = path;
-    waypointIdx.current  = 0;
-    prevWpPos.current = { x: posRef.current.x, z: posRef.current.z };
-  }, [autopilotTarget]);
+    if (autopilotTarget === null) return;
+    posRef.current      = { x: RECORDED_PATH[0].x, z: RECORDED_PATH[0].z };
+    waypointIdx.current = 0;
+    arrivedRef.current  = false;
+    speedRef.current    = 0;
+    carOrientRef.current = 0;
+    camPosRef.current.set(RECORDED_PATH[0].x, ROAD_Y + 8, RECORDED_PATH[0].z + 16);
+    camLookRef.current.set(RECORDED_PATH[0].x, ROAD_Y + 0.4, RECORDED_PATH[0].z);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autopilotTourId]);
 
-  // When recording starts/stops, reset the last-sample tracker
+  // When station target changes (user pressed Next/Prev), just reset arrived flag
+  // so the car continues from its current waypoint index
   useEffect(() => {
-    if (isRecording) {
-      lastSampleRef.current = null;
-    }
-  }, [isRecording]);
+    if (autopilotTarget === null) return;
+    arrivedRef.current = false;
+  }, [autopilotTarget]);
 
   // Keyboard + d-pad — manual mode only
   useEffect(() => {
@@ -470,45 +444,58 @@ function Scene({
     const dt   = Math.min(delta, 0.05);
     const keys = keysRef.current;
 
-    // ── Autopilot: direct rail movement ──────────────────────────────────────
+    // ── Autopilot: follow RECORDED_PATH, stop at target station ──────────────
     let autopilotMoved = false;
     if (!isManual && autopilotTarget !== null) {
-      const path  = waypointPath.current;
-      let   wpIdx = waypointIdx.current;
       const AUTO_SPEED = 22;
 
-      if (!arrivedRef.current && wpIdx < path.length) {
-        const wp    = path[wpIdx];
-        const dx    = wp.x - posRef.current.x;
-        const dz    = wp.z - posRef.current.z;
-        const dist  = Math.sqrt(dx * dx + dz * dz);
-        const isLast = wpIdx === path.length - 1;
+      if (!arrivedRef.current) {
+        // Check if we've reached the target station
+        const targetSt = STATIONS[autopilotTarget];
+        const sdx = posRef.current.x - targetSt.x;
+        const sdz = posRef.current.z - targetSt.z;
+        const stationDist = Math.sqrt(sdx * sdx + sdz * sdz);
 
-        if (dist < (isLast ? ARRIVE_DIST : 5)) {
-          posRef.current.x = wp.x;
-          posRef.current.z = wp.z;
-          waypointIdx.current++;
-          wpIdx++;
-          if (wpIdx >= path.length) {
-            arrivedRef.current = true;
-            speedRef.current   = 0;
-            keysRef.current    = { up: false, down: false, left: false, right: false };
-            onAutoArrived();
-          }
+        if (stationDist < ARRIVE_DIST) {
+          // Stop at this station
+          arrivedRef.current = true;
+          speedRef.current   = 0;
+          wheelOrRef.current = 0;
+          onAutoArrived();
         } else {
-          const step = Math.min(AUTO_SPEED * dt, dist);
-          posRef.current.x = posRef.current.x + (dx / dist) * step;
-          posRef.current.z = posRef.current.z + (dz / dist) * step;
-          const targetAngle  = Math.atan2(-dx, -dz);
-          const angleDiff    = normaliseAngle(targetAngle - carOrientRef.current);
-          carOrientRef.current += angleDiff * Math.min(dt * 5, 1);
-          speedRef.current = AUTO_SPEED / MOV_SCALE;
-          wheelOrRef.current = THREE.MathUtils.lerp(wheelOrRef.current, 0, Math.min(dt * 4, 1));
+          // Follow the next recorded waypoint
+          let wpIdx = waypointIdx.current;
+          // If we've consumed all waypoints, loop back (tour wraps around)
+          if (wpIdx >= RECORDED_PATH.length) {
+            wpIdx = 0;
+            waypointIdx.current = 0;
+          }
+
+          const wp  = RECORDED_PATH[wpIdx];
+          const dx  = wp.x - posRef.current.x;
+          const dz  = wp.z - posRef.current.z;
+          const dist = Math.sqrt(dx * dx + dz * dz);
+
+          if (dist < WP_REACH_DIST) {
+            // Close enough — advance to next waypoint
+            waypointIdx.current++;
+          } else {
+            const step = Math.min(AUTO_SPEED * dt, dist);
+            posRef.current.x += (dx / dist) * step;
+            posRef.current.z += (dz / dist) * step;
+            const targetAngle = Math.atan2(-dx, -dz);
+            const angleDiff   = normaliseAngle(targetAngle - carOrientRef.current);
+            carOrientRef.current += angleDiff * Math.min(dt * 5, 1);
+            speedRef.current   = AUTO_SPEED / MOV_SCALE;
+            wheelOrRef.current = THREE.MathUtils.lerp(wheelOrRef.current, 0, Math.min(dt * 4, 1));
+          }
         }
-      } else if (arrivedRef.current) {
-        speedRef.current = Math.max(0, speedRef.current - dt * DECEL);
+      } else {
+        // Already arrived — coast to a stop
+        speedRef.current   = Math.max(0, speedRef.current - dt * DECEL);
         wheelOrRef.current = THREE.MathUtils.lerp(wheelOrRef.current, 0, Math.min(dt * 4, 1));
       }
+
       autopilotMoved = true;
     } else if (!isManual && autopilotTarget === null) {
       keys.up = false; keys.down = false; keys.left = false; keys.right = false;
@@ -556,25 +543,6 @@ function Scene({
       const cz = clamp(newZ, CITY_MIN_Z, CITY_MAX_Z);
       if (!isBuilding(cx, posRef.current.z, state.scene, carRef.current)) posRef.current.x = cx;
       if (!isBuilding(posRef.current.x, cz, state.scene, carRef.current)) posRef.current.z = cz;
-    }
-
-    // ── Path recording (manual mode only) ────────────────────────────────────
-    if (isManual && isRecording && onPositionSample) {
-      const { x, z } = posRef.current;
-      const last = lastSampleRef.current;
-      if (last === null) {
-        // Always capture the very first point
-        lastSampleRef.current = { x, z };
-        onPositionSample(x, z);
-      } else {
-        const dx = x - last.x;
-        const dz = z - last.z;
-        const distSq = dx * dx + dz * dz;
-        if (distSq >= RECORD_SAMPLE_DIST * RECORD_SAMPLE_DIST) {
-          lastSampleRef.current = { x, z };
-          onPositionSample(x, z);
-        }
-      }
     }
 
     // ── Sync car mesh ─────────────────────────────────────────────────────────
@@ -626,8 +594,8 @@ function Scene({
     }
 
     // ── Colour-panel boundary ─────────────────────────────────────────────────
-    const dx0 = posRef.current.x - 72;
-    const dz0 = posRef.current.z - (-40);
+    const dx0 = posRef.current.x - RECORDED_PATH[0].x;
+    const dz0 = posRef.current.z - RECORDED_PATH[0].z;
     const atBound = (dx0 * dx0 + dz0 * dz0) < 100;
     if (atBound !== atBoundRef.current) {
       atBoundRef.current = atBound;
@@ -668,25 +636,27 @@ function Scene({
 
 // ── Exported component ────────────────────────────────────────────────────────
 interface ProjectWorldProps {
-  onNearProject:    (idx: number | null) => void;
-  onAtBoundary:     (at: boolean) => void;
-  onAutoArrived:    () => void;
-  onPositionSample?: (x: number, z: number) => void;
-  theme:            Theme;
-  carColors:        CarColors;
-  autopilotTarget:  number | null;
-  isManual:         boolean;
-  isRecording:      boolean;
+  onNearProject:   (idx: number | null) => void;
+  onAtBoundary:    (at: boolean) => void;
+  onAutoArrived:   () => void;
+  theme:           Theme;
+  carColors:       CarColors;
+  autopilotTarget: number | null;
+  autopilotTourId: number;
+  isManual:        boolean;
 }
 
 export default function ProjectWorld({
-  onNearProject, onAtBoundary, onAutoArrived, onPositionSample,
-  theme, carColors, autopilotTarget, isManual, isRecording,
+  onNearProject, onAtBoundary, onAutoArrived,
+  theme, carColors, autopilotTarget, autopilotTourId, isManual,
 }: ProjectWorldProps) {
   const bg = THEMES[theme].bg;
   return (
     <Canvas
-      camera={{ position: [72, ROAD_Y + 8, 80 + 16], fov: 62, near: 0.5, far: 800 }}
+      camera={{
+        position: [RECORDED_PATH[0].x, ROAD_Y + 8, RECORDED_PATH[0].z + 16],
+        fov: 62, near: 0.5, far: 800,
+      }}
       style={{ width: "100%", height: "100%" }}
       gl={{ antialias: false, alpha: false, powerPreference: "high-performance" }}
       dpr={[0.5, 0.9]}
@@ -697,12 +667,11 @@ export default function ProjectWorld({
         onNearProject={onNearProject}
         onAtBoundary={onAtBoundary}
         onAutoArrived={onAutoArrived}
-        onPositionSample={onPositionSample}
         theme={theme}
         carColors={carColors}
         autopilotTarget={autopilotTarget}
+        autopilotTourId={autopilotTourId}
         isManual={isManual}
-        isRecording={isRecording}
       />
     </Canvas>
   );

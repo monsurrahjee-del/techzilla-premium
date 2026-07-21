@@ -65,9 +65,8 @@ export default function Portfolio({ active = false }: PortfolioProps) {
   const [rimIdx,   setRimIdx]   = useState(5);
   const [glassIdx, setGlassIdx] = useState(0);
 
-  // ── Path recording ────────────────────────────────────────────────────────
-  const [isRecording, setIsRecording] = useState(false);
-  const recordedPathRef = useRef<{ x: number; z: number }[]>([]);
+  // ── Tour ID — increments each time "Start Tour" is pressed ──────────────
+  const [tourId, setTourId] = useState(0);
 
   const carColors: CarColors = {
     body:         BODY_COLORS[bodyIdx].hex,
@@ -109,8 +108,6 @@ export default function Portfolio({ active = false }: PortfolioProps) {
     setAutopilotTarget(null);
     setHintHidden(true);
     setColorsHidden(true);
-    // Stop any active recording
-    if (isRecording) stopRecording();
   };
 
   const selectManual = () => {
@@ -134,7 +131,10 @@ export default function Portfolio({ active = false }: PortfolioProps) {
     setAutoPhase("driving");
   }, []);
 
-  const handleStartTour = () => driveToStation(0);
+  const handleStartTour = () => {
+    setTourId(id => id + 1);
+    driveToStation(0);
+  };
 
   const handleNext = () => {
     const next = (autoTargetIdx + 1) % STATIONS.length;
@@ -194,54 +194,6 @@ export default function Portfolio({ active = false }: PortfolioProps) {
     onPointerLeave: () => dpadRelease(key),
   });
 
-  // ── Path recording ────────────────────────────────────────────────────────
-  const startRecording = () => {
-    recordedPathRef.current = [];
-    setIsRecording(true);
-  };
-
-  const stopRecording = () => {
-    setIsRecording(false);
-  };
-
-  const downloadPath = () => {
-    const path = recordedPathRef.current;
-    if (path.length === 0) return;
-
-    // Round coords to 2 decimal places to keep file size small
-    const simplified = path.map(p => ({
-      x: Math.round(p.x * 100) / 100,
-      z: Math.round(p.z * 100) / 100,
-    }));
-
-    const payload = {
-      version: 1,
-      recorded: new Date().toISOString(),
-      pointCount: simplified.length,
-      description: "Manual drive path — send this file to use as the new autopilot route.",
-      waypoints: simplified,
-    };
-
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href     = url;
-    a.download = `drive-path-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleStopAndDownload = () => {
-    stopRecording();
-    // Wait a tick so state settles before we read the ref
-    setTimeout(downloadPath, 50);
-  };
-
-  // Callback passed to ProjectWorld — called every N world-units of travel
-  const handlePositionSample = useCallback((x: number, z: number) => {
-    recordedPathRef.current.push({ x, z });
-  }, []);
-
   const isDark          = theme === "dark";
   const currentProject  = nearIdx !== null ? projects[nearIdx] : null;
   const isManual        = mode === "manual";
@@ -257,12 +209,11 @@ export default function Portfolio({ active = false }: PortfolioProps) {
             onNearProject={handleNear}
             onAtBoundary={handleAtBoundary}
             onAutoArrived={handleAutoArrived}
-            onPositionSample={handlePositionSample}
             theme={theme}
             carColors={carColors}
             autopilotTarget={autopilotTarget}
+            autopilotTourId={tourId}
             isManual={isManual}
-            isRecording={isRecording}
           />
         )}
       </div>
@@ -461,38 +412,6 @@ export default function Portfolio({ active = false }: PortfolioProps) {
             <button className={`${styles.dpadBtn} ${dpadState.down  ? styles.pressed : ""}`} {...makeDpad("down")}  aria-label="Reverse">▼</button>
             <button className={`${styles.dpadBtn} ${dpadState.right ? styles.pressed : ""}`} {...makeDpad("right")} aria-label="Right">▶</button>
           </div>
-        </div>
-      )}
-
-      {/* ── Record button — manual mode only ── */}
-      {isManual && (
-        <div className={styles.recordWrap}>
-          {!isRecording ? (
-            <button
-              className={`${styles.recordBtn} ${isDark ? styles.recordBtnDark : styles.recordBtnLight}`}
-              onClick={startRecording}
-              title="Record your drive path so it can be used as the autopilot route"
-            >
-              {/* Red circle / record icon */}
-              <span className={styles.recordDot} />
-              Record Path
-            </button>
-          ) : (
-            <button
-              className={`${styles.recordBtnActive} ${isDark ? styles.recordBtnActiveDark : styles.recordBtnActiveLight}`}
-              onClick={handleStopAndDownload}
-              title="Stop recording and download the path as JSON"
-            >
-              {/* Blinking indicator */}
-              <span className={styles.recordingIndicator} />
-              Stop & Download
-            </button>
-          )}
-          {isRecording && (
-            <span className={`${styles.recordCount} ${isDark ? styles.recordCountDark : styles.recordCountLight}`}>
-              Recording…
-            </span>
-          )}
         </div>
       )}
 
