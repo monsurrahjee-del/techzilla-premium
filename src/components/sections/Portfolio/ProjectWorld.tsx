@@ -6,54 +6,66 @@ import { useGLTF, Html } from "@react-three/drei";
 import * as THREE from "three";
 import { projects } from "@/lib/projects";
 
-// ── Road surface Y (matches YUKA path y=20.75) ───────────────────────────────
+// ── Road surface Y ────────────────────────────────────────────────────────────
 const ROAD_Y = 20.75;
 
-// ── Project stations — every position is a confirmed road node ───────────────
-// Circles sit ON the road so the car never needs to leave it to reach them.
+// ── Project stations — visual circle positions (at/near building entrances) ───
+// These are DISPLAY positions only. The car navigates to "approach nodes" on
+// the road that are within NEAR_DIST of each station, never to the station
+// position itself (which may sit at a building boundary).
 export const STATIONS: { x: number; z: number; icon: string }[] = [
-  { x:  75, z: -40, icon: "🎪" }, // 0 Party Place      — east highway
-  { x: 120, z: -40, icon: "✈️" }, // 1 Maser Travels    — east highway
-  { x: 188, z: -40, icon: "🏦" }, // 2 Loan Mgmt        — end of east highway
-  { x:  25, z: -40, icon: "💳" }, // 3 YCT Microfinance — west highway
-  { x: -92, z: -40, icon: "🏨" }, // 4 Malete Hostels   — end of west highway
-  { x:  92, z:  80, icon: "🍽️" }, // 5 Zennyola Foods   — south road
+  { x:  75, z: -40, icon: "🎪" }, // 0 Party Place
+  { x: 120, z: -40, icon: "✈️" }, // 1 Maser Travels
+  { x: 188, z: -40, icon: "🏦" }, // 2 Loan Mgmt
+  { x:  25, z: -40, icon: "💳" }, // 3 YCT Microfinance
+  { x: -92, z: -40, icon: "🏨" }, // 4 Malete Hostels
+  { x:  92, z:  80, icon: "🍽️" }, // 5 Zennyola Foods
 ];
 
-// ── Road-graph waypoints — every node is on a real city road ─────────────────
-// Branch nodes that were inside buildings / bushes have been removed entirely.
+// ── Road graph nodes ──────────────────────────────────────────────────────────
+// Every node is on a confirmed open road surface — never inside a building.
+// Approach nodes are positioned so they are:
+//   • reachable without entering any building
+//   • within NEAR_DIST (15 units) of the station circle → project card triggers
+//   • close enough for the car to visually "touch" the circle (radius 4.5)
+//
+//  Station ↔ Nearest approach node distances:
+//   Party Place  (x=75)  → node 0 (x=72):  dist = 3   ← inside circle radius ✓
+//   Maser        (x=120) → node 1 (x=112): dist = 8   < 15 ✓
+//   Loan Mgmt    (x=188) → node 2 (x=178): dist = 10  < 15 ✓
+//   YCT          (x=25)  → node 3 (x=34):  dist = 9   < 15 ✓
+//   Malete       (x=-92) → node 6 (x=-82): dist = 10  < 15 ✓
+//   Zennyola     (x=92,z=80) → node 9 (x=84,z=80): dist = 8 < 15 ✓
 type RoadNode = { x: number; z: number };
 
 const ROAD_NODES: RoadNode[] = [
-  { x:  72, z: -40 },  //  0  spawn / main junction
-  { x:  75, z: -40 },  //  1  Station 0  (Party Place)
-  { x: 120, z: -40 },  //  2  Station 1  (Maser Travels)
-  { x: 188, z: -40 },  //  3  Station 2  (Loan Mgmt)    — east highway end
-  { x:  25, z: -40 },  //  4  Station 3  (YCT)
-  { x:   0, z: -40 },  //  5  west highway junction
-  { x: -60, z: -40 },  //  6  west highway junction 2
-  { x: -92, z: -40 },  //  7  Station 4  (Malete Hostels) — west highway end
-  { x:  72, z:   0 },  //  8  south road junction 1
-  { x:  72, z:  80 },  //  9  south road junction 2
-  { x:  92, z:  80 },  // 10  Station 5  (Zennyola Foods) — south road end
+  { x:  72, z: -40 },  // 0  E/W junction — also Party Place approach
+  { x: 112, z: -40 },  // 1  Maser Travels approach
+  { x: 178, z: -40 },  // 2  Loan Mgmt approach
+  { x:  34, z: -40 },  // 3  YCT approach
+  { x:   0, z: -40 },  // 4  west junction
+  { x: -60, z: -40 },  // 5  west junction 2
+  { x: -82, z: -40 },  // 6  Malete Hostels approach
+  { x:  72, z:   0 },  // 7  south junction 1
+  { x:  72, z:  80 },  // 8  south junction 2 / spawn
+  { x:  84, z:  80 },  // 9  Zennyola Foods approach
 ];
 
-// Road edges — every segment travels along a real city road; no building entries
+// Every edge stays on a real road surface — no building corridors
 const ROAD_EDGES: [number, number][] = [
   // East highway at z = -40
-  [0, 1], [1, 2], [2, 3],
+  [0, 1], [1, 2],
   // West highway at z = -40
-  [0, 4], [4, 5], [5, 6], [6, 7],
-  // South road (x ≈ 72 → 92)
-  [0, 8], [8, 9], [9, 10],
+  [0, 3], [3, 4], [4, 5], [5, 6],
+  // South road (x≈72 southward, then east to Zennyola)
+  [0, 7], [7, 8], [8, 9],
 ];
 
-// BFS to find waypoint path between nearest nodes
+// BFS shortest path between the nearest road nodes to (sx,sz) and (tx,tz)
 function findRoadPath(
   sx: number, sz: number,
   tx: number, tz: number,
 ): RoadNode[] {
-  // Nearest start / end node
   let startN = 0, endN = 0;
   let minS = Infinity, minE = Infinity;
   for (let i = 0; i < ROAD_NODES.length; i++) {
@@ -61,16 +73,14 @@ function findRoadPath(
     const ds = (sx - n.x) ** 2 + (sz - n.z) ** 2;
     const de = (tx - n.x) ** 2 + (tz - n.z) ** 2;
     if (ds < minS) { minS = ds; startN = i; }
-    if (de < minE) { minE = de; endN = i; }
+    if (de < minE) { minE = de; endN   = i; }
   }
 
   if (startN === endN) return [ROAD_NODES[endN]];
 
-  // Build adjacency list
   const adj: number[][] = ROAD_NODES.map(() => []);
   for (const [a, b] of ROAD_EDGES) { adj[a].push(b); adj[b].push(a); }
 
-  // BFS
   const prev = new Array<number>(ROAD_NODES.length).fill(-1);
   const vis  = new Array<boolean>(ROAD_NODES.length).fill(false);
   const q = [startN];
@@ -83,36 +93,23 @@ function findRoadPath(
     }
   }
 
-  // Reconstruct
   const idxPath: number[] = [];
   let c = endN;
   while (c !== -1) { idxPath.unshift(c); c = prev[c]; }
-
-  // All navigation targets are road nodes, so we return the graph path as-is.
-  // We never append the raw target coords — that was the old source of off-road travel.
   return idxPath.map(i => ({ ...ROAD_NODES[i] }));
 }
 
-// ── Car colour types ─────────────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────────────
 export type CarColors = {
   body:  string;
   rim:   string;
   glass: string;
   glassOpacity: number;
 };
-
-// ── Theme ────────────────────────────────────────────────────────────────────
 export type Theme = "dark" | "light";
-
 export type ThemeColors = {
-  bg:         string;
-  ambientInt: number;
-  ambientCol: string;
-  dirInt:     number;
-  dirCol:     string;
-  fogCol:     string;
-  fogNear:    number;
-  fogFar:     number;
+  bg: string; ambientInt: number; ambientCol: string;
+  dirInt: number; dirCol: string; fogCol: string; fogNear: number; fogFar: number;
 };
 
 const THEMES: Record<Theme, ThemeColors> = {
@@ -126,7 +123,7 @@ const THEMES: Record<Theme, ThemeColors> = {
   },
 } as const;
 
-// ── City + House GLB ─────────────────────────────────────────────────────────
+// ── City + House GLB ──────────────────────────────────────────────────────────
 function CityModel() {
   const { scene: cityScene  } = useGLTF("/models/city.glb");
   const { scene: houseScene } = useGLTF("/models/house.glb");
@@ -148,69 +145,48 @@ function CityModel() {
 
 // ── Ground circle ─────────────────────────────────────────────────────────────
 function GroundCircle({
-  index,
-  accent,
-  isNear,
-  isClose,
+  index, accent, isNear, isClose,
 }: {
-  index:   number;
-  accent:  string;
-  isNear:  boolean;   // within 15 units — project card + ring brightness
-  isClose: boolean;   // within 30 units — hide floating label
+  index: number; accent: string; isNear: boolean; isClose: boolean;
 }) {
   const { x, z, icon } = STATIONS[index];
   const project = projects[index];
   const ringRef = useRef<THREE.Mesh>(null!);
-  const tmr     = useRef(Math.random() * Math.PI * 2);
+  const tmr = useRef(Math.random() * Math.PI * 2);
 
   useFrame((_, delta) => {
     tmr.current += delta * 1.6;
     if (!ringRef.current) return;
-    const s = 1 + Math.sin(tmr.current) * 0.12;
-    ringRef.current.scale.setScalar(s);
+    ringRef.current.scale.setScalar(1 + Math.sin(tmr.current) * 0.12);
     const mat = ringRef.current.material as THREE.MeshBasicMaterial;
     mat.opacity = (isNear ? 0.85 : 0.40) + Math.sin(tmr.current) * 0.12;
   });
 
   return (
     <group>
-      {/* Filled circle */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x, ROAD_Y + 0.01, z]}>
         <circleGeometry args={[4.5, 40]} />
         <meshBasicMaterial color={accent} transparent
           opacity={isNear ? 0.50 : 0.18} depthWrite={false} />
       </mesh>
-
-      {/* Pulsing outer ring */}
       <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[x, ROAD_Y + 0.02, z]}>
         <ringGeometry args={[4.7, 5.8, 40]} />
         <meshBasicMaterial color={accent} transparent opacity={0.4} depthWrite={false} />
       </mesh>
-
-      {/* Floating name label — hidden when car is close (blocks screen) */}
       <Html position={[x, ROAD_Y + 8, z]} center distanceFactor={55}
         style={{ pointerEvents: "none" }} zIndexRange={[0, 10]}>
         <div style={{
-          background: `${accent}55`,
-          border: `1.5px solid ${accent}`,
-          borderRadius: "8px",
-          padding: "5px 12px",
-          color: "#fff",
-          fontSize: "12px",
-          fontWeight: 700,
-          whiteSpace: "nowrap",
+          background: `${accent}55`, border: `1.5px solid ${accent}`,
+          borderRadius: "8px", padding: "5px 12px", color: "#fff",
+          fontSize: "12px", fontWeight: 700, whiteSpace: "nowrap",
           fontFamily: "system-ui, -apple-system, sans-serif",
-          textShadow: "0 1px 3px rgba(0,0,0,0.9)",
-          letterSpacing: "0.02em",
-          opacity:    isClose ? 0 : 1,
-          transition: "opacity 0.4s ease",
+          textShadow: "0 1px 3px rgba(0,0,0,0.9)", letterSpacing: "0.02em",
+          opacity: isClose ? 0 : 1, transition: "opacity 0.4s ease",
           pointerEvents: "none",
         }}>
           {icon} {project.title}
         </div>
       </Html>
-
-      {/* Glow light — only when near */}
       {isNear && (
         <pointLight position={[x, ROAD_Y + 4, z]} color={accent}
           intensity={40} distance={28} decay={2} />
@@ -221,9 +197,9 @@ function GroundCircle({
 
 // ── Ferrari car ───────────────────────────────────────────────────────────────
 function Car({ carRef, colors, theme }: {
-  carRef:  React.RefObject<THREE.Group>;
-  colors:  CarColors;
-  theme:   Theme;
+  carRef: React.RefObject<THREE.Group>;
+  colors: CarColors;
+  theme:  Theme;
 }) {
   const frontAxleRef = useRef<THREE.Group>(null!);
   const wheelFLRoot  = useRef<THREE.Object3D | null>(null);
@@ -241,8 +217,8 @@ function Car({ carRef, colors, theme }: {
     const frRoot = carScene.getObjectByName("wheel_fr");
     wheelFLRoot.current = flRoot ?? null;
     wheelFRRoot.current = frRoot ?? null;
-    wheelRL.current     = carScene.getObjectByName("wheel_rl") ?? null;
-    wheelRR.current     = carScene.getObjectByName("wheel_rr") ?? null;
+    wheelRL.current = carScene.getObjectByName("wheel_rl") ?? null;
+    wheelRR.current = carScene.getObjectByName("wheel_rr") ?? null;
 
     if (flRoot) {
       const inner = flInner.current;
@@ -256,7 +232,6 @@ function Car({ carRef, colors, theme }: {
       while (frRoot.children.length) inner.add(frRoot.children[0]);
       frRoot.add(inner);
     }
-
     (carRef as any).__frontAxle = frontAxleRef;
     (carRef as any).__speedRef  = { current: 0 };
   }, [carScene, carRef]);
@@ -270,7 +245,6 @@ function Car({ carRef, colors, theme }: {
     const glassPart = carScene.getObjectByName("glass") as THREE.Mesh | undefined;
     if (bodyPart?.isMesh)  bodyPart.material  = bodyMat;
     if (glassPart?.isMesh) glassPart.material = glassMat;
-
     (["rim_fl","rim_fr","rim_rr","rim_rl","trim"] as const).forEach(name => {
       const part = carScene.getObjectByName(name) as THREE.Mesh | undefined;
       if (part?.isMesh) part.material = rimMat;
@@ -283,7 +257,7 @@ function Car({ carRef, colors, theme }: {
     const dt  = Math.min(delta, 0.05);
     const spd = (carRef as any).__speedRef?.current ?? 0;
     const WHEEL_DIAM = 0.66;
-    const angDelta   = (spd * dt * 0.12) * (2 / WHEEL_DIAM);
+    const angDelta = (spd * dt * 0.12) * (2 / WHEEL_DIAM);
     flInner.current.rotation.x -= angDelta;
     frInner.current.rotation.x -= angDelta;
     if (wheelRL.current) wheelRL.current.rotation.x -= angDelta;
@@ -313,17 +287,15 @@ function Car({ carRef, colors, theme }: {
 }
 
 // ── Building-collision detector ───────────────────────────────────────────────
-// Shoots a ray straight down from above the proposed (x, z) position.
-// Hits road surface at Y ≈ ROAD_Y; hits a building/bush roof at Y > ROAD_Y.
-// Returns true when the position is occupied by a structure taller than the road.
+// Casts a ray straight down from above (x, z). Road surface hits at Y ≈ ROAD_Y;
+// a building/bush roof hits at Y > ROAD_Y + BLDG_Y_MARGIN.
 const _bcRay    = new THREE.Raycaster();
 const _bcDown   = new THREE.Vector3(0, -1, 0);
 const _bcOrigin = new THREE.Vector3();
-const BLDG_Y_MARGIN = 1.5; // anything whose surface is > ROAD_Y + 1.5 is a building
+const BLDG_Y_MARGIN = 1.5;
 
 function isBuilding(
-  x: number,
-  z: number,
+  x: number, z: number,
   scene: THREE.Scene,
   excludeObj?: THREE.Object3D | null,
 ): boolean {
@@ -333,7 +305,7 @@ function isBuilding(
     ? scene.children.filter(c => c !== excludeObj)
     : scene.children;
   const hits = _bcRay.intersectObjects(targets, true);
-  if (hits.length === 0) return false;             // open air → treat as clear
+  if (hits.length === 0) return false; // open air → clear
   return hits[0].point.y > ROAD_Y + BLDG_Y_MARGIN;
 }
 
@@ -350,26 +322,31 @@ function normaliseAngle(a: number): number {
 // ── Scene constants ───────────────────────────────────────────────────────────
 const CITY_MIN_X = -120, CITY_MAX_X = 210, CITY_MIN_Z = -110, CITY_MAX_Z = 130;
 const MAX_SPEED   = 280, MAX_SPD_REV = -70;
-const ACCEL       = 140, ACCEL_REV  = 50;
-const DECEL       = 90,  BRAKE_POW  = 8;
-const STEER_SPD   = 1.8, MAX_STEER  = 0.55;
-const TURN_RAD    = 20,  MOV_SCALE  = 0.12;
-const ARRIVE_DIST = 8;   // stop within 8 units of waypoint
-const NEAR_DIST   = 15;  // project card trigger
+const ACCEL       = 140, ACCEL_REV   = 50;
+const DECEL       = 90,  BRAKE_POW   = 8;
+const STEER_SPD   = 1.8, MAX_STEER   = 0.55;
+const TURN_RAD    = 20,  MOV_SCALE   = 0.12;
+// Arrive at last waypoint when within this many units.
+// 12 units gives a comfortable road-stop before any building boundary.
+const ARRIVE_DIST = 12;
+const NEAR_DIST   = 15;  // project card trigger distance
 const CLOSE_DIST  = 30;  // label hide threshold
+// If the autopilot has been blocked by a building for this many seconds,
+// declare "arrived" (last waypoint) or advance (intermediate waypoint).
+const STUCK_TIMEOUT = 0.5;
 
 const expEaseOut = (k: number) => (k === 1 ? 1 : -Math.pow(2, -10 * k) + 1);
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 // ── Main scene ────────────────────────────────────────────────────────────────
 interface SceneProps {
-  onNearProject:    (idx: number | null) => void;
-  onAtBoundary:     (at: boolean) => void;
-  onAutoArrived:    () => void;
-  theme:            Theme;
-  carColors:        CarColors;
-  autopilotTarget:  number | null;
-  isManual:         boolean;
+  onNearProject:   (idx: number | null) => void;
+  onAtBoundary:    (at: boolean) => void;
+  onAutoArrived:   () => void;
+  theme:           Theme;
+  carColors:       CarColors;
+  autopilotTarget: number | null;
+  isManual:        boolean;
 }
 
 function Scene({
@@ -379,8 +356,8 @@ function Scene({
   const t = THEMES[theme];
 
   const carRef       = useRef<THREE.Group>(null!);
-  // Spawn on the south road (node 9) — well behind Party Place so the tour
-  // drives a visible route: south road → main junction → east highway → Party Place.
+  // Spawn at south road node 8 — well behind Party Place so the tour
+  // drives a visible route: south road → junction → east highway → stations.
   const posRef       = useRef({ x: 72, z: 80 });
   const carOrientRef = useRef(0);
   const speedRef     = useRef(0);
@@ -392,37 +369,33 @@ function Scene({
   const curCloseRef  = useRef<number | null>(null);
   const atBoundRef   = useRef(false);
   const arrivedRef   = useRef(false);
+  // Seconds the autopilot has been blocked by a building on the current segment
+  const stuckTimerRef = useRef(0);
 
-  // Autopilot waypoint state
-  const waypointPath  = useRef<RoadNode[]>([]);
-  const waypointIdx   = useRef(0);
-  // Tracks the START of the current road segment so we can rail-snap during autopilot
-  const prevWpPos = useRef<{ x: number; z: number }>({ x: 72, z: 80 });
+  const waypointPath = useRef<RoadNode[]>([]);
+  const waypointIdx  = useRef(0);
 
   const [nearIdx,  setNearIdx]  = useState<number | null>(null);
   const [closeIdx, setCloseIdx] = useState<number | null>(null);
 
-  // Compute road path whenever autopilot target changes
+  // Recompute road path whenever autopilot target changes
   useEffect(() => {
-    arrivedRef.current = false;
+    arrivedRef.current    = false;
+    stuckTimerRef.current = 0;
     if (autopilotTarget === null) {
       waypointPath.current = [];
       waypointIdx.current  = 0;
       return;
     }
     const target = STATIONS[autopilotTarget];
-    const path = findRoadPath(
+    waypointPath.current = findRoadPath(
       posRef.current.x, posRef.current.z,
       target.x, target.z,
     );
-    waypointPath.current = path;
-    waypointIdx.current  = 0;
-    // Seed prevWpPos to the car's current position so the first rail segment
-    // runs from here → path[0], keeping us on-road from the very first frame.
-    prevWpPos.current = { x: posRef.current.x, z: posRef.current.z };
+    waypointIdx.current = 0;
   }, [autopilotTarget]);
 
-  // Keyboard + d-pad — manual mode only
+  // Keyboard
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (!isManual) return;
@@ -455,7 +428,6 @@ function Scene({
     };
   }, [isManual]);
 
-  // Clear keys when switching to manual
   useEffect(() => {
     if (isManual) keysRef.current = { up: false, down: false, left: false, right: false };
   }, [isManual]);
@@ -464,64 +436,113 @@ function Scene({
     const dt   = Math.min(delta, 0.05);
     const keys = keysRef.current;
 
-    // ── Autopilot: direct rail movement (physics-free, cannot enter buildings) ──
-    // The car's position is moved purely along the straight line between road
-    // nodes — no steering drift, no physics lag, geometrically on-road always.
+    // ── AUTOPILOT ─────────────────────────────────────────────────────────────
     let autopilotMoved = false;
+
     if (!isManual && autopilotTarget !== null) {
-      const path  = waypointPath.current;
-      let   wpIdx = waypointIdx.current;
+      autopilotMoved = true;
+      const path   = waypointPath.current;
+      let   wpIdx  = waypointIdx.current;
       const AUTO_SPEED = 22; // world-units / second
 
       if (!arrivedRef.current && wpIdx < path.length) {
-        const wp    = path[wpIdx];
-        const dx    = wp.x - posRef.current.x;
-        const dz    = wp.z - posRef.current.z;
-        const dist  = Math.sqrt(dx * dx + dz * dz);
+        const wp     = path[wpIdx];
+        const dx     = wp.x - posRef.current.x;
+        const dz     = wp.z - posRef.current.z;
+        const dist   = Math.sqrt(dx * dx + dz * dz);
         const isLast = wpIdx === path.length - 1;
 
         if (dist < (isLast ? ARRIVE_DIST : 5)) {
-          // Arrived at this waypoint — snap exactly to it and advance
-          posRef.current.x = wp.x;
-          posRef.current.z = wp.z;
-          waypointIdx.current++;
-          wpIdx++;
-          if (wpIdx >= path.length) {
-            arrivedRef.current = true;
-            speedRef.current   = 0;
-            keysRef.current    = { up: false, down: false, left: false, right: false };
+          // ── Close enough to this waypoint ──────────────────────────────────
+          if (isLast) {
+            // FINAL waypoint — only move car to this position if it is clear.
+            // This prevents teleporting into a building on the snap.
+            if (!isBuilding(wp.x, wp.z, state.scene, carRef.current)) {
+              posRef.current.x = wp.x;
+              posRef.current.z = wp.z;
+            }
+            // Declare arrived regardless (car stays on road if wp was a building)
+            arrivedRef.current    = true;
+            speedRef.current      = 0;
+            stuckTimerRef.current = 0;
+            keysRef.current       = { up: false, down: false, left: false, right: false };
             onAutoArrived();
+          } else {
+            // INTERMEDIATE waypoint — snap and advance; no building check needed
+            // because BFS intermediate nodes are all on confirmed road segments.
+            posRef.current.x      = wp.x;
+            posRef.current.z      = wp.z;
+            stuckTimerRef.current = 0;
+            waypointIdx.current++;
+            wpIdx++;
+            if (wpIdx >= path.length) {
+              // Edge-case guard (path ran out after advancing)
+              arrivedRef.current = true;
+              speedRef.current   = 0;
+              onAutoArrived();
+            }
           }
         } else {
-          // Move directly along segment — no physics, no drift.
-          // The road graph is pre-validated to only pass through real road
-          // segments, so we trust it unconditionally — no building check here.
-          // (Building checks caused the car to stop short or skip waypoints
-          //  when a road node happened to overlap a building collider.)
-          const step = Math.min(AUTO_SPEED * dt, dist);
-          posRef.current.x = posRef.current.x + (dx / dist) * step;
-          posRef.current.z = posRef.current.z + (dz / dist) * step;
-          // Smoothly rotate car to face travel direction
-          const targetAngle  = Math.atan2(-dx, -dz);
-          const angleDiff    = normaliseAngle(targetAngle - carOrientRef.current);
+          // ── Still traveling toward waypoint ────────────────────────────────
+          // Always face the waypoint
+          const targetAngle = Math.atan2(-dx, -dz);
+          const angleDiff   = normaliseAngle(targetAngle - carOrientRef.current);
           carOrientRef.current += angleDiff * Math.min(dt * 5, 1);
-          // Keep wheel-spin animation proportional to speed
-          speedRef.current = AUTO_SPEED / MOV_SCALE;
-          // Smoothly straighten front wheels (since we're controlling heading directly)
-          wheelOrRef.current = THREE.MathUtils.lerp(wheelOrRef.current, 0, Math.min(dt * 4, 1));
+          wheelOrRef.current    = THREE.MathUtils.lerp(wheelOrRef.current, 0, Math.min(dt * 4, 1));
+
+          const step      = Math.min(AUTO_SPEED * dt, dist);
+          const proposedX = posRef.current.x + (dx / dist) * step;
+          const proposedZ = posRef.current.z + (dz / dist) * step;
+
+          if (!isBuilding(proposedX, proposedZ, state.scene, carRef.current)) {
+            // ── Road is clear — move forward ──────────────────────────────
+            posRef.current.x      = proposedX;
+            posRef.current.z      = proposedZ;
+            stuckTimerRef.current = 0;
+            speedRef.current      = AUTO_SPEED / MOV_SCALE;
+          } else {
+            // ── Building detected — FREEZE (do NOT skip the waypoint) ──────
+            // Slow car to a halt visually while blocked.
+            speedRef.current      = Math.max(0, speedRef.current - dt * DECEL * 3);
+            stuckTimerRef.current += dt;
+
+            if (stuckTimerRef.current >= STUCK_TIMEOUT) {
+              // Stuck too long — resolve:
+              stuckTimerRef.current = 0;
+              if (isLast) {
+                // Car is stopped at the building wall just outside the station.
+                // The circle is touching distance (approach nodes ensure this).
+                arrivedRef.current = true;
+                speedRef.current   = 0;
+                keysRef.current    = { up: false, down: false, left: false, right: false };
+                onAutoArrived();
+              } else {
+                // Intermediate waypoint is blocked — advance WITHOUT teleporting.
+                // The car stays at its current (road-side) position and aims
+                // for the next waypoint from there.
+                waypointIdx.current++;
+                wpIdx++;
+                if (wpIdx >= path.length) {
+                  arrivedRef.current = true;
+                  speedRef.current   = 0;
+                  onAutoArrived();
+                }
+              }
+            }
+          }
         }
       } else if (arrivedRef.current) {
-        // Gently coast to a halt
-        speedRef.current = Math.max(0, speedRef.current - dt * DECEL);
+        // Coast to a halt
+        speedRef.current   = Math.max(0, speedRef.current - dt * DECEL);
         wheelOrRef.current = THREE.MathUtils.lerp(wheelOrRef.current, 0, Math.min(dt * 4, 1));
       }
-      autopilotMoved = true;
     } else if (!isManual && autopilotTarget === null) {
       keys.up = false; keys.down = false; keys.left = false; keys.right = false;
     }
 
+    // ── MANUAL ────────────────────────────────────────────────────────────────
     if (!autopilotMoved) {
-      // ── Speed (manual) ──────────────────────────────────────────────────────
+      // Speed
       if (keys.up) {
         speedRef.current = clamp(speedRef.current + dt * ACCEL, MAX_SPD_REV, MAX_SPEED);
       }
@@ -542,7 +563,7 @@ function Scene({
         }
       }
 
-      // ── Steering (manual) ───────────────────────────────────────────────────
+      // Steering
       if (keys.left)  wheelOrRef.current = clamp(wheelOrRef.current + dt * STEER_SPD, -MAX_STEER, MAX_STEER);
       if (keys.right) wheelOrRef.current = clamp(wheelOrRef.current - dt * STEER_SPD, -MAX_STEER, MAX_STEER);
       if (!keys.left && !keys.right) {
@@ -553,12 +574,11 @@ function Scene({
         }
       }
 
-      // ── Movement (manual) ───────────────────────────────────────────────────
+      // Movement + axis-separated building check (sliding along walls)
       const forwardDelta = -speedRef.current * dt * MOV_SCALE;
       carOrientRef.current -= (forwardDelta * TURN_RAD * 0.02) * wheelOrRef.current;
       const newX = posRef.current.x + Math.sin(carOrientRef.current) * forwardDelta;
       const newZ = posRef.current.z + Math.cos(carOrientRef.current) * forwardDelta;
-      // Axis-separated building check: allow sliding along a wall
       const cx = clamp(newX, CITY_MIN_X, CITY_MAX_X);
       const cz = clamp(newZ, CITY_MIN_Z, CITY_MAX_Z);
       if (!isBuilding(cx, posRef.current.z, state.scene, carRef.current)) posRef.current.x = cx;
@@ -583,19 +603,16 @@ function Scene({
       camHeight,
       posRef.current.z + Math.cos(carOrientRef.current) * camDist,
     );
-    const alphaPos  = 1 - Math.exp(-10 * dt);
-    const alphaLook = 1 - Math.exp(-12 * dt);
-    camPosRef.current.lerp(_camTarget, alphaPos);
+    camPosRef.current.lerp(_camTarget, 1 - Math.exp(-10 * dt));
     state.camera.position.copy(camPosRef.current);
     _lookTarget.set(posRef.current.x, ROAD_Y + 0.4, posRef.current.z);
-    camLookRef.current.lerp(_lookTarget, alphaLook);
+    camLookRef.current.lerp(_lookTarget, 1 - Math.exp(-12 * dt));
     state.camera.lookAt(camLookRef.current);
 
-    // ── Project proximity (card trigger: 15, label hide: 30) ─────────────────
+    // ── Project proximity ─────────────────────────────────────────────────────
     let nearest: number | null = null;
     let nearestClose: number | null = null;
-    let minDist = Infinity;
-    let minClose = Infinity;
+    let minDist = Infinity, minClose = Infinity;
     for (let i = 0; i < STATIONS.length; i++) {
       const dx   = posRef.current.x - STATIONS[i].x;
       const dz   = posRef.current.z - STATIONS[i].z;
@@ -632,23 +649,16 @@ function Scene({
         <pointLight position={[72, ROAD_Y + 30, -40]} color="#6080ff"
           intensity={4} distance={200} decay={1} />
       )}
-
       <Suspense fallback={null}><CityModel /></Suspense>
-
       {projects.map((p, i) => (
         <GroundCircle
-          key={i}
-          index={i}
-          accent={p.accent}
-          isNear={nearIdx  === i}
-          isClose={closeIdx === i}
+          key={i} index={i} accent={p.accent}
+          isNear={nearIdx === i} isClose={closeIdx === i}
         />
       ))}
-
       <Suspense fallback={null}>
         <Car carRef={carRef} colors={carColors} theme={theme} />
       </Suspense>
-
       <fog attach="fog" args={[t.fogCol, t.fogNear, t.fogFar]} />
     </>
   );
