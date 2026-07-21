@@ -21,16 +21,6 @@ const STATIONS: { x: number; z: number; icon: string }[] = [
   { x:  92, z: 108, icon: "🍽️" }, // 5 Zennyola Foods — restaurant (north road)
 ];
 
-// ── Approximate building block zones — car cannot cut through these ──────────
-// These are the interior city-block areas between the YUKA road loop segments.
-// [minX, minZ, maxX, maxZ]
-const BUILDING_BOXES: [number, number, number, number][] = [
-  [84,  -54, 110,  -4],  // Central block (between x=72 and x=115 roads)
-  [120, -54, 182, -30],  // East inner block (between z=-22.5 and z=-63.5 roads)
-  [-88, -80,  62, 102],  // Large west-centre interior block
-  [120, -80, 182, -66],  // South-east small block
-];
-const BOX_MARGIN = 3; // car clearance buffer in world units
 
 // ── Car colour types ─────────────────────────────────────────────────────────
 export type CarColors = {
@@ -445,36 +435,8 @@ function Scene({ onNearProject, onAtBoundary, theme, carColors }: SceneProps) {
     const newX = posRef.current.x + Math.sin(carOrientRef.current) * forwardDelta;
     const newZ = posRef.current.z + Math.cos(carOrientRef.current) * forwardDelta;
 
-    // ── Building collision ────────────────────────────────────────────────────
-    let resolvedX = clamp(newX, CITY_MIN_X, CITY_MAX_X);
-    let resolvedZ = clamp(newZ, CITY_MIN_Z, CITY_MAX_Z);
-    let bounced   = false;
-
-    for (const [minX, minZ, maxX, maxZ] of BUILDING_BOXES) {
-      const bx1 = minX - BOX_MARGIN;
-      const bz1 = minZ - BOX_MARGIN;
-      const bx2 = maxX + BOX_MARGIN;
-      const bz2 = maxZ + BOX_MARGIN;
-
-      if (resolvedX > bx1 && resolvedX < bx2 && resolvedZ > bz1 && resolvedZ < bz2) {
-        // Push to nearest edge
-        const dL = resolvedX - bx1;
-        const dR = bx2 - resolvedX;
-        const dT = resolvedZ - bz1;
-        const dB = bz2 - resolvedZ;
-        const m  = Math.min(dL, dR, dT, dB);
-        if      (m === dL) resolvedX = bx1;
-        else if (m === dR) resolvedX = bx2;
-        else if (m === dT) resolvedZ = bz1;
-        else               resolvedZ = bz2;
-        bounced = true;
-        break;
-      }
-    }
-
-    posRef.current.x = resolvedX;
-    posRef.current.z = resolvedZ;
-    if (bounced) speedRef.current *= -0.15; // light bounce-back
+    posRef.current.x = clamp(newX, CITY_MIN_X, CITY_MAX_X);
+    posRef.current.z = clamp(newZ, CITY_MIN_Z, CITY_MAX_Z);
 
     // ── Sync car mesh ─────────────────────────────────────────────────────────
     if (carRef.current) {
