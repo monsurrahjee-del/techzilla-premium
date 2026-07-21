@@ -1,28 +1,36 @@
 "use client";
 
 import { useRef, useEffect, useState, useMemo, Suspense } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { useGLTF, Html } from "@react-three/drei";
 import * as THREE from "three";
 import { projects } from "@/lib/projects";
 
-// ── Road surface Y — matches YUKA path y=20.75 from 3d-city-tour ────────────
+// ── Road surface Y (matches YUKA path y=20.75) ───────────────────────────────
 const ROAD_Y = 20.75;
 
-// ── 6 project stations distributed around the city road loop ─────────────────
-// nx, nz = outward normal the billboard FACE points toward (toward the road/viewer)
-// Positions come from the YUKA waypoint network (city at scale 5):
-//   Loop: [72,-40] → [72,7.85] → [115,7.85] → [115,-22.5] → [192,-22.5]
-//         → [192,-88] → bridge → [-93.5,-88] → [-100,-88] → [-100,112]
-//         → [192.5,112] → [192.5,-63.5] → [72,-63.5] → [72,-40]
-const STATIONS: { x: number; z: number; nx: number; nz: number }[] = [
-  { x:  86, z: -50,  nx: -1, nz:  0 }, // 0 — east of N-S road at x=72  → faces west
-  { x: 115, z:  18,  nx:  0, nz: -1 }, // 1 — north of E-W road at z=7.85 → faces south
-  { x: 200, z: -55,  nx:  1, nz:  0 }, // 2 — east outer road at x=192    → faces east
-  { x:  50, z: -90,  nx:  0, nz:  1 }, // 3 — south E-W road at z=-88     → faces north
-  { x:-108, z:  20,  nx: -1, nz:  0 }, // 4 — west road at x=-100         → faces west
-  { x:  80, z: 120,  nx:  0, nz: -1 }, // 5 — north E-W road at z=112     → faces south
+// ── Project stations: ground circle positions near representative buildings ──
+// Placed ON the road, beside the building type that represents each project.
+// Project order: Party Place, Maser Travels, Loan Mgmt, YCT Micro, Malete Hostels, Zennyola Foods
+const STATIONS: { x: number; z: number; icon: string }[] = [
+  { x:  75, z: -20, icon: "🎪" }, // 0 Party Place — event venue (central road)
+  { x: 120, z: -10, icon: "✈️" }, // 1 Maser Travels — travel building (NE road)
+  { x: 188, z: -40, icon: "🏦" }, // 2 Loan Mgmt — bank (east outer road)
+  { x:  25, z: -85, icon: "💳" }, // 3 YCT Microfinance — finance (south road)
+  { x: -92, z:  30, icon: "🏨" }, // 4 Malete Hostels — hostel (west road)
+  { x:  92, z: 108, icon: "🍽️" }, // 5 Zennyola Foods — restaurant (north road)
 ];
+
+// ── Approximate building block zones — car cannot cut through these ──────────
+// These are the interior city-block areas between the YUKA road loop segments.
+// [minX, minZ, maxX, maxZ]
+const BUILDING_BOXES: [number, number, number, number][] = [
+  [84,  -54, 110,  -4],  // Central block (between x=72 and x=115 roads)
+  [120, -54, 182, -30],  // East inner block (between z=-22.5 and z=-63.5 roads)
+  [-88, -80,  62, 102],  // Large west-centre interior block
+  [120, -80, 182, -66],  // South-east small block
+];
+const BOX_MARGIN = 3; // car clearance buffer in world units
 
 // ── Car colour types ─────────────────────────────────────────────────────────
 export type CarColors = {
@@ -36,26 +44,26 @@ export type CarColors = {
 export type Theme = "dark" | "light";
 
 export type ThemeColors = {
-  bg:           string;
-  ambientInt:   number;
-  ambientCol:   string;
-  dirInt:       number;
-  dirCol:       string;
-  fogCol:       string;
-  fogNear:      number;
-  fogFar:       number;
+  bg:        string;
+  ambientInt: number;
+  ambientCol: string;
+  dirInt:    number;
+  dirCol:    string;
+  fogCol:    string;
+  fogNear:   number;
+  fogFar:    number;
 };
 
 const THEMES: Record<Theme, ThemeColors> = {
   dark: {
     bg:          "#050508",
-    ambientInt:  0.35,
+    ambientInt:  0.4,
     ambientCol:  "#8090c0",
-    dirInt:      0.7,
+    dirInt:      0.8,
     dirCol:      "#b0b8e0",
     fogCol:      "#050508",
-    fogNear:     80,
-    fogFar:      380,
+    fogNear:     100,
+    fogFar:      420,
   },
   light: {
     bg:          "#87ceeb",
@@ -64,204 +72,131 @@ const THEMES: Record<Theme, ThemeColors> = {
     dirInt:      2.5,
     dirCol:      "#fffde7",
     fogCol:      "#87ceeb",
-    fogNear:     120,
-    fogFar:      600,
+    fogNear:     140,
+    fogFar:      620,
   },
 } as const;
 
 // ── City + House GLB ─────────────────────────────────────────────────────────
 function CityModel() {
-  const { scene: cityScene } = useGLTF("/models/city.glb");
+  const { scene: cityScene  } = useGLTF("/models/city.glb");
   const { scene: houseScene } = useGLTF("/models/house.glb");
 
   const city  = useMemo(() => cityScene.clone(true),  [cityScene]);
   const house = useMemo(() => houseScene.clone(true), [houseScene]);
 
+  // Disable shadows on every mesh — huge perf win for a 97 MB model
+  useMemo(() => {
+    city.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) {
+        obj.castShadow    = false;
+        obj.receiveShadow = false;
+      }
+    });
+  }, [city]);
+
   return (
     <>
-      {/* City at scale 5 — roads at y≈20.75 as per YUKA path */}
-      <primitive
-        object={city}
-        scale={[5, 5, 5]}
-        castShadow
-        receiveShadow
-      />
-      {/* Extra house placed at YUKA reference position (50, hei-1.04, 25) */}
+      <primitive object={city}  scale={[5, 5, 5]} />
       <primitive
         object={house}
         scale={[5, 5, 5]}
         position={[50, ROAD_Y - 1.04, 25]}
         rotation={[0, Math.PI / 2, 0]}
-        castShadow
-        receiveShadow
       />
     </>
   );
 }
 
-// ── Billboard 3-D → 2-D position type ────────────────────────────────────────
-export type BillboardPos = {
-  x: number; y: number; w: number; h: number; visible: boolean;
-  corners: [[number,number],[number,number],[number,number],[number,number]] | null;
-};
-
-// Pre-allocated vectors — avoid per-frame GC
-const _vTL = new THREE.Vector3();
-const _vTR = new THREE.Vector3();
-const _vBR = new THREE.Vector3();
-const _vBL = new THREE.Vector3();
-
-// ── Project station ───────────────────────────────────────────────────────────
-function ProjectStation({
+// ── Ground circle — replaces the billboard, marks the project location ────────
+function GroundCircle({
   index,
   accent,
   isNear,
-  theme,
 }: {
   index:  number;
   accent: string;
   isNear: boolean;
-  theme:  Theme;
 }) {
-  const { x, z, nx, nz } = STATIONS[index];
-
-  // Perpendicular axis (horizontal span of billboard)
-  const perpX = -nz;
-  const perpZ =  nx;
-
-  // Y-rotation so local +Z faces along (nx, nz) — billboard faces road
-  const yaw = Math.atan2(nx, nz);
-
-  const glowRef  = useRef<THREE.PointLight>(null!);
-  const frameRef = useRef<THREE.Mesh>(null!);
-  const tmr      = useRef(0);
+  const { x, z, icon } = STATIONS[index];
+  const project  = projects[index];
+  const ringRef  = useRef<THREE.Mesh>(null!);
+  const tmr      = useRef(Math.random() * Math.PI * 2);
 
   useFrame((_, delta) => {
-    tmr.current += delta;
-    if (glowRef.current)
-      glowRef.current.intensity = (isNear ? 60 : 18) + Math.sin(tmr.current * 1.8) * 6;
-    if (frameRef.current)
-      (frameRef.current.material as THREE.MeshStandardMaterial).emissiveIntensity =
-        (isNear ? 4.0 : 1.2) + Math.sin(tmr.current * 2.5) * 0.6;
+    tmr.current += delta * 1.6;
+    if (!ringRef.current) return;
+    const s = 1 + Math.sin(tmr.current) * 0.12;
+    ringRef.current.scale.setScalar(s);
+    const mat = ringRef.current.material as THREE.MeshBasicMaterial;
+    mat.opacity = (isNear ? 0.85 : 0.40) + Math.sin(tmr.current) * 0.12;
   });
-
-  const ry = ROAD_Y;
-  const panelY = ry + 5.6;
-
-  // Slight offset in facing direction (so glass is "in front" of the board)
-  const glassOffX = nx * 0.06;
-  const glassOffZ = nz * 0.06;
-
-  // Station pad glow color changes when near
-  const padEmissive = isNear ? 1.0 : 0.15;
-
-  // Pole base: slightly behind the face (inward from road)
-  const poleX = x - nx * 0.5;
-  const poleZ = z - nz * 0.5;
-
-  // Point light in front, toward road
-  const lightX = x + nx * 2;
-  const lightZ = z + nz * 2;
-
-  // Connector strip: from road-edge inward ~3 units, perpendicular to facing
-  // drawn as a thin glowing line in the accent colour
-  const connLen = 4;
-  const connX = x - nx * (connLen / 2);
-  const connZ = z - nz * (connLen / 2);
 
   return (
     <group>
-      {/* Glowing pad on road surface */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x, ry + 0.01, z]}>
-        <circleGeometry args={[5.5, 48]} />
-        <meshStandardMaterial
+      {/* Filled circle */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x, ROAD_Y + 0.01, z]}>
+        <circleGeometry args={[4.5, 40]} />
+        <meshBasicMaterial
           color={accent}
-          emissive={accent}
-          emissiveIntensity={padEmissive}
           transparent
-          opacity={0.35}
+          opacity={isNear ? 0.50 : 0.18}
           depthWrite={false}
         />
       </mesh>
 
-      {/* Accent stripe approaching the station */}
-      <group position={[connX, ry + 0.02, connZ]} rotation={[0, yaw, 0]}>
-        <mesh rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[0.4, connLen]} />
-          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={isNear ? 2.0 : 0.8} />
-        </mesh>
-      </group>
-
-      {/* Pole */}
-      <mesh position={[poleX, ry + 3, poleZ]}>
-        <cylinderGeometry args={[0.1, 0.14, 6, 8]} />
-        <meshStandardMaterial color="#3a3a4a" metalness={0.8} roughness={0.25} />
-      </mesh>
-      <mesh position={[poleX, ry + 0.12, poleZ]}>
-        <cylinderGeometry args={[0.18, 0.22, 0.25, 8]} />
-        <meshStandardMaterial color="#2a2a3a" metalness={0.7} roughness={0.3} />
-      </mesh>
-
-      {/* Billboard back panel */}
-      <mesh
-        position={[x - nx * 0.09, panelY, z - nz * 0.09]}
-        rotation={[0, yaw, 0]}
-      >
-        <boxGeometry args={[6.0, 3.6, 0.18]} />
-        <meshStandardMaterial color="#06060e" roughness={0.9} metalness={0.2} />
-      </mesh>
-
-      {/* Glowing frame border */}
-      <mesh
-        ref={frameRef}
-        position={[x + glassOffX * 0.5, panelY, z + glassOffZ * 0.5]}
-        rotation={[0, yaw, 0]}
-      >
-        <boxGeometry args={[6.1, 3.7, 0.06]} />
-        <meshStandardMaterial
+      {/* Pulsing outer ring */}
+      <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[x, ROAD_Y + 0.02, z]}>
+        <ringGeometry args={[4.7, 5.8, 40]} />
+        <meshBasicMaterial
           color={accent}
-          emissive={accent}
-          emissiveIntensity={1.2}
           transparent
-          opacity={0.7}
+          opacity={0.4}
+          depthWrite={false}
         />
       </mesh>
 
-      {/* Glass display screen */}
-      <mesh
-        position={[x + glassOffX, panelY, z + glassOffZ]}
-        rotation={[0, yaw, 0]}
+      {/* Floating name label (always faces camera via Html) */}
+      <Html
+        position={[x, ROAD_Y + 8, z]}
+        center
+        distanceFactor={55}
+        style={{ pointerEvents: "none" }}
+        zIndexRange={[0, 10]}
       >
-        <boxGeometry args={[5.6, 3.2, 0.04]} />
-        <meshStandardMaterial
-          color="#000010"
-          emissive="#1a1aff"
-          emissiveIntensity={theme === "dark" ? 0.06 : 0.02}
-          transparent
-          opacity={0.88}
-          metalness={0.9}
-          roughness={0.05}
+        <div
+          style={{
+            background: isNear
+              ? `${accent}dd`
+              : `${accent}55`,
+            border:     `1.5px solid ${accent}`,
+            borderRadius: "8px",
+            padding:    "5px 12px",
+            color:      "#fff",
+            fontSize:   "12px",
+            fontWeight: 700,
+            whiteSpace: "nowrap",
+            fontFamily: "system-ui, -apple-system, sans-serif",
+            textShadow: "0 1px 3px rgba(0,0,0,0.9)",
+            letterSpacing: "0.02em",
+            transition: "background 0.3s, transform 0.3s",
+            transform:  isNear ? "scale(1.12)" : "scale(1)",
+          }}
+        >
+          {icon} {project.title}
+        </div>
+      </Html>
+
+      {/* Glow light — only active when car is near (saves GPU) */}
+      {isNear && (
+        <pointLight
+          position={[x, ROAD_Y + 4, z]}
+          color={accent}
+          intensity={40}
+          distance={28}
+          decay={2}
         />
-      </mesh>
-
-      {/* Station glow light */}
-      <pointLight
-        ref={glowRef}
-        position={[lightX, panelY, lightZ]}
-        color={accent}
-        intensity={18}
-        distance={22}
-        decay={2}
-      />
-
-      {/* Ground glow beneath station */}
-      <pointLight
-        position={[x, ry + 1, z]}
-        color={accent}
-        intensity={isNear ? 30 : 8}
-        distance={12}
-        decay={2}
-      />
+      )}
     </group>
   );
 }
@@ -277,21 +212,20 @@ function Car({
   theme:   Theme;
 }) {
   const frontAxleRef = useRef<THREE.Group>(null!);
-
-  const wheelFLRoot = useRef<THREE.Object3D | null>(null);
-  const wheelFRRoot = useRef<THREE.Object3D | null>(null);
-  const flInner     = useRef(new THREE.Group());
-  const frInner     = useRef(new THREE.Group());
-  const wheelRL     = useRef<THREE.Object3D | null>(null);
-  const wheelRR     = useRef<THREE.Object3D | null>(null);
+  const wheelFLRoot  = useRef<THREE.Object3D | null>(null);
+  const wheelFRRoot  = useRef<THREE.Object3D | null>(null);
+  const flInner      = useRef(new THREE.Group());
+  const frInner      = useRef(new THREE.Group());
+  const wheelRL      = useRef<THREE.Object3D | null>(null);
+  const wheelRR      = useRef<THREE.Object3D | null>(null);
 
   const { scene: gltfScene } = useGLTF("/models/ferrari.glb");
   const carScene = useMemo(() => gltfScene.clone(true), [gltfScene]);
 
+  // Wire up wheel references
   useEffect(() => {
     const flRoot = carScene.getObjectByName("wheel_fl");
     const frRoot = carScene.getObjectByName("wheel_fr");
-
     wheelFLRoot.current = flRoot ?? null;
     wheelFRRoot.current = frRoot ?? null;
     wheelRL.current     = carScene.getObjectByName("wheel_rl") ?? null;
@@ -299,14 +233,14 @@ function Car({
 
     if (flRoot) {
       const inner = flInner.current;
-      while (inner.children.length > 0) inner.remove(inner.children[0]);
-      while (flRoot.children.length > 0) inner.add(flRoot.children[0]);
+      while (inner.children.length) inner.remove(inner.children[0]);
+      while (flRoot.children.length) inner.add(flRoot.children[0]);
       flRoot.add(inner);
     }
     if (frRoot) {
       const inner = frInner.current;
-      while (inner.children.length > 0) inner.remove(inner.children[0]);
-      while (frRoot.children.length > 0) inner.add(frRoot.children[0]);
+      while (inner.children.length) inner.remove(inner.children[0]);
+      while (frRoot.children.length) inner.add(frRoot.children[0]);
       frRoot.add(inner);
     }
 
@@ -314,6 +248,7 @@ function Car({
     (carRef as any).__speedRef  = { current: 0 };
   }, [carScene, carRef]);
 
+  // Apply car colours
   useEffect(() => {
     const bodyMat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(colors.body), metalness: 0.9, roughness: 0.2,
@@ -326,29 +261,27 @@ function Car({
       opacity: colors.glassOpacity, metalness: 0.9, roughness: 0.05,
     });
 
-    const bodyPart = carScene.getObjectByName("body") as THREE.Mesh | undefined;
-    if (bodyPart?.isMesh) bodyPart.material = bodyMat;
+    const bodyPart  = carScene.getObjectByName("body")  as THREE.Mesh | undefined;
+    const glassPart = carScene.getObjectByName("glass") as THREE.Mesh | undefined;
+    if (bodyPart?.isMesh)  bodyPart.material  = bodyMat;
+    if (glassPart?.isMesh) glassPart.material = glassMat;
 
-    (["rim_fl", "rim_fr", "rim_rr", "rim_rl", "trim"] as const).forEach((name) => {
+    (["rim_fl","rim_fr","rim_rr","rim_rl","trim"] as const).forEach((name) => {
       const part = carScene.getObjectByName(name) as THREE.Mesh | undefined;
       if (part?.isMesh) part.material = rimMat;
     });
-
-    const glassPart = carScene.getObjectByName("glass") as THREE.Mesh | undefined;
-    if (glassPart?.isMesh) glassPart.material = glassMat;
   }, [carScene, colors.body, colors.rim, colors.glass, colors.glassOpacity]);
 
   const shadowTex = useMemo(
     () => new THREE.TextureLoader().load("/models/ferrari_ao.png"), []
   );
 
+  // Wheel spin + steer animation
   useFrame((_, delta) => {
     const dt  = Math.min(delta, 0.05);
     const spd = (carRef as any).__speedRef?.current ?? 0;
-
-    const MOV_SCALE  = 0.07;
-    const WHEEL_DIAM = 1.32;
-    const angDelta   = (spd * dt * MOV_SCALE) * (2 / WHEEL_DIAM);
+    const WHEEL_DIAM = 0.66; // matched to scale 1.2
+    const angDelta   = (spd * dt * 0.12) * (2 / WHEEL_DIAM);
 
     flInner.current.rotation.x -= angDelta;
     frInner.current.rotation.x -= angDelta;
@@ -360,142 +293,85 @@ function Car({
     if (wheelFRRoot.current) wheelFRRoot.current.rotation.z = steer;
   });
 
+  // Car scale 1.2 — noticeably smaller in the big city, still easily visible
+  // AO shadow plane scales with car (original 6.29×12.48 at scale 2.4 → 3.15×6.24 at scale 1.2)
   return (
     <group ref={carRef}>
       <group ref={frontAxleRef} />
-      <primitive object={carScene} scale={[2.4, 2.4, 2.4]} position={[0, 0.01, 0]} />
+      <primitive object={carScene} scale={[1.2, 1.2, 1.2]} position={[0, 0.01, 0]} />
 
-      {/* AO contact shadow */}
+      {/* AO contact shadow (scaled to match 1.2) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]} renderOrder={2}>
-        <planeGeometry args={[6.29, 12.48]} />
-        <meshBasicMaterial map={shadowTex} transparent opacity={0.75} depthWrite={false} color="black" />
+        <planeGeometry args={[3.15, 6.24]} />
+        <meshBasicMaterial
+          map={shadowTex}
+          transparent
+          opacity={0.75}
+          depthWrite={false}
+          color="black"
+        />
       </mesh>
 
-      {/* Headlight beams — dark only */}
+      {/* Headlight beams — dark theme only */}
       {theme === "dark" && (
         <>
-          <pointLight position={[ 0.52, 0.38, -2.0]} color="#fffadc" intensity={120} distance={40} decay={2} />
-          <pointLight position={[-0.52, 0.38, -2.0]} color="#fffadc" intensity={120} distance={40} decay={2} />
-          <pointLight position={[0,     0.60, -5.0]} color="#ffffff"  intensity={80}  distance={30} decay={2} />
+          <pointLight position={[ 0.26, 0.20, -1.0]} color="#fffadc" intensity={60} distance={25} decay={2} />
+          <pointLight position={[-0.26, 0.20, -1.0]} color="#fffadc" intensity={60} distance={25} decay={2} />
+          <pointLight position={[ 0,    0.30, -2.8]} color="#ffffff"  intensity={40} distance={18} decay={2} />
         </>
       )}
     </group>
   );
 }
 
-// ── Billboard 3-D → 2-D Projector ────────────────────────────────────────────
-function BillboardProjector({
-  onProject,
-  nearIdx,
-}: {
-  onProject: (positions: BillboardPos[]) => void;
-  nearIdx:   number | null;
-}) {
-  const { camera, size } = useThree();
-
-  useFrame(() => {
-    const hw  = 2.8;
-    const top = ROAD_Y + 7.2;
-    const bot = ROAD_Y + 4.0;
-
-    const out: BillboardPos[] = STATIONS.map(({ x, z, nx, nz }, i) => {
-      if (nearIdx !== i) return { x: 0, y: 0, w: 0, h: 0, visible: false, corners: null };
-
-      // Perpendicular axis (horizontal span of billboard)
-      const perpX = -nz;
-      const perpZ =  nx;
-
-      // Glass face is offset slightly toward the viewer (in normal direction)
-      const gx = x + nx * 0.06;
-      const gz = z + nz * 0.06;
-
-      _vTL.set(gx - hw * perpX, top, gz - hw * perpZ); _vTL.project(camera);
-      _vTR.set(gx + hw * perpX, top, gz + hw * perpZ); _vTR.project(camera);
-      _vBR.set(gx + hw * perpX, bot, gz + hw * perpZ); _vBR.project(camera);
-      _vBL.set(gx - hw * perpX, bot, gz - hw * perpZ); _vBL.project(camera);
-
-      if (_vTL.z >= 1 || _vTR.z >= 1 || _vBR.z >= 1 || _vBL.z >= 1)
-        return { x: 0, y: 0, w: 0, h: 0, visible: false, corners: null };
-
-      // NDC → pixel
-      const ndcToPixel = (v: THREE.Vector3): [number, number] => [
-        ( v.x * 0.5 + 0.5) * size.width,
-        (-v.y * 0.5 + 0.5) * size.height,
-      ];
-
-      const corners: [[number,number],[number,number],[number,number],[number,number]] = [
-        ndcToPixel(_vTL),
-        ndcToPixel(_vTR),
-        ndcToPixel(_vBR),
-        ndcToPixel(_vBL),
-      ];
-
-      const xs = corners.map((c) => c[0]);
-      const ys = corners.map((c) => c[1]);
-      const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
-      const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
-      const w  = Math.max(...xs) - Math.min(...xs);
-
-      const visible =
-        w > 20 &&
-        cx > -size.width * 0.2 && cx < size.width * 1.2 &&
-        cy > -size.height * 0.2 && cy < size.height * 1.2;
-
-      return { x: cx, y: cy, w, h: Math.max(...ys) - Math.min(...ys), visible, corners };
-    });
-
-    onProject(out);
-  });
-
-  return null;
-}
+// ── Pre-allocated vectors — avoid per-frame heap allocations ─────────────────
+const _camTarget  = new THREE.Vector3();
+const _lookTarget = new THREE.Vector3();
 
 // ── Main scene ────────────────────────────────────────────────────────────────
 interface SceneProps {
-  onNearProject:  (idx: number | null) => void;
-  onBillboardPos: (pos: BillboardPos[]) => void;
-  onAtBoundary:   (at: boolean) => void;
-  theme:          Theme;
-  carColors:      CarColors;
+  onNearProject: (idx: number | null) => void;
+  onAtBoundary:  (at: boolean) => void;
+  theme:         Theme;
+  carColors:     CarColors;
 }
 
 const expEaseOut = (k: number) => (k === 1 ? 1 : -Math.pow(2, -10 * k) + 1);
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-// City road loop extents (at scale 5, based on YUKA waypoints + margin)
 const CITY_MIN_X = -120;
 const CITY_MAX_X =  210;
 const CITY_MIN_Z = -110;
 const CITY_MAX_Z =  130;
 
-function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }: SceneProps) {
+// ── Car physics constants ─────────────────────────────────────────────────────
+const MAX_SPEED   = 280;   // units/s at full throttle (snappier across the big city)
+const MAX_SPD_REV = -70;
+const ACCEL       = 140;   // fast acceleration for responsive feel
+const ACCEL_REV   = 50;
+const DECEL       = 90;
+const BRAKE_POW   = 8;
+const STEER_SPD   = 1.8;
+const MAX_STEER   = 0.55;
+const TURN_RAD    = 20;
+const MOV_SCALE   = 0.12;  // world-units-per-speed-unit — tuned for city scale
+
+function Scene({ onNearProject, onAtBoundary, theme, carColors }: SceneProps) {
   const t = THEMES[theme];
 
-  // Start position = YUKA start waypoint [72, hei, -40]
   const carRef       = useRef<THREE.Group>(null!);
-  const posRef       = useRef({ x: 72, z: -40 });
+  const posRef       = useRef({ x: 72, z: -40 });  // YUKA start waypoint
   const carOrientRef = useRef(0);
   const speedRef     = useRef(0);
   const wheelOrRef   = useRef(0);
   const keysRef      = useRef({ up: false, down: false, left: false, right: false });
-  const camPosRef    = useRef(new THREE.Vector3(72, ROAD_Y + 14, -40 + 20));
-  const camLookRef   = useRef(new THREE.Vector3(72, ROAD_Y + 0.5, -40));
+  const camPosRef    = useRef(new THREE.Vector3(72, ROAD_Y + 8, -40 + 16));
+  const camLookRef   = useRef(new THREE.Vector3(72, ROAD_Y + 0.4, -40));
   const curProjRef   = useRef<number | null>(null);
   const atBoundRef   = useRef(false);
   const [nearIdx, setNearIdx] = useState<number | null>(null);
 
-  // CarControls.js constants
-  const MAX_SPEED   = 200;
-  const MAX_SPD_REV = -50;
-  const ACCEL       = 80;
-  const ACCEL_REV   = 40;
-  const DECEL       = 70;
-  const BRAKE_POW   = 10;
-  const STEER_SPD   = 1.5;
-  const MAX_STEER   = 0.6;
-  const TURN_RAD    = 22;
-  const MOV_SCALE   = 0.07;
-
+  // Keyboard + mobile d-pad event listeners
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (["ArrowUp",    "w","W"].includes(e.key)) { keysRef.current.up    = true; e.preventDefault(); }
@@ -509,7 +385,6 @@ function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }
       if (["ArrowLeft",  "a","A"].includes(e.key)) keysRef.current.left  = false;
       if (["ArrowRight", "d","D"].includes(e.key)) keysRef.current.right = false;
     };
-    // Mobile d-pad fires a custom event from Portfolio.tsx
     const carKey = (e: Event) => {
       const { key, pressed } = (e as CustomEvent<{ key: string; pressed: boolean }>).detail;
       if (key === "up")    keysRef.current.up    = pressed;
@@ -531,7 +406,7 @@ function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }
     const dt   = Math.min(delta, 0.05);
     const keys = keysRef.current;
 
-    // ── Speed ──────────────────────────────────────────────────────────────
+    // ── Speed ─────────────────────────────────────────────────────────────────
     if (keys.up) {
       speedRef.current = clamp(speedRef.current + dt * ACCEL, MAX_SPD_REV, MAX_SPEED);
     }
@@ -552,7 +427,7 @@ function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }
       }
     }
 
-    // ── Steering ────────────────────────────────────────────────────────────
+    // ── Steering ──────────────────────────────────────────────────────────────
     if (keys.left)  wheelOrRef.current = clamp(wheelOrRef.current + dt * STEER_SPD, -MAX_STEER, MAX_STEER);
     if (keys.right) wheelOrRef.current = clamp(wheelOrRef.current - dt * STEER_SPD, -MAX_STEER, MAX_STEER);
     if (!keys.left && !keys.right) {
@@ -563,18 +438,45 @@ function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }
       }
     }
 
-    // ── Movement ─────────────────────────────────────────────────────────────
+    // ── Movement ──────────────────────────────────────────────────────────────
     const forwardDelta = -speedRef.current * dt * MOV_SCALE;
     carOrientRef.current -= (forwardDelta * TURN_RAD * 0.02) * wheelOrRef.current;
 
-    posRef.current.x += Math.sin(carOrientRef.current) * forwardDelta;
-    posRef.current.z += Math.cos(carOrientRef.current) * forwardDelta;
+    const newX = posRef.current.x + Math.sin(carOrientRef.current) * forwardDelta;
+    const newZ = posRef.current.z + Math.cos(carOrientRef.current) * forwardDelta;
 
-    // Soft city boundary clamp
-    posRef.current.x = clamp(posRef.current.x, CITY_MIN_X, CITY_MAX_X);
-    posRef.current.z = clamp(posRef.current.z, CITY_MIN_Z, CITY_MAX_Z);
+    // ── Building collision ────────────────────────────────────────────────────
+    let resolvedX = clamp(newX, CITY_MIN_X, CITY_MAX_X);
+    let resolvedZ = clamp(newZ, CITY_MIN_Z, CITY_MAX_Z);
+    let bounced   = false;
 
-    // ── Sync car mesh ────────────────────────────────────────────────────────
+    for (const [minX, minZ, maxX, maxZ] of BUILDING_BOXES) {
+      const bx1 = minX - BOX_MARGIN;
+      const bz1 = minZ - BOX_MARGIN;
+      const bx2 = maxX + BOX_MARGIN;
+      const bz2 = maxZ + BOX_MARGIN;
+
+      if (resolvedX > bx1 && resolvedX < bx2 && resolvedZ > bz1 && resolvedZ < bz2) {
+        // Push to nearest edge
+        const dL = resolvedX - bx1;
+        const dR = bx2 - resolvedX;
+        const dT = resolvedZ - bz1;
+        const dB = bz2 - resolvedZ;
+        const m  = Math.min(dL, dR, dT, dB);
+        if      (m === dL) resolvedX = bx1;
+        else if (m === dR) resolvedX = bx2;
+        else if (m === dT) resolvedZ = bz1;
+        else               resolvedZ = bz2;
+        bounced = true;
+        break;
+      }
+    }
+
+    posRef.current.x = resolvedX;
+    posRef.current.z = resolvedZ;
+    if (bounced) speedRef.current *= -0.15; // light bounce-back
+
+    // ── Sync car mesh ─────────────────────────────────────────────────────────
     if (carRef.current) {
       carRef.current.position.set(posRef.current.x, ROAD_Y, posRef.current.z);
       carRef.current.rotation.y = carOrientRef.current;
@@ -582,35 +484,36 @@ function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }
       if (sr) sr.current = speedRef.current;
     }
 
-    // ── Wheel steer visual ───────────────────────────────────────────────────
+    // ── Wheel steer visual ────────────────────────────────────────────────────
     const fa = (carRef as any).__frontAxle;
     if (fa?.current) fa.current.rotation.y = wheelOrRef.current;
 
-    // ── Chase camera — follows from behind car ───────────────────────────────
-    const camDist   = 18;
-    const camHeight = ROAD_Y + 13;
-    const camTarget = new THREE.Vector3(
+    // ── Chase camera ──────────────────────────────────────────────────────────
+    // Pre-allocated _camTarget / _lookTarget — no per-frame heap allocations
+    const camDist   = 14;
+    const camHeight = ROAD_Y + 8;
+    _camTarget.set(
       posRef.current.x + Math.sin(carOrientRef.current) * camDist,
       camHeight,
       posRef.current.z + Math.cos(carOrientRef.current) * camDist,
     );
-    const alphaPos  = 1 - Math.exp(-9  * dt);
-    const alphaLook = 1 - Math.exp(-11 * dt);
-    camPosRef.current.lerp(camTarget, alphaPos);
+    const alphaPos  = 1 - Math.exp(-10 * dt);
+    const alphaLook = 1 - Math.exp(-12 * dt);
+    camPosRef.current.lerp(_camTarget, alphaPos);
     state.camera.position.copy(camPosRef.current);
 
-    const lookTarget = new THREE.Vector3(posRef.current.x, ROAD_Y + 0.6, posRef.current.z);
-    camLookRef.current.lerp(lookTarget, alphaLook);
+    _lookTarget.set(posRef.current.x, ROAD_Y + 0.4, posRef.current.z);
+    camLookRef.current.lerp(_lookTarget, alphaLook);
     state.camera.lookAt(camLookRef.current);
 
-    // ── Project proximity — 2-D distance in XZ ──────────────────────────────
+    // ── Project proximity — 2D XZ distance ───────────────────────────────────
     let nearest: number | null = null;
     let minDist = Infinity;
     for (let i = 0; i < STATIONS.length; i++) {
       const dx   = posRef.current.x - STATIONS[i].x;
       const dz   = posRef.current.z - STATIONS[i].z;
       const dist = Math.sqrt(dx * dx + dz * dz);
-      if (dist < 20 && dist < minDist) { minDist = dist; nearest = i; }
+      if (dist < 15 && dist < minDist) { minDist = dist; nearest = i; }
     }
     if (nearest !== curProjRef.current) {
       curProjRef.current = nearest;
@@ -618,10 +521,10 @@ function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }
       onNearProject(nearest);
     }
 
-    // ── Boundary (near start position = colour panel) ───────────────────────
+    // ── Colour-panel boundary (near spawn) ───────────────────────────────────
     const dx0 = posRef.current.x - 72;
     const dz0 = posRef.current.z - (-40);
-    const atBound = Math.sqrt(dx0*dx0 + dz0*dz0) < 10;
+    const atBound = (dx0 * dx0 + dz0 * dz0) < 100; // radius 10
     if (atBound !== atBoundRef.current) {
       atBoundRef.current = atBound;
       onAtBoundary(atBound);
@@ -637,7 +540,6 @@ function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }
         color={t.dirCol}
         castShadow={false}
       />
-      {/* Extra fill light for dark theme so the Ferrari looks great */}
       {theme === "dark" && (
         <pointLight position={[72, ROAD_Y + 30, -40]} color="#6080ff" intensity={4} distance={200} decay={1} />
       )}
@@ -647,20 +549,17 @@ function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }
       </Suspense>
 
       {projects.map((p, i) => (
-        <ProjectStation
+        <GroundCircle
           key={i}
           index={i}
           accent={p.accent}
           isNear={nearIdx === i}
-          theme={theme}
         />
       ))}
 
       <Suspense fallback={null}>
         <Car carRef={carRef} colors={carColors} theme={theme} />
       </Suspense>
-
-      <BillboardProjector onProject={onBillboardPos} nearIdx={nearIdx} />
 
       <fog attach="fog" args={[t.fogCol, t.fogNear, t.fogFar]} />
     </>
@@ -669,16 +568,14 @@ function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }
 
 // ── Exported component ────────────────────────────────────────────────────────
 interface ProjectWorldProps {
-  onNearProject:  (idx: number | null) => void;
-  onBillboardPos: (pos: BillboardPos[]) => void;
-  onAtBoundary:   (at: boolean) => void;
-  theme:          Theme;
-  carColors:      CarColors;
+  onNearProject: (idx: number | null) => void;
+  onAtBoundary:  (at: boolean) => void;
+  theme:         Theme;
+  carColors:     CarColors;
 }
 
 export default function ProjectWorld({
   onNearProject,
-  onBillboardPos,
   onAtBoundary,
   theme,
   carColors,
@@ -687,7 +584,7 @@ export default function ProjectWorld({
   return (
     <Canvas
       camera={{
-        position: [72, ROAD_Y + 14, -40 + 22],
+        position: [72, ROAD_Y + 8, -40 + 16],
         fov: 62,
         near: 0.5,
         far: 800,
@@ -700,7 +597,6 @@ export default function ProjectWorld({
       <color attach="background" args={[bg]} />
       <Scene
         onNearProject={onNearProject}
-        onBillboardPos={onBillboardPos}
         onAtBoundary={onAtBoundary}
         theme={theme}
         carColors={carColors}
