@@ -331,15 +331,49 @@ const ACCEL       = 140, ACCEL_REV  = 50;
 const DECEL       = 90,  BRAKE_POW  = 8;
 const STEER_SPD   = 1.8, MAX_STEER  = 0.55;
 const TURN_RAD    = 20,  MOV_SCALE  = 0.12;
-// Distance to station centre that counts as "arrived" — enough for all stations
-const ARRIVE_DIST = 12;
-const NEAR_DIST   = 15;
-const CLOSE_DIST  = 30;
-// Waypoint advance threshold — move to next waypoint when this close
-const WP_REACH_DIST = 3;
+// Stop when the car centre is within this many units of the station centre.
+// Must be < circle radius (3.0) so the car visibly stops inside the ring.
+const ARRIVE_DIST   = 2.5;
+const NEAR_DIST     = 15;
+const CLOSE_DIST    = 30;
+// Advance to the next waypoint once the car is this close to it.
+// Smaller = car hugs path more tightly = station positions are reliably hit.
+const WP_REACH_DIST = 1.5;
+// How far ahead along the path the steering target is projected (pure pursuit).
+// Larger = smoother curves; smaller = tighter path tracking.
+const LOOKAHEAD_DIST = 10;
 
 const expEaseOut = (k: number) => (k === 1 ? 1 : -Math.pow(2, -10 * k) + 1);
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+// Pure-pursuit lookahead: walk `lookaheadDist` world-units ahead along the
+// remaining recorded path and return that point. The car steers toward this
+// point instead of the raw next waypoint, which rounds off sharp corners and
+// makes reversals feel like controlled turns rather than sudden flips.
+function getLookaheadPoint(
+  pos: { x: number; z: number },
+  wpIdx: number,
+  lookaheadDist: number,
+): { x: number; z: number } {
+  let remaining = lookaheadDist;
+  let px = pos.x;
+  let pz = pos.z;
+
+  for (let i = wpIdx; i < RECORDED_PATH.length; i++) {
+    const wp = RECORDED_PATH[i];
+    const dx = wp.x - px;
+    const dz = wp.z - pz;
+    const d  = Math.sqrt(dx * dx + dz * dz);
+    if (d >= remaining) {
+      return { x: px + (dx / d) * remaining, z: pz + (dz / d) * remaining };
+    }
+    remaining -= d;
+    px = wp.x;
+    pz = wp.z;
+  }
+  // Past end of path — return last waypoint
+  return { ...RECORDED_PATH[RECORDED_PATH.length - 1] };
+}
 
 // ── Main scene ────────────────────────────────────────────────────────────────
 interface SceneProps {
@@ -463,29 +497,40 @@ function Scene({
           wheelOrRef.current = 0;
           onAutoArrived();
         } else {
-          // Follow the next recorded waypoint
+          // Follow recorded path with pure-pursuit lookahead steering
           let wpIdx = waypointIdx.current;
-          // If we've consumed all waypoints, loop back (tour wraps around)
+          // Loop back if we've consumed all waypoints
           if (wpIdx >= RECORDED_PATH.length) {
             wpIdx = 0;
             waypointIdx.current = 0;
           }
 
-          const wp  = RECORDED_PATH[wpIdx];
-          const dx  = wp.x - posRef.current.x;
-          const dz  = wp.z - posRef.current.z;
+          const wp   = RECORDED_PATH[wpIdx];
+          const dx   = wp.x - posRef.current.x;
+          const dz   = wp.z - posRef.current.z;
           const dist = Math.sqrt(dx * dx + dz * dz);
 
           if (dist < WP_REACH_DIST) {
-            // Close enough — advance to next waypoint
+            // Close enough — advance to next waypoint (no movement this frame)
             waypointIdx.current++;
           } else {
+            // Move position toward the raw next waypoint (path fidelity)
             const step = Math.min(AUTO_SPEED * dt, dist);
             posRef.current.x += (dx / dist) * step;
             posRef.current.z += (dz / dist) * step;
-            const targetAngle = Math.atan2(-dx, -dz);
-            const angleDiff   = normaliseAngle(targetAngle - carOrientRef.current);
-            carOrientRef.current += angleDiff * Math.min(dt * 5, 1);
+
+            // Steer toward the lookahead point (smoothness)
+            const look  = getLookaheadPoint(posRef.current, wpIdx, LOOKAHEAD_DIST);
+            const ldx   = look.x - posRef.current.x;
+            const ldz   = look.z - posRef.current.z;
+            const ldist = Math.sqrt(ldx * ldx + ldz * ldz);
+            if (ldist > 0.01) {
+              const targetAngle = Math.atan2(-ldx, -ldz);
+              const angleDiff   = normaliseAngle(targetAngle - carOrientRef.current);
+              // Gentle smoothing — avoids snapping on U-turns and sharp bends
+              carOrientRef.current += angleDiff * Math.min(dt * 3.5, 1);
+            }
+
             speedRef.current   = AUTO_SPEED / MOV_SCALE;
             wheelOrRef.current = THREE.MathUtils.lerp(wheelOrRef.current, 0, Math.min(dt * 4, 1));
           }
