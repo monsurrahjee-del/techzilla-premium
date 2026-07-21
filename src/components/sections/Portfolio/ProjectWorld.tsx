@@ -497,43 +497,52 @@ function Scene({
           wheelOrRef.current = 0;
           onAutoArrived();
         } else {
-          // Follow recorded path with pure-pursuit lookahead steering
-          let wpIdx = waypointIdx.current;
-          // Loop back if we've consumed all waypoints
-          if (wpIdx >= RECORDED_PATH.length) {
-            wpIdx = 0;
-            waypointIdx.current = 0;
-          }
+          // Continuous path following — consume exactly AUTO_SPEED * dt units
+          // along RECORDED_PATH with no per-waypoint pause frames.
+          let budget = AUTO_SPEED * dt;        // world-units left to travel this frame
+          let steerDx = 0, steerDz = 0;       // direction of the last segment moved
 
-          const wp   = RECORDED_PATH[wpIdx];
-          const dx   = wp.x - posRef.current.x;
-          const dz   = wp.z - posRef.current.z;
-          const dist = Math.sqrt(dx * dx + dz * dz);
+          while (budget > 0.0001) {
+            if (waypointIdx.current >= RECORDED_PATH.length) {
+              waypointIdx.current = 0;         // loop path
+            }
+            const wp  = RECORDED_PATH[waypointIdx.current];
+            const dx  = wp.x - posRef.current.x;
+            const dz  = wp.z - posRef.current.z;
+            const seg = Math.sqrt(dx * dx + dz * dz);
 
-          if (dist < WP_REACH_DIST) {
-            // Close enough — advance to next waypoint (no movement this frame)
-            waypointIdx.current++;
-          } else {
-            // Move position toward the raw next waypoint (path fidelity)
-            const step = Math.min(AUTO_SPEED * dt, dist);
-            posRef.current.x += (dx / dist) * step;
-            posRef.current.z += (dz / dist) * step;
-
-            // Steer toward the lookahead point (smoothness)
-            const look  = getLookaheadPoint(posRef.current, wpIdx, LOOKAHEAD_DIST);
-            const ldx   = look.x - posRef.current.x;
-            const ldz   = look.z - posRef.current.z;
-            const ldist = Math.sqrt(ldx * ldx + ldz * ldz);
-            if (ldist > 0.01) {
-              const targetAngle = Math.atan2(-ldx, -ldz);
-              const angleDiff   = normaliseAngle(targetAngle - carOrientRef.current);
-              // Gentle smoothing — avoids snapping on U-turns and sharp bends
-              carOrientRef.current += angleDiff * Math.min(dt * 3.5, 1);
+            if (seg < 0.0001) {
+              // Already at this waypoint — skip it
+              waypointIdx.current++;
+              continue;
             }
 
-            speedRef.current   = AUTO_SPEED / MOV_SCALE;
-            wheelOrRef.current = THREE.MathUtils.lerp(wheelOrRef.current, 0, Math.min(dt * 4, 1));
+            steerDx = dx; steerDz = dz;       // remember steering direction
+
+            if (seg <= budget) {
+              // Consume entire segment — snap to waypoint and move on
+              posRef.current.x = wp.x;
+              posRef.current.z = wp.z;
+              budget -= seg;
+              waypointIdx.current++;
+            } else {
+              // Partial segment — move remaining budget and stop
+              posRef.current.x += (dx / seg) * budget;
+              posRef.current.z += (dz / seg) * budget;
+              budget = 0;
+            }
           }
+
+          // Steer toward the current next waypoint (original behaviour)
+          if (Math.abs(steerDx) + Math.abs(steerDz) > 0.01) {
+            const len         = Math.sqrt(steerDx * steerDx + steerDz * steerDz);
+            const targetAngle = Math.atan2(-steerDx / len, -steerDz / len);
+            const angleDiff   = normaliseAngle(targetAngle - carOrientRef.current);
+            carOrientRef.current += angleDiff * Math.min(dt * 5, 1);
+          }
+
+          speedRef.current   = AUTO_SPEED / MOV_SCALE;
+          wheelOrRef.current = THREE.MathUtils.lerp(wheelOrRef.current, 0, Math.min(dt * 4, 1));
         }
       } else {
         // Already arrived — coast to a stop
