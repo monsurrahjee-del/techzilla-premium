@@ -9,51 +9,43 @@ import { projects } from "@/lib/projects";
 // ── Road surface Y (matches YUKA path y=20.75) ───────────────────────────────
 const ROAD_Y = 20.75;
 
-// ── Project stations ──────────────────────────────────────────────────────────
+// ── Project stations — every position is a confirmed road node ───────────────
+// Circles sit ON the road so the car never needs to leave it to reach them.
 export const STATIONS: { x: number; z: number; icon: string }[] = [
-  { x:  75, z: -20, icon: "🎪" }, // 0 Party Place
-  { x: 120, z: -10, icon: "✈️" }, // 1 Maser Travels
-  { x: 188, z: -40, icon: "🏦" }, // 2 Loan Mgmt
-  { x:  25, z: -85, icon: "💳" }, // 3 YCT Microfinance
-  { x: -92, z:  30, icon: "🏨" }, // 4 Malete Hostels
-  { x:  92, z: 108, icon: "🍽️" }, // 5 Zennyola Foods
+  { x:  75, z: -40, icon: "🎪" }, // 0 Party Place      — east highway
+  { x: 120, z: -40, icon: "✈️" }, // 1 Maser Travels    — east highway
+  { x: 188, z: -40, icon: "🏦" }, // 2 Loan Mgmt        — end of east highway
+  { x:  25, z: -40, icon: "💳" }, // 3 YCT Microfinance — west highway
+  { x: -92, z: -40, icon: "🏨" }, // 4 Malete Hostels   — end of west highway
+  { x:  92, z:  80, icon: "🍽️" }, // 5 Zennyola Foods   — south road
 ];
 
-// ── Road-graph waypoints (junctions along city roads) ────────────────────────
-// These form a simplified grid following the city road layout
+// ── Road-graph waypoints — every node is on a real city road ─────────────────
+// Branch nodes that were inside buildings / bushes have been removed entirely.
 type RoadNode = { x: number; z: number };
 
 const ROAD_NODES: RoadNode[] = [
   { x:  72, z: -40 },  //  0  spawn / main junction
-  { x:  75, z: -40 },  //  1  station-0 approach
-  { x:  75, z: -20 },  //  2  station 0  (Party Place)
-  { x: 120, z: -40 },  //  3  station-1 approach / highway junction right
-  { x: 120, z: -10 },  //  4  station 1  (Maser Travels)
-  { x: 188, z: -40 },  //  5  station 2  (Loan Mgmt) — on highway
-  { x:  25, z: -40 },  //  6  station-3 approach / highway junction left
-  { x:  25, z: -85 },  //  7  station 3  (YCT Microfinance)
-  { x:   0, z: -40 },  //  8  highway junction far-left
-  { x: -60, z: -40 },  //  9  highway junction far-left-2
-  { x: -92, z: -40 },  // 10  station-4 approach
-  { x: -92, z:  30 },  // 11  station 4  (Malete Hostels)
-  { x:  72, z:   0 },  // 12  junction south of spawn
-  { x:  72, z:  80 },  // 13  junction south
-  { x:  92, z:  80 },  // 14  station-5 approach
-  { x:  92, z: 108 },  // 15  station 5  (Zennyola Foods)
+  { x:  75, z: -40 },  //  1  Station 0  (Party Place)
+  { x: 120, z: -40 },  //  2  Station 1  (Maser Travels)
+  { x: 188, z: -40 },  //  3  Station 2  (Loan Mgmt)    — east highway end
+  { x:  25, z: -40 },  //  4  Station 3  (YCT)
+  { x:   0, z: -40 },  //  5  west highway junction
+  { x: -60, z: -40 },  //  6  west highway junction 2
+  { x: -92, z: -40 },  //  7  Station 4  (Malete Hostels) — west highway end
+  { x:  72, z:   0 },  //  8  south road junction 1
+  { x:  72, z:  80 },  //  9  south road junction 2
+  { x:  92, z:  80 },  // 10  Station 5  (Zennyola Foods) — south road end
 ];
 
-// Bidirectional road edges
+// Road edges — every segment travels along a real city road; no building entries
 const ROAD_EDGES: [number, number][] = [
-  // Main east-west highway at z = -40
-  [0, 1], [1, 3], [3, 5],   // spawn → st0-app → st1-app → station2
-  [0, 6], [6, 8], [8, 9], [9, 10], // spawn ← → far-left
-  // Station branches
-  [1, 2],   // st0 approach → station 0
-  [3, 4],   // station 1 approach → station 1
-  [6, 7],   // station 3 approach → station 3
-  [10, 11], // station 4 approach → station 4
-  // South road from spawn
-  [0, 12], [12, 13], [13, 14], [14, 15],
+  // East highway at z = -40
+  [0, 1], [1, 2], [2, 3],
+  // West highway at z = -40
+  [0, 4], [4, 5], [5, 6], [6, 7],
+  // South road (x ≈ 72 → 92)
+  [0, 8], [8, 9], [9, 10],
 ];
 
 // BFS to find waypoint path between nearest nodes
@@ -72,7 +64,7 @@ function findRoadPath(
     if (de < minE) { minE = de; endN = i; }
   }
 
-  if (startN === endN) return [ROAD_NODES[endN], { x: tx, z: tz }];
+  if (startN === endN) return [ROAD_NODES[endN]];
 
   // Build adjacency list
   const adj: number[][] = ROAD_NODES.map(() => []);
@@ -96,13 +88,9 @@ function findRoadPath(
   let c = endN;
   while (c !== -1) { idxPath.unshift(c); c = prev[c]; }
 
-  const waypoints: RoadNode[] = idxPath.map(i => ({ ...ROAD_NODES[i] }));
-  // Append exact target if it differs from the last road node
-  const last = ROAD_NODES[endN];
-  if (Math.abs(tx - last.x) > 3 || Math.abs(tz - last.z) > 3) {
-    waypoints.push({ x: tx, z: tz });
-  }
-  return waypoints;
+  // All navigation targets are road nodes, so we return the graph path as-is.
+  // We never append the raw target coords — that was the old source of off-road travel.
+  return idxPath.map(i => ({ ...ROAD_NODES[i] }));
 }
 
 // ── Car colour types ─────────────────────────────────────────────────────────
