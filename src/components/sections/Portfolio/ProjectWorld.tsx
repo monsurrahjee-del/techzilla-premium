@@ -71,6 +71,7 @@ export const STATIONS: { x: number; z: number; icon: string }[] = [
   { x:  27, z: -22, icon: "💳" }, // 3 YCT Microfinance — z≈-22 road westbound
   { x: -87, z: -29, icon: "🏨" }, // 4 Malete Hostels   — west side dip
   { x:  86, z:  71, icon: "🍽️" }, // 5 Zennyola Foods   — south road return
+  { x:  72, z:  58, icon: "⛪" }, // 6 RCCG Church       — between Zennyola and path end
 ];
 
 // ── Car colour types ──────────────────────────────────────────────────────────

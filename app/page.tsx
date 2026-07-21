@@ -116,12 +116,16 @@ export default function Home() {
       /* ── Vapor trigger ───────────────────────────────────────────────────── */
       // Skip on the initial load evaluation so that a page reload from the bottom
       // of the page (e.g. from the work section) does not re-play the vapor.
-      if (raw >= 0.99 && !vaporTriggered && !isInitialEval) {
+      // Always mark triggered when raw>=0.99 — even on initial load — so
+      // scrolling back from Our Work then forward again never re-fires the overlay.
+      if (raw >= 0.99) {
         vaporTriggered = true;
-        frozenScrollRef.current = window.scrollY;
-        vaporActiveRef.current  = true;
-        window.dispatchEvent(new CustomEvent("services-section-active", { detail: { active: false } }));
-        startTransition(() => setVaporRevealed(true));
+        if (!isInitialEval) {
+          frozenScrollRef.current = window.scrollY;
+          vaporActiveRef.current  = true;
+          window.dispatchEvent(new CustomEvent("services-section-active", { detail: { active: false } }));
+          startTransition(() => setVaporRevealed(true));
+        }
       }
     };
 

@@ -15,6 +15,7 @@
   position: absolute;
   inset: 0;
   z-index: 1;
+  pointer-events: none; /* prevent R3F from raycasting on every mousemove */
 }
 
 /* ── Billboard iframe overlay ─────────────────────────────────────────────── */
