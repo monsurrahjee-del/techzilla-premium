@@ -324,6 +324,19 @@ function Car({ carRef, colors, theme }: {
   );
 }
 
+// ── Road-rail snap: project point onto a segment, return clamped closest ──
+function snapToSegment(
+  px: number, pz: number,
+  ax: number, az: number,
+  bx: number, bz: number,
+): { x: number; z: number } {
+  const abx = bx - ax, abz = bz - az;
+  const len2 = abx * abx + abz * abz;
+  if (len2 < 0.001) return { x: ax, z: az };
+  const t = Math.max(0, Math.min(1, ((px - ax) * abx + (pz - az) * abz) / len2));
+  return { x: ax + t * abx, z: az + t * abz };
+}
+
 // ── Pre-allocated vectors ─────────────────────────────────────────────────────
 const _camTarget  = new THREE.Vector3();
 const _lookTarget = new THREE.Vector3();
@@ -379,8 +392,10 @@ function Scene({
   const arrivedRef   = useRef(false);
 
   // Autopilot waypoint state
-  const waypointPath = useRef<RoadNode[]>([]);
-  const waypointIdx  = useRef(0);
+  const waypointPath  = useRef<RoadNode[]>([]);
+  const waypointIdx   = useRef(0);
+  // Tracks the START of the current road segment so we can rail-snap during autopilot
+  const prevWpPos = useRef<{ x: number; z: number }>({ x: 72, z: -40 });
 
   const [nearIdx,  setNearIdx]  = useState<number | null>(null);
   const [closeIdx, setCloseIdx] = useState<number | null>(null);
@@ -400,6 +415,9 @@ function Scene({
     );
     waypointPath.current = path;
     waypointIdx.current  = 0;
+    // Seed prevWpPos to the car's current position so the first rail segment
+    // runs from here → path[0], keeping us on-road from the very first frame.
+    prevWpPos.current = { x: posRef.current.x, z: posRef.current.z };
   }, [autopilotTarget]);
 
   // Keyboard + d-pad — manual mode only
@@ -459,8 +477,12 @@ function Scene({
         const dist = Math.sqrt(dx * dx + dz * dz);
         const isLast = wpIdx === path.length - 1;
 
-        // Advance waypoint when close enough
-        if (dist < (isLast ? ARRIVE_DIST : 12)) {
+        // Advance waypoint when close enough.
+        // Use a tighter radius (8 instead of 12) so the car commits to each
+        // waypoint before starting the turn — prevents corner-cutting through buildings.
+        if (dist < (isLast ? ARRIVE_DIST : 8)) {
+          // Save the waypoint we just reached as the new segment start
+          prevWpPos.current = { x: path[wpIdx].x, z: path[wpIdx].z };
           waypointIdx.current++;
           wpIdx++;
           if (wpIdx >= path.length && !arrivedRef.current) {
@@ -540,6 +562,27 @@ function Scene({
     const newZ = posRef.current.z + Math.cos(carOrientRef.current) * forwardDelta;
     posRef.current.x = clamp(newX, CITY_MIN_X, CITY_MAX_X);
     posRef.current.z = clamp(newZ, CITY_MIN_Z, CITY_MAX_Z);
+
+    // ── Road-rail snap (autopilot only) ───────────────────────────────────────
+    // After the physics step, clamp the car back onto the current road segment.
+    // This makes it geometrically impossible for the autopilot to enter a building:
+    // the car is forced to travel along the straight line between the two road nodes
+    // that bracket the current leg of the journey.
+    if (!isManual && autopilotTarget !== null) {
+      const path   = waypointPath.current;
+      const wpIdx  = waypointIdx.current;
+      if (path.length > 0 && wpIdx < path.length) {
+        const segA = prevWpPos.current;          // where this leg started
+        const segB = path[wpIdx];                // where this leg ends
+        const snapped = snapToSegment(
+          posRef.current.x, posRef.current.z,
+          segA.x, segA.z,
+          segB.x, segB.z,
+        );
+        posRef.current.x = snapped.x;
+        posRef.current.z = snapped.z;
+      }
+    }
 
     // ── Sync car mesh ─────────────────────────────────────────────────────────
     if (carRef.current) {
