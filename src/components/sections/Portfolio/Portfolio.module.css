@@ -27,16 +27,19 @@
 }
 
 .billboardFrame {
+  /* Positioning handled entirely by JS matrix3d — left:0 top:0 is the origin */
   position: absolute;
   overflow: hidden;
-  border-radius: 4px;
-  border: 1.5px solid rgba(255,255,255,0.3);
-  box-shadow: 0 0 20px rgba(0,0,0,0.6);
+  border-radius: 3px;
   pointer-events: none;
-  transition: opacity 0.2s ease;
+  /* No box-shadow or border — the 3-D frame provides the visual border */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .billboardIframe {
+  /* Renders a virtual 3× viewport then scales back so websites look
+     properly sized at the projected billboard dimensions (BB_W × BB_H). */
   width: 300%;
   height: 300%;
   transform: scale(0.3333);

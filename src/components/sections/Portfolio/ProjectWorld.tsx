@@ -493,10 +493,10 @@ function Car({
     // ── Wheel rolling — CarControls.js formula ────────────────────────────
     // Car moves: Δpos = spd * dt * MOV_SCALE  (world units per frame)
     // Wheel rotates: Δθ = Δpos / wheel_radius = Δpos * 2 / wheel_diameter
-    // At scale 1.8 the ferrari wheel diameter ≈ 0.55 * 1.8 = 0.99 world units
+    // At scale 2.4 the ferrari wheel diameter ≈ 0.55 * 2.4 = 1.32 world units
     // Subtract angDelta so forward motion → front of wheel descends (correct roll)
     const MOV_SCALE  = 0.07;   // must match Scene's MOV_SCALE
-    const WHEEL_DIAM = 0.99;   // world units: model ~0.55 * scale 1.8
+    const WHEEL_DIAM = 1.32;   // world units: model ~0.55 * scale 2.4
     const angDelta   = (spd * dt * MOV_SCALE) * (2 / WHEEL_DIAM);
 
     // Inner groups (front) and direct nodes (rear) — rolling on X axis
@@ -517,13 +517,14 @@ function Car({
       {/* Steer-angle data carrier — zero geometry, invisible */}
       <group ref={frontAxleRef} />
 
-      {/* Ferrari 458 Italia GLB */}
-      <primitive object={carScene} scale={[1.8, 1.8, 1.8]} position={[0, 0.01, 0]} />
+      {/* Ferrari 458 Italia GLB — scale 2.4 (bigger than before) */}
+      <primitive object={carScene} scale={[2.4, 2.4, 2.4]} position={[0, 0.01, 0]} />
 
-      {/* AO contact shadow — sized to match car footprint at scale 1.8.
-          color="black" prevents white fringing on transparent texture edges. */}
+      {/* AO contact shadow — sized to match car footprint at scale 2.4.
+          color="black" prevents white fringing on transparent texture edges.
+          Shadow size = reference footprint × (2.4/1.8) factor: [6.29, 12.48] */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]} renderOrder={2}>
-        <planeGeometry args={[4.72, 9.36]} />
+        <planeGeometry args={[6.29, 12.48]} />
         <meshBasicMaterial map={shadowTex} transparent opacity={0.75} depthWrite={false} color="black" />
       </mesh>
 
@@ -540,7 +541,20 @@ function Car({
 }
 
 // ── Billboard 3-D → 2-D Projector ──────────────────────────────────────────
-export type BillboardPos = { x: number; y: number; w: number; h: number; visible: boolean };
+// corners: [TL, TR, BR, BL] projected screen positions of the display glass
+export type BillboardPos = {
+  x: number; y: number; w: number; h: number; visible: boolean;
+  corners: [[number,number],[number,number],[number,number],[number,number]] | null;
+};
+
+// Pre-allocated vectors — avoid per-frame GC pressure
+const _vTL = new THREE.Vector3();
+const _vTR = new THREE.Vector3();
+const _vBR = new THREE.Vector3();
+const _vBL = new THREE.Vector3();
+
+// Throttle: only reproject every 3rd frame when car is far from billboards
+let _bbFrame = 0;
 
 function BillboardProjector({
   onProject,
@@ -551,24 +565,48 @@ function BillboardProjector({
   const prev = useRef<string>("");
 
   useFrame(() => {
+    _bbFrame = (_bbFrame + 1) % 3;
+    if (_bbFrame !== 0) return; // run at ~20fps instead of 60fps
+
     const out: BillboardPos[] = P_Z.map((pz, i) => {
-      const bx = P_SIDE[i] * STATION_X;
-      const by = 5.6;
-      const bz = pz - 0.45;
+      const bx  = P_SIDE[i] * STATION_X;
+      // Use the glass surface Z (from ProjectStation: z - 0.36)
+      const bz  = pz - 0.36;
+      const top = 7.2;    // 5.6 + 1.6
+      const bot = 4.0;    // 5.6 - 1.6
+      const hw  = 2.8;    // half-width
 
-      const center = new THREE.Vector3(bx, by, bz).project(camera);
-      if (center.z >= 1) return { x: 0, y: 0, w: 0, h: 0, visible: false };
+      // Project 4 corners of the display glass
+      _vTL.set(bx - hw, top, bz); _vTL.project(camera);
+      _vTR.set(bx + hw, top, bz); _vTR.project(camera);
+      _vBR.set(bx + hw, bot, bz); _vBR.project(camera);
+      _vBL.set(bx - hw, bot, bz); _vBL.project(camera);
 
-      const screenX = ((center.x + 1) / 2) * size.width;
-      const screenY = ((-center.y + 1) / 2) * size.height;
+      // Cull if any corner is behind the camera
+      if (_vTL.z >= 1 || _vTR.z >= 1 || _vBR.z >= 1 || _vBL.z >= 1)
+        return { x: 0, y: 0, w: 0, h: 0, visible: false, corners: null };
 
-      const lv = new THREE.Vector3(bx - 2.8, by, bz).project(camera);
-      const rv = new THREE.Vector3(bx + 2.8, by, bz).project(camera);
-      const w  = Math.abs(((rv.x - lv.x) / 2) * size.width);
-      const h  = w * 0.57;
+      const toSX = (v: THREE.Vector3) => ((v.x + 1) / 2) * size.width;
+      const toSY = (v: THREE.Vector3) => ((-v.y + 1) / 2) * size.height;
 
-      const visible = center.z > -1 && Math.abs(center.x) < 1.8 && Math.abs(center.y) < 1.8 && w > 20;
-      return { x: screenX, y: screenY, w, h, visible };
+      const corners: [[number,number],[number,number],[number,number],[number,number]] = [
+        [toSX(_vTL), toSY(_vTL)],
+        [toSX(_vTR), toSY(_vTR)],
+        [toSX(_vBR), toSY(_vBR)],
+        [toSX(_vBL), toSY(_vBL)],
+      ];
+
+      // Bounding-box centre + approx width for legacy compat / visibility check
+      const xs = corners.map(c => c[0]);
+      const ys = corners.map(c => c[1]);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
+      const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+      const w  = maxX - minX;
+
+      const visible = w > 20 && cx > -size.width * 0.2 && cx < size.width * 1.2
+                              && cy > -size.height * 0.2 && cy < size.height * 1.2;
+      return { x: cx, y: cy, w, h: maxY - minY, visible, corners };
     });
 
     const key = out.map(p => `${p.visible ? 1 : 0},${Math.round(p.x)},${Math.round(p.y)},${Math.round(p.w)}`).join("|");
@@ -659,7 +697,13 @@ function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }
       speedRef.current = clamp(speedRef.current + dt * ACCEL, MAX_SPD_REV, MAX_SPEED);
     }
     if (keys.down) {
-      speedRef.current = clamp(speedRef.current - dt * ACCEL_REV, MAX_SPD_REV, MAX_SPEED);
+      if (speedRef.current > 0) {
+        // Brake hard first — bring car to a full stop before reversing
+        speedRef.current = clamp(speedRef.current - dt * DECEL * BRAKE_POW, 0, MAX_SPEED);
+      } else {
+        // Already stopped (or already in reverse) — accelerate in reverse
+        speedRef.current = clamp(speedRef.current - dt * ACCEL_REV, MAX_SPD_REV, MAX_SPEED);
+      }
     }
     if (!keys.up && !keys.down) {
       // Normal coast-down: no brakePower multiplier (CarControls.js: brakingDeceleration=1 by default,
@@ -811,8 +855,8 @@ export default function ProjectWorld({ onNearProject, onBillboardPos, onAtBounda
       camera={{ position: [0, 14, 20], fov: 62, near: 0.1, far: 220 }}
       style={{ width: "100%", height: "100%" }}
       gl={{ antialias: false, alpha: false, powerPreference: "high-performance" }}
-      dpr={[0.75, 1]}
-      performance={{ min: 0.5 }}
+      dpr={[0.5, 0.85]}
+      performance={{ min: 0.3 }}
       flat
     >
       <color attach="background" args={[bg]} />

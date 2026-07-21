@@ -8,6 +8,64 @@ import type { BillboardPos, Theme, CarColors } from "./ProjectWorld";
 
 const ProjectWorld = dynamic(() => import("./ProjectWorld"), { ssr: false });
 
+// ── Module-level flag: survives SPA navigation re-mounts ────────────────────
+// Once the user has driven the car, never show the controls hint again.
+let _portfolioMoved = false;
+
+// ── CSS Perspective helper ───────────────────────────────────────────────────
+// Maps a W×H rectangle (at left:0 top:0 with transform-origin:0 0) to 4
+// arbitrary screen-space points [TL, TR, BR, BL] via a CSS matrix3d
+// computed from the 3×3 projective homography.
+const BB_W = 350; // natural display width in px
+const BB_H = 200; // natural display height in px (5.6:3.2 ≈ 1.75 ratio)
+
+function perspectiveCSS(
+  W: number, H: number,
+  pts: [[number,number],[number,number],[number,number],[number,number]]
+): string {
+  const [x1,y1] = pts[0]; // TL ← (0,0)
+  const [x2,y2] = pts[1]; // TR ← (W,0)
+  const [x3,y3] = pts[2]; // BR ← (W,H)
+  const [x4,y4] = pts[3]; // BL ← (0,H)
+
+  // 8×8 linear system for the 3×3 projective matrix [h1…h8, h9=1]
+  const A: number[][] = [
+    [0, 0, 1, 0, 0, 0,      0,      0],
+    [0, 0, 0, 0, 0, 1,      0,      0],
+    [W, 0, 1, 0, 0, 0, -x2*W,      0],
+    [0, 0, 0, W, 0, 1, -y2*W,      0],
+    [W, H, 1, 0, 0, 0, -x3*W, -x3*H],
+    [0, 0, 0, W, H, 1, -y3*W, -y3*H],
+    [0, H, 1, 0, 0, 0,      0, -x4*H],
+    [0, 0, 0, 0, H, 1,      0, -y4*H],
+  ];
+  const b = [x1, y1, x2, y2, x3, y3, x4, y4];
+
+  // Gaussian elimination with partial pivoting
+  const n = 8;
+  const M = A.map((row, i) => [...row, b[i]]);
+  for (let col = 0; col < n; col++) {
+    let maxRow = col;
+    for (let row = col + 1; row < n; row++) {
+      if (Math.abs(M[row][col]) > Math.abs(M[maxRow][col])) maxRow = row;
+    }
+    [M[col], M[maxRow]] = [M[maxRow], M[col]];
+    const pivot = M[col][col];
+    if (Math.abs(pivot) < 1e-10) return ""; // degenerate quad
+    for (let row = 0; row < n; row++) {
+      if (row === col) continue;
+      const f = M[row][col] / pivot;
+      for (let k = col; k <= n; k++) M[row][k] -= f * M[col][k];
+    }
+  }
+  const h = M.map((row, i) => row[n] / row[i]);
+  const [h1,h2,h3,h4,h5,h6,h7,h8] = h;
+
+  // CSS matrix3d in column-major order (W3C spec):
+  // col0=(h1,h4,0,h7), col1=(h2,h5,0,h8), col2=(0,0,1,0), col3=(h3,h6,0,1)
+  return `matrix3d(${h1},${h4},0,${h7},${h2},${h5},0,${h8},0,0,1,0,${h3},${h6},0,1)`;
+}
+
 // ── Car colour palettes — mirrors JS-3D-Car's materialsLib ──────────────────
 const BODY_COLORS = [
   { label: "Orange",   hex: "#ff4400" },
@@ -40,7 +98,8 @@ interface PortfolioProps {
 export default function Portfolio({ active = false }: PortfolioProps) {
   const [nearIdx,    setNearIdx]    = useState<number | null>(null);
   const [mounted,    setMounted]    = useState(false);
-  const [hintHidden,   setHintHidden]   = useState(false);
+  // Start hidden if user has already driven before (survives SPA re-mounts)
+  const [hintHidden,   setHintHidden]   = useState(_portfolioMoved);
   const [colorsHidden, setColorsHidden] = useState(false);
   const [theme,      setTheme]      = useState<Theme>("dark");
   const [dpadState,  setDpadState]  = useState({ up: false, down: false, left: false, right: false });
@@ -60,7 +119,8 @@ export default function Portfolio({ active = false }: PortfolioProps) {
   // Billboard overlay — updated via DOM refs to avoid re-renders
   const overlayRef   = useRef<HTMLDivElement>(null);
   const iframeRefs   = useRef<(HTMLDivElement | null)[]>([]);
-  const movedRef     = useRef(false);
+  // Initialise from the module-level flag so hint stays gone after SPA re-mounts
+  const movedRef     = useRef(_portfolioMoved);
 
   // Mount Three.js world when section becomes active
   useEffect(() => {
@@ -72,6 +132,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
     const onKey = (e: KeyboardEvent) => {
       if (!movedRef.current && ["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","w","s","a","d"].includes(e.key)) {
         movedRef.current = true;
+        _portfolioMoved  = true; // persist across SPA re-mounts
         setTimeout(() => setHintHidden(true), 1800);
         // Hide colour panel quickly — 400 ms feels responsive without being jarring
         setTimeout(() => setColorsHidden(true), 400);
@@ -81,24 +142,30 @@ export default function Portfolio({ active = false }: PortfolioProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Colour panel: re-show when car reaches start or end of the road
+  // Colour panel: only re-show at boundary if user has NEVER moved yet.
+  // Once they've driven away the colour picker stays hidden permanently.
   const handleAtBoundary = useCallback((at: boolean) => {
-    if (at) setColorsHidden(false);
+    if (at && !movedRef.current) setColorsHidden(false);
   }, []);
 
-  // Billboard projection callback — update DOM directly, no React re-render
+  // Billboard projection — apply CSS matrix3d perspective so the iframe
+  // appears physically INSIDE the 3-D billboard screen rather than a flat sticker.
   const handleBillboardPos = useCallback((positions: BillboardPos[]) => {
     positions.forEach((pos, i) => {
       const el = iframeRefs.current[i];
       if (!el) return;
-      if (pos.visible && pos.w > 24) {
-        el.style.display  = "block";
-        el.style.left     = `${pos.x - pos.w / 2}px`;
-        el.style.top      = `${pos.y - pos.h / 2}px`;
-        el.style.width    = `${pos.w}px`;
-        el.style.height   = `${pos.h}px`;
+      if (pos.visible && pos.corners) {
+        const xfm = perspectiveCSS(BB_W, BB_H, pos.corners);
+        if (!xfm) { el.style.display = "none"; return; }
+        el.style.display         = "block";
+        el.style.left            = "0";
+        el.style.top             = "0";
+        el.style.width           = `${BB_W}px`;
+        el.style.height          = `${BB_H}px`;
+        el.style.transformOrigin = "0 0";
+        el.style.transform       = xfm;
       } else {
-        el.style.display  = "none";
+        el.style.display = "none";
       }
     });
   }, []);
@@ -112,6 +179,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
     window.dispatchEvent(new CustomEvent("car-key", { detail: { key, pressed } }));
     if (pressed && !movedRef.current) {
       movedRef.current = true;
+      _portfolioMoved  = true;
       setTimeout(() => setHintHidden(true), 1800);
       setTimeout(() => setColorsHidden(true), 400);
     }

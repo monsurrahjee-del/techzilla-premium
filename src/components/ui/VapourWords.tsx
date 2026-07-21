@@ -6,6 +6,10 @@ import styles from "./VapourWords.module.css";
 const WORDS = ["The", "services", "We", "Provide"];
 const WORD_MS = 2600; // ms each word holds
 
+// Module-level flag — survives component unmounts and section re-activations.
+// Once the animation has played once per page-load we never replay it.
+let _vapourPlayed = false;
+
 interface Props {
   active: boolean;
   onComplete?: () => void;
@@ -25,6 +29,14 @@ export default function VapourWords({ active, onComplete }: Props) {
       doneRef.current = false;
       return;
     }
+
+    // If this animation already ran during this page-load, skip straight to
+    // the completion callback so the parent transitions immediately.
+    if (_vapourPlayed) {
+      cbRef.current?.();
+      return;
+    }
+
     doneRef.current = false;
     setWordIndex(0);
 
@@ -35,6 +47,7 @@ export default function VapourWords({ active, onComplete }: Props) {
           advance(idx + 1);
         } else if (!doneRef.current) {
           doneRef.current = true;
+          _vapourPlayed = true; // remember for all future re-activations
           // small extra pause so the last word fully vaporises before transition
           timerRef.current = setTimeout(() => cbRef.current?.(), 900);
         }
