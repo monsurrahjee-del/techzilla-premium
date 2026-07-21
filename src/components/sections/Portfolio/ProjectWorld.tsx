@@ -312,7 +312,6 @@ function ProjectStation({
   const x    = side * STATION_X;
 
   const glowRef  = useRef<THREE.PointLight>(null!);
-  const ringRef  = useRef<THREE.Mesh>(null!);
   const frameRef = useRef<THREE.Mesh>(null!);
   const tmr      = useRef(0);
 
@@ -320,8 +319,6 @@ function ProjectStation({
     tmr.current += delta;
     if (glowRef.current)
       glowRef.current.intensity = (isNear ? 40 : 12) + Math.sin(tmr.current * 1.8) * 5;
-    if (ringRef.current)
-      ringRef.current.rotation.y += delta * (isNear ? 1.4 : 0.45);
     if (frameRef.current)
       (frameRef.current.material as THREE.MeshStandardMaterial).emissiveIntensity =
         (isNear ? 4.0 : 1.2) + Math.sin(tmr.current * 2.5) * 0.6;
@@ -352,10 +349,6 @@ function ProjectStation({
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.003, z]}>
         <circleGeometry args={[6.5, 48]} />
         <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.1} transparent opacity={0.38} />
-      </mesh>
-      <mesh ref={ringRef} position={[x, 4.2, z]}>
-        <torusGeometry args={[4.5, 0.08, 8, 52]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={2.2} />
       </mesh>
       <mesh position={[x, 2.5, z - 0.5]}>
         <cylinderGeometry args={[0.1, 0.14, 5, 8]} />
@@ -768,12 +761,15 @@ function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }
       camHeight,
       posRef.current.z + Math.cos(carOrientRef.current) * camDist
     );
-    // Increased lerp factors for noticeably smoother camera tracking
-    camPosRef.current.lerp(camTarget, 0.10);
+    // Frame-rate-independent exponential decay lerp — smooth at any FPS.
+    // k=9 → ~half-life of ~77ms; camera reaches 95% in ~330ms.
+    const alphaPos  = 1 - Math.exp(-9  * dt);
+    const alphaLook = 1 - Math.exp(-11 * dt);
+    camPosRef.current.lerp(camTarget, alphaPos);
     state.camera.position.copy(camPosRef.current);
 
     const lookTarget = new THREE.Vector3(posRef.current.x, 0.6, posRef.current.z);
-    camLookRef.current.lerp(lookTarget, 0.14);
+    camLookRef.current.lerp(lookTarget, alphaLook);
     state.camera.lookAt(camLookRef.current);
 
     // ── Project proximity ───────────────────────────────────────────────────

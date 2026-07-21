@@ -58,6 +58,7 @@ export default function Home() {
     if (!hero || !about || !services || !portfolio) return;
 
     let vaporTriggered = false;
+    let isInitialEval  = true; // skip vapor trigger on browser scroll-restore at mount
 
     const supportsScrollDriven =
       typeof CSS !== "undefined" &&
@@ -113,8 +114,9 @@ export default function Home() {
       }
 
       /* ── Vapor trigger ───────────────────────────────────────────────────── */
-      // Was raw >= 0.94 in 200vh (= 188vh scroll) → 188/300 = 0.627 in 300vh
-      if (raw >= 0.99 && !vaporTriggered) {
+      // Skip on the initial load evaluation so that a page reload from the bottom
+      // of the page (e.g. from the work section) does not re-play the vapor.
+      if (raw >= 0.99 && !vaporTriggered && !isInitialEval) {
         vaporTriggered = true;
         frozenScrollRef.current = window.scrollY;
         vaporActiveRef.current  = true;
@@ -138,9 +140,11 @@ export default function Home() {
 
     window.addEventListener("scroll", onScroll, { passive: true });
 
-    // Evaluate on load (e.g. browser scroll restore after refresh)
+    // Evaluate on load (e.g. browser scroll restore after refresh).
+    // isInitialEval stays true during this call so vapor is not re-triggered.
     const initMax = document.documentElement.scrollHeight - window.innerHeight;
     driveFrame(initMax > 0 ? window.scrollY / initMax : 0);
+    isInitialEval = false; // allow vapor to trigger on subsequent user scrolls
 
     return () => window.removeEventListener("scroll", onScroll);
   }, []);

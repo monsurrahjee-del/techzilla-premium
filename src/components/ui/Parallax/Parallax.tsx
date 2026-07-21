@@ -15,10 +15,9 @@ export default function Parallax({ children, strength = 20, className }: Props) 
   useEffect(() => {
     if (!ref.current) return;
 
-    // quickTo creates a reusable setter that updates the running tween in-place
-    // instead of spawning a new tween on every mousemove (which piles up).
-    const xTo = gsap.quickTo(ref.current, "x", { duration: 0.1, ease: "power3.out" });
-    const yTo = gsap.quickTo(ref.current, "y", { duration: 0.1, ease: "power3.out" });
+    // duration: 0 → pure 1:1 tracking, no animation lag on any page.
+    const xTo = gsap.quickTo(ref.current, "x", { duration: 0, ease: "none" });
+    const yTo = gsap.quickTo(ref.current, "y", { duration: 0, ease: "none" });
 
     const handleMove = (e: MouseEvent) => {
       xTo((e.clientX / window.innerWidth  - 0.5) * strength);
