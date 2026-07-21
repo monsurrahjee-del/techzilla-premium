@@ -450,87 +450,81 @@ function Scene({
     const dt   = Math.min(delta, 0.05);
     const keys = keysRef.current;
 
-    // ── Autopilot: waypoint navigation ───────────────────────────────────────
-    let autoAngleDiff  = 0;
-    let autoShouldDrive = false;
-
+    // ── Autopilot: direct rail movement (physics-free, cannot enter buildings) ──
+    // The car's position is moved purely along the straight line between road
+    // nodes — no steering drift, no physics lag, geometrically on-road always.
+    let autopilotMoved = false;
     if (!isManual && autopilotTarget !== null) {
-      const path = waypointPath.current;
-      let wpIdx  = waypointIdx.current;
+      const path  = waypointPath.current;
+      let   wpIdx = waypointIdx.current;
+      const AUTO_SPEED = 22; // world-units / second
 
-      if (wpIdx < path.length) {
-        const wp   = path[wpIdx];
-        const dx   = wp.x - posRef.current.x;
-        const dz   = wp.z - posRef.current.z;
-        const dist = Math.sqrt(dx * dx + dz * dz);
+      if (!arrivedRef.current && wpIdx < path.length) {
+        const wp    = path[wpIdx];
+        const dx    = wp.x - posRef.current.x;
+        const dz    = wp.z - posRef.current.z;
+        const dist  = Math.sqrt(dx * dx + dz * dz);
         const isLast = wpIdx === path.length - 1;
 
-        // Advance waypoint when close enough.
-        // Use a tighter radius (8 instead of 12) so the car commits to each
-        // waypoint before starting the turn — prevents corner-cutting through buildings.
-        if (dist < (isLast ? ARRIVE_DIST : 8)) {
-          // Save the waypoint we just reached as the new segment start
-          prevWpPos.current = { x: path[wpIdx].x, z: path[wpIdx].z };
+        if (dist < (isLast ? ARRIVE_DIST : 5)) {
+          // Arrived at this waypoint — snap exactly to it and advance
+          posRef.current.x = wp.x;
+          posRef.current.z = wp.z;
           waypointIdx.current++;
           wpIdx++;
-          if (wpIdx >= path.length && !arrivedRef.current) {
+          if (wpIdx >= path.length) {
             arrivedRef.current = true;
             speedRef.current   = 0;
             keysRef.current    = { up: false, down: false, left: false, right: false };
             onAutoArrived();
           }
+        } else {
+          // Move directly along segment — no physics, no drift
+          const step = Math.min(AUTO_SPEED * dt, dist);
+          posRef.current.x += (dx / dist) * step;
+          posRef.current.z += (dz / dist) * step;
+          // Smoothly rotate car to face travel direction
+          const targetAngle  = Math.atan2(-dx, -dz);
+          const angleDiff    = normaliseAngle(targetAngle - carOrientRef.current);
+          carOrientRef.current += angleDiff * Math.min(dt * 5, 1);
+          // Keep wheel-spin animation proportional to speed
+          speedRef.current = AUTO_SPEED / MOV_SCALE;
+          // Smoothly straighten front wheels (since we're controlling heading directly)
+          wheelOrRef.current = THREE.MathUtils.lerp(wheelOrRef.current, 0, Math.min(dt * 4, 1));
         }
-
-        if (wpIdx < path.length) {
-          const wp2  = path[wpIdx];
-          const dx2  = wp2.x - posRef.current.x;
-          const dz2  = wp2.z - posRef.current.z;
-          const dist2 = Math.sqrt(dx2 * dx2 + dz2 * dz2);
-          const targetAngle = Math.atan2(-dx2, -dz2);
-          autoAngleDiff    = normaliseAngle(targetAngle - carOrientRef.current);
-          autoShouldDrive  = dist2 > ARRIVE_DIST;
-        }
+      } else if (arrivedRef.current) {
+        // Gently coast to a halt
+        speedRef.current = Math.max(0, speedRef.current - dt * DECEL);
+        wheelOrRef.current = THREE.MathUtils.lerp(wheelOrRef.current, 0, Math.min(dt * 4, 1));
       }
-
-      // Override keys (speed driven by autoShouldDrive, steer handled below)
-      keys.up    = autoShouldDrive;
-      keys.down  = false;
-      keys.left  = false;
-      keys.right = false;
+      autopilotMoved = true;
     } else if (!isManual && autopilotTarget === null) {
       keys.up = false; keys.down = false; keys.left = false; keys.right = false;
     }
 
-    // ── Speed ─────────────────────────────────────────────────────────────────
-    if (keys.up) {
-      speedRef.current = clamp(speedRef.current + dt * ACCEL, MAX_SPD_REV, MAX_SPEED);
-    }
-    if (keys.down) {
-      if (speedRef.current > 0) {
-        speedRef.current = clamp(speedRef.current - dt * DECEL * BRAKE_POW, 0, MAX_SPEED);
-      } else {
-        speedRef.current = clamp(speedRef.current - dt * ACCEL_REV, MAX_SPD_REV, MAX_SPEED);
+    if (!autopilotMoved) {
+      // ── Speed (manual) ──────────────────────────────────────────────────────
+      if (keys.up) {
+        speedRef.current = clamp(speedRef.current + dt * ACCEL, MAX_SPD_REV, MAX_SPEED);
       }
-    }
-    if (!keys.up && !keys.down) {
-      if (speedRef.current > 0) {
-        const k = expEaseOut(speedRef.current / MAX_SPEED);
-        speedRef.current = clamp(speedRef.current - k * dt * DECEL, 0, MAX_SPEED);
-      } else {
-        const k = expEaseOut(speedRef.current / MAX_SPD_REV);
-        speedRef.current = clamp(speedRef.current + k * dt * ACCEL_REV, MAX_SPD_REV, 0);
+      if (keys.down) {
+        if (speedRef.current > 0) {
+          speedRef.current = clamp(speedRef.current - dt * DECEL * BRAKE_POW, 0, MAX_SPEED);
+        } else {
+          speedRef.current = clamp(speedRef.current - dt * ACCEL_REV, MAX_SPD_REV, MAX_SPEED);
+        }
       }
-    }
+      if (!keys.up && !keys.down) {
+        if (speedRef.current > 0) {
+          const k = expEaseOut(speedRef.current / MAX_SPEED);
+          speedRef.current = clamp(speedRef.current - k * dt * DECEL, 0, MAX_SPEED);
+        } else {
+          const k = expEaseOut(speedRef.current / MAX_SPD_REV);
+          speedRef.current = clamp(speedRef.current + k * dt * ACCEL_REV, MAX_SPD_REV, 0);
+        }
+      }
 
-    // ── Steering ──────────────────────────────────────────────────────────────
-    if (!isManual && autopilotTarget !== null) {
-      // Proportional steering: smoothly interpolate toward target angle
-      const targetWheel = clamp(autoAngleDiff * (MAX_STEER / 0.6), -MAX_STEER, MAX_STEER);
-      wheelOrRef.current = THREE.MathUtils.lerp(
-        wheelOrRef.current, targetWheel, Math.min(dt * 6, 1),
-      );
-    } else {
-      // Key-based steering (manual)
+      // ── Steering (manual) ───────────────────────────────────────────────────
       if (keys.left)  wheelOrRef.current = clamp(wheelOrRef.current + dt * STEER_SPD, -MAX_STEER, MAX_STEER);
       if (keys.right) wheelOrRef.current = clamp(wheelOrRef.current - dt * STEER_SPD, -MAX_STEER, MAX_STEER);
       if (!keys.left && !keys.right) {
@@ -540,36 +534,14 @@ function Scene({
           wheelOrRef.current = clamp(wheelOrRef.current + dt * STEER_SPD, -MAX_STEER, 0);
         }
       }
-    }
 
-    // ── Movement ──────────────────────────────────────────────────────────────
-    const forwardDelta = -speedRef.current * dt * MOV_SCALE;
-    carOrientRef.current -= (forwardDelta * TURN_RAD * 0.02) * wheelOrRef.current;
-
-    const newX = posRef.current.x + Math.sin(carOrientRef.current) * forwardDelta;
-    const newZ = posRef.current.z + Math.cos(carOrientRef.current) * forwardDelta;
-    posRef.current.x = clamp(newX, CITY_MIN_X, CITY_MAX_X);
-    posRef.current.z = clamp(newZ, CITY_MIN_Z, CITY_MAX_Z);
-
-    // ── Road-rail snap (autopilot only) ───────────────────────────────────────
-    // After the physics step, clamp the car back onto the current road segment.
-    // This makes it geometrically impossible for the autopilot to enter a building:
-    // the car is forced to travel along the straight line between the two road nodes
-    // that bracket the current leg of the journey.
-    if (!isManual && autopilotTarget !== null) {
-      const path   = waypointPath.current;
-      const wpIdx  = waypointIdx.current;
-      if (path.length > 0 && wpIdx < path.length) {
-        const segA = prevWpPos.current;          // where this leg started
-        const segB = path[wpIdx];                // where this leg ends
-        const snapped = snapToSegment(
-          posRef.current.x, posRef.current.z,
-          segA.x, segA.z,
-          segB.x, segB.z,
-        );
-        posRef.current.x = snapped.x;
-        posRef.current.z = snapped.z;
-      }
+      // ── Movement (manual) ───────────────────────────────────────────────────
+      const forwardDelta = -speedRef.current * dt * MOV_SCALE;
+      carOrientRef.current -= (forwardDelta * TURN_RAD * 0.02) * wheelOrRef.current;
+      const newX = posRef.current.x + Math.sin(carOrientRef.current) * forwardDelta;
+      const newZ = posRef.current.z + Math.cos(carOrientRef.current) * forwardDelta;
+      posRef.current.x = clamp(newX, CITY_MIN_X, CITY_MAX_X);
+      posRef.current.z = clamp(newZ, CITY_MIN_Z, CITY_MAX_Z);
     }
 
     // ── Sync car mesh ─────────────────────────────────────────────────────────
