@@ -27,19 +27,15 @@
 }
 
 .billboardFrame {
-  /* Positioning handled entirely by JS matrix3d — left:0 top:0 is the origin */
   position: absolute;
   overflow: hidden;
   border-radius: 3px;
   pointer-events: none;
-  /* No box-shadow or border — the 3-D frame provides the visual border */
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
 
 .billboardIframe {
-  /* Renders a virtual 3× viewport then scales back so websites look
-     properly sized at the projected billboard dimensions (BB_W × BB_H). */
   width: 300%;
   height: 300%;
   transform: scale(0.3333);
@@ -152,9 +148,7 @@
   background: rgba(20,20,60,0.2);
 }
 
-.toggleLabel {
-  line-height: 1;
-}
+.toggleLabel { line-height: 1; }
 
 /* ── Project info card ────────────────────────────────────────────────────── */
 .projectCard {
@@ -248,9 +242,7 @@
 }
 
 /* ── Card body ────────────────────────────────────────────────────────────── */
-.cardBody {
-  padding: 18px 22px 18px;
-}
+.cardBody { padding: 18px 22px 18px; }
 
 .cardAccentBar {
   width: 32px;
@@ -429,11 +421,7 @@
   box-shadow: 0 4px 18px rgba(0,0,0,0.12);
 }
 
-.colorRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+.colorRow { display: flex; align-items: center; gap: 8px; }
 
 .colorLabel {
   font-family: "Geist Mono", monospace;
@@ -446,14 +434,10 @@
 .colorLabelDark  { color: rgba(255,255,255,0.38); }
 .colorLabelLight { color: rgba(20,20,60,0.48); }
 
-.swatches {
-  display: flex;
-  gap: 5px;
-}
+.swatches { display: flex; gap: 5px; }
 
 .swatch {
-  width: 18px;
-  height: 18px;
+  width: 18px; height: 18px;
   border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;
@@ -467,6 +451,289 @@
   border-color: #fff;
   box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 0 8px rgba(255,255,255,0.5);
   transform: scale(1.15);
+}
+
+/* ── Preloader overlay ────────────────────────────────────────────────────── */
+.preloader {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #050508;
+  animation: preloaderFadeIn 0.3s ease both;
+}
+
+@keyframes preloaderFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.preloaderInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  width: min(320px, 80vw);
+}
+
+.preloaderTitle {
+  font-family: "Geist", system-ui, sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: rgba(255,255,255,0.75);
+}
+
+.preloaderBarWrap {
+  width: 100%;
+  height: 3px;
+  background: rgba(255,255,255,0.10);
+  border-radius: 100px;
+  overflow: hidden;
+}
+
+.preloaderBar {
+  height: 100%;
+  background: linear-gradient(90deg, #6080ff, #c040ff);
+  border-radius: 100px;
+  transition: width 0.08s linear;
+}
+
+.preloaderPct {
+  font-family: "Geist Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  color: rgba(255,255,255,0.3);
+}
+
+/* ── Mode selection modal ─────────────────────────────────────────────────── */
+.modalBackdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 8, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: modalFadeIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.modal {
+  width: min(520px, 90vw);
+  border-radius: 24px;
+  padding: 36px 32px 32px;
+  animation: modalSlideIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes modalSlideIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modalDark {
+  background: rgba(10, 10, 22, 0.94);
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(100,120,255,0.15);
+}
+
+.modalLight {
+  background: rgba(240, 244, 255, 0.96);
+  border: 1px solid rgba(80,80,180,0.15);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.18);
+}
+
+.modalTitle {
+  font-family: "Geist", system-ui, sans-serif;
+  font-size: clamp(1.2rem, 3vw, 1.5rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #fff;
+  margin: 0 0 8px;
+  text-align: center;
+}
+
+.modalLight .modalTitle { color: #0f0f2a; }
+
+.modalSub {
+  font-family: "Geist", system-ui, sans-serif;
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.4);
+  text-align: center;
+  margin: 0 0 28px;
+}
+
+.modalLight .modalSub { color: rgba(20,20,60,0.5); }
+
+.modalOptions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.modeBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 18px 20px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.05);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.18s ease, box-shadow 0.2s ease;
+  text-align: center;
+}
+.modeBtn:hover {
+  background: rgba(255,255,255,0.09);
+  transform: translateY(-2px);
+}
+.modeBtn:active { transform: scale(0.97); }
+
+.modeBtnAuto:hover {
+  border-color: rgba(100, 160, 255, 0.5);
+  box-shadow: 0 0 0 1px rgba(100,160,255,0.2), 0 6px 24px rgba(80,120,255,0.15);
+}
+
+.modeBtnManual:hover {
+  border-color: rgba(180, 100, 255, 0.5);
+  box-shadow: 0 0 0 1px rgba(180,100,255,0.2), 0 6px 24px rgba(160,80,255,0.15);
+}
+
+.modeBtnIcon {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+.modeBtnLabel {
+  font-family: "Geist", system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+
+.modalLight .modeBtnLabel { color: #0f0f2a; }
+
+.modeBtnDesc {
+  font-family: "Geist", system-ui, sans-serif;
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.38);
+  line-height: 1.5;
+}
+
+.modeBtnDesc em {
+  font-style: normal;
+  color: rgba(255,255,255,0.65);
+  font-weight: 600;
+}
+
+.modalLight .modeBtnDesc { color: rgba(20,20,60,0.5); }
+.modalLight .modeBtnDesc em { color: rgba(20,20,60,0.8); }
+
+/* ── Go to Project button ─────────────────────────────────────────────────── */
+.gotoBtn {
+  position: absolute;
+  bottom: 30px;
+  right: 28px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 100px;
+  border: none;
+  cursor: pointer;
+  font-family: "Geist", system-ui, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease, opacity 0.2s ease;
+  user-select: none;
+  white-space: nowrap;
+  max-width: min(260px, 60vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gotoBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+.gotoBtn:active:not(:disabled) { transform: scale(0.97); }
+
+.gotoBtnDark {
+  background: linear-gradient(135deg, #4060ff 0%, #8040ff 100%);
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(64,96,255,0.45), 0 0 0 1px rgba(255,255,255,0.12);
+}
+.gotoBtnDark:hover:not(:disabled) {
+  box-shadow: 0 6px 28px rgba(64,96,255,0.6), 0 0 0 1px rgba(255,255,255,0.18);
+}
+
+.gotoBtnLight {
+  background: linear-gradient(135deg, #3050ee 0%, #7030ee 100%);
+  color: #fff;
+  box-shadow: 0 4px 18px rgba(50,80,200,0.35);
+}
+
+.gotoBtnDisabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* ── Manual / Auto toggle (floating pill) ─────────────────────────────────── */
+.manualToggle {
+  position: absolute;
+  bottom: 80px;
+  right: 28px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 100px;
+  border: none;
+  cursor: pointer;
+  font-family: "Geist", system-ui, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+  user-select: none;
+}
+.manualToggle:hover { transform: translateY(-1px); }
+.manualToggle:active { transform: scale(0.97); }
+
+.manualToggleDark {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.65);
+  border: 1px solid rgba(255,255,255,0.14);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+.manualToggleDark:hover {
+  background: rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.9);
+}
+
+.manualToggleLight {
+  background: rgba(20,20,60,0.10);
+  color: rgba(20,20,60,0.65);
+  border: 1px solid rgba(20,20,80,0.18);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+.manualToggleLight:hover {
+  background: rgba(20,20,60,0.18);
+  color: rgba(20,20,60,0.9);
 }
 
 /* ── Responsive ───────────────────────────────────────────────────────────── */
@@ -483,6 +750,9 @@
   .dpad { display: flex; }
   .controlsHint { display: none; }
   .progressBar { bottom: 104px; }
+  .gotoBtn { bottom: 22px; right: 20px; font-size: 0.74rem; padding: 10px 14px; }
+  .manualToggle { bottom: 72px; right: 20px; }
+  .modalOptions { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
   .projectCard { bottom: 148px; }

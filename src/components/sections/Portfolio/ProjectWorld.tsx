@@ -10,15 +10,13 @@ import { projects } from "@/lib/projects";
 const ROAD_Y = 20.75;
 
 // ── Project stations: ground circle positions near representative buildings ──
-// Placed ON the road, beside the building type that represents each project.
-// Project order: Party Place, Maser Travels, Loan Mgmt, YCT Micro, Malete Hostels, Zennyola Foods
-const STATIONS: { x: number; z: number; icon: string }[] = [
-  { x:  75, z: -20, icon: "🎪" }, // 0 Party Place — event venue (central road)
-  { x: 120, z: -10, icon: "✈️" }, // 1 Maser Travels — travel building (NE road)
-  { x: 188, z: -40, icon: "🏦" }, // 2 Loan Mgmt — bank (east outer road)
-  { x:  25, z: -85, icon: "💳" }, // 3 YCT Microfinance — finance (south road)
-  { x: -92, z:  30, icon: "🏨" }, // 4 Malete Hostels — hostel (west road)
-  { x:  92, z: 108, icon: "🍽️" }, // 5 Zennyola Foods — restaurant (north road)
+export const STATIONS: { x: number; z: number; icon: string }[] = [
+  { x:  75, z: -20, icon: "🎪" }, // 0 Party Place
+  { x: 120, z: -10, icon: "✈️" }, // 1 Maser Travels
+  { x: 188, z: -40, icon: "🏦" }, // 2 Loan Mgmt
+  { x:  25, z: -85, icon: "💳" }, // 3 YCT Microfinance
+  { x: -92, z:  30, icon: "🏨" }, // 4 Malete Hostels
+  { x:  92, z: 108, icon: "🍽️" }, // 5 Zennyola Foods
 ];
 
 
@@ -75,7 +73,6 @@ function CityModel() {
   const city  = useMemo(() => cityScene.clone(true),  [cityScene]);
   const house = useMemo(() => houseScene.clone(true), [houseScene]);
 
-  // Disable shadows on every mesh — huge perf win for a 97 MB model
   useMemo(() => {
     city.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {
@@ -98,7 +95,7 @@ function CityModel() {
   );
 }
 
-// ── Ground circle — replaces the billboard, marks the project location ────────
+// ── Ground circle ─────────────────────────────────────────────────────────────
 function GroundCircle({
   index,
   accent,
@@ -146,7 +143,7 @@ function GroundCircle({
         />
       </mesh>
 
-      {/* Floating name label (always faces camera via Html) */}
+      {/* Floating name label — hidden when car is near (would block screen) */}
       <Html
         position={[x, ROAD_Y + 8, z]}
         center
@@ -156,9 +153,7 @@ function GroundCircle({
       >
         <div
           style={{
-            background: isNear
-              ? `${accent}dd`
-              : `${accent}55`,
+            background: `${accent}55`,
             border:     `1.5px solid ${accent}`,
             borderRadius: "8px",
             padding:    "5px 12px",
@@ -169,15 +164,17 @@ function GroundCircle({
             fontFamily: "system-ui, -apple-system, sans-serif",
             textShadow: "0 1px 3px rgba(0,0,0,0.9)",
             letterSpacing: "0.02em",
-            transition: "background 0.3s, transform 0.3s",
-            transform:  isNear ? "scale(1.12)" : "scale(1)",
+            // Hide when car is close — it blocks the screen
+            opacity:    isNear ? 0 : 1,
+            transition: "opacity 0.3s ease",
+            pointerEvents: "none",
           }}
         >
           {icon} {project.title}
         </div>
       </Html>
 
-      {/* Glow light — only active when car is near (saves GPU) */}
+      {/* Glow light — only active when car is near */}
       {isNear && (
         <pointLight
           position={[x, ROAD_Y + 4, z]}
@@ -212,7 +209,6 @@ function Car({
   const { scene: gltfScene } = useGLTF("/models/ferrari.glb");
   const carScene = useMemo(() => gltfScene.clone(true), [gltfScene]);
 
-  // Wire up wheel references
   useEffect(() => {
     const flRoot = carScene.getObjectByName("wheel_fl");
     const frRoot = carScene.getObjectByName("wheel_fr");
@@ -238,7 +234,6 @@ function Car({
     (carRef as any).__speedRef  = { current: 0 };
   }, [carScene, carRef]);
 
-  // Apply car colours
   useEffect(() => {
     const bodyMat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(colors.body), metalness: 0.9, roughness: 0.2,
@@ -266,11 +261,10 @@ function Car({
     () => new THREE.TextureLoader().load("/models/ferrari_ao.png"), []
   );
 
-  // Wheel spin + steer animation
   useFrame((_, delta) => {
     const dt  = Math.min(delta, 0.05);
     const spd = (carRef as any).__speedRef?.current ?? 0;
-    const WHEEL_DIAM = 0.66; // matched to scale 1.2
+    const WHEEL_DIAM = 0.66;
     const angDelta   = (spd * dt * 0.12) * (2 / WHEEL_DIAM);
 
     flInner.current.rotation.x -= angDelta;
@@ -283,14 +277,11 @@ function Car({
     if (wheelFRRoot.current) wheelFRRoot.current.rotation.z = steer;
   });
 
-  // Car scale 1.2 — noticeably smaller in the big city, still easily visible
-  // AO shadow plane scales with car (original 6.29×12.48 at scale 2.4 → 3.15×6.24 at scale 1.2)
   return (
     <group ref={carRef}>
       <group ref={frontAxleRef} />
       <primitive object={carScene} scale={[1.2, 1.2, 1.2]} position={[0, 0.01, 0]} />
 
-      {/* AO contact shadow (scaled to match 1.2) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]} renderOrder={2}>
         <planeGeometry args={[3.15, 6.24]} />
         <meshBasicMaterial
@@ -302,7 +293,6 @@ function Car({
         />
       </mesh>
 
-      {/* Headlight beams — dark theme only */}
       {theme === "dark" && (
         <>
           <pointLight position={[ 0.26, 0.20, -1.0]} color="#fffadc" intensity={60} distance={25} decay={2} />
@@ -314,16 +304,26 @@ function Car({
   );
 }
 
-// ── Pre-allocated vectors — avoid per-frame heap allocations ─────────────────
+// ── Pre-allocated vectors ─────────────────────────────────────────────────────
 const _camTarget  = new THREE.Vector3();
 const _lookTarget = new THREE.Vector3();
 
+// ── Normalise angle to (-PI, PI] ─────────────────────────────────────────────
+function normaliseAngle(a: number): number {
+  while (a >  Math.PI) a -= 2 * Math.PI;
+  while (a < -Math.PI) a += 2 * Math.PI;
+  return a;
+}
+
 // ── Main scene ────────────────────────────────────────────────────────────────
 interface SceneProps {
-  onNearProject: (idx: number | null) => void;
-  onAtBoundary:  (at: boolean) => void;
-  theme:         Theme;
-  carColors:     CarColors;
+  onNearProject:    (idx: number | null) => void;
+  onAtBoundary:     (at: boolean) => void;
+  onAutoArrived:    () => void;
+  theme:            Theme;
+  carColors:        CarColors;
+  autopilotTarget:  number | null;
+  isManual:         boolean;
 }
 
 const expEaseOut = (k: number) => (k === 1 ? 1 : -Math.pow(2, -10 * k) + 1);
@@ -334,23 +334,33 @@ const CITY_MAX_X =  210;
 const CITY_MIN_Z = -110;
 const CITY_MAX_Z =  130;
 
-// ── Car physics constants ─────────────────────────────────────────────────────
-const MAX_SPEED   = 280;   // units/s at full throttle (snappier across the big city)
+const MAX_SPEED   = 280;
 const MAX_SPD_REV = -70;
-const ACCEL       = 140;   // fast acceleration for responsive feel
+const ACCEL       = 140;
 const ACCEL_REV   = 50;
 const DECEL       = 90;
 const BRAKE_POW   = 8;
 const STEER_SPD   = 1.8;
 const MAX_STEER   = 0.55;
 const TURN_RAD    = 20;
-const MOV_SCALE   = 0.12;  // world-units-per-speed-unit — tuned for city scale
+const MOV_SCALE   = 0.12;
 
-function Scene({ onNearProject, onAtBoundary, theme, carColors }: SceneProps) {
+// Arrival radius — stop here (slightly larger than proximity trigger)
+const ARRIVE_DIST = 10;
+
+function Scene({
+  onNearProject,
+  onAtBoundary,
+  onAutoArrived,
+  theme,
+  carColors,
+  autopilotTarget,
+  isManual,
+}: SceneProps) {
   const t = THEMES[theme];
 
   const carRef       = useRef<THREE.Group>(null!);
-  const posRef       = useRef({ x: 72, z: -40 });  // YUKA start waypoint
+  const posRef       = useRef({ x: 72, z: -40 });
   const carOrientRef = useRef(0);
   const speedRef     = useRef(0);
   const wheelOrRef   = useRef(0);
@@ -359,11 +369,18 @@ function Scene({ onNearProject, onAtBoundary, theme, carColors }: SceneProps) {
   const camLookRef   = useRef(new THREE.Vector3(72, ROAD_Y + 0.4, -40));
   const curProjRef   = useRef<number | null>(null);
   const atBoundRef   = useRef(false);
+  const arrivedRef   = useRef(false);
   const [nearIdx, setNearIdx] = useState<number | null>(null);
 
-  // Keyboard + mobile d-pad event listeners
+  // Reset arrived flag whenever autopilotTarget changes
+  useEffect(() => {
+    arrivedRef.current = false;
+  }, [autopilotTarget]);
+
+  // Keyboard + mobile d-pad — only in manual mode
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      if (!isManual) return;
       if (["ArrowUp",    "w","W"].includes(e.key)) { keysRef.current.up    = true; e.preventDefault(); }
       if (["ArrowDown",  "s","S"].includes(e.key)) { keysRef.current.down  = true; e.preventDefault(); }
       if (["ArrowLeft",  "a","A"].includes(e.key)) { keysRef.current.left  = true; e.preventDefault(); }
@@ -376,6 +393,7 @@ function Scene({ onNearProject, onAtBoundary, theme, carColors }: SceneProps) {
       if (["ArrowRight", "d","D"].includes(e.key)) keysRef.current.right = false;
     };
     const carKey = (e: Event) => {
+      if (!isManual) return;
       const { key, pressed } = (e as CustomEvent<{ key: string; pressed: boolean }>).detail;
       if (key === "up")    keysRef.current.up    = pressed;
       if (key === "down")  keysRef.current.down  = pressed;
@@ -390,11 +408,51 @@ function Scene({ onNearProject, onAtBoundary, theme, carColors }: SceneProps) {
       window.removeEventListener("keyup",    up);
       window.removeEventListener("car-key",  carKey);
     };
-  }, []);
+  }, [isManual]);
+
+  // When switching to manual, clear any autopilot key states
+  useEffect(() => {
+    if (isManual) {
+      keysRef.current = { up: false, down: false, left: false, right: false };
+    }
+  }, [isManual]);
 
   useFrame((state, delta) => {
     const dt   = Math.min(delta, 0.05);
     const keys = keysRef.current;
+
+    // ── Autopilot override ────────────────────────────────────────────────────
+    if (!isManual && autopilotTarget !== null) {
+      const st  = STATIONS[autopilotTarget];
+      const dx  = st.x - posRef.current.x;
+      const dz  = st.z - posRef.current.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+
+      if (dist > ARRIVE_DIST) {
+        // Not yet arrived — steer toward target
+        // Movement dir is (-sin(orient), -cos(orient)), so target angle:
+        const targetAngle = Math.atan2(-dx, -dz);
+        const angleDiff   = normaliseAngle(targetAngle - carOrientRef.current);
+
+        const STEER_DEAD = 0.08;
+        keys.up    = true;
+        keys.down  = false;
+        keys.left  = angleDiff >  STEER_DEAD;
+        keys.right = angleDiff < -STEER_DEAD;
+
+        arrivedRef.current = false;
+      } else {
+        // Arrived — stop car
+        keys.up = false; keys.down = false; keys.left = false; keys.right = false;
+        if (!arrivedRef.current) {
+          arrivedRef.current = true;
+          onAutoArrived();
+        }
+      }
+    } else if (!isManual && autopilotTarget === null) {
+      // Auto mode but no target — keep keys cleared (car coasts to stop)
+      keys.up = false; keys.down = false; keys.left = false; keys.right = false;
+    }
 
     // ── Speed ─────────────────────────────────────────────────────────────────
     if (keys.up) {
@@ -451,7 +509,6 @@ function Scene({ onNearProject, onAtBoundary, theme, carColors }: SceneProps) {
     if (fa?.current) fa.current.rotation.y = wheelOrRef.current;
 
     // ── Chase camera ──────────────────────────────────────────────────────────
-    // Pre-allocated _camTarget / _lookTarget — no per-frame heap allocations
     const camDist   = 14;
     const camHeight = ROAD_Y + 8;
     _camTarget.set(
@@ -468,7 +525,7 @@ function Scene({ onNearProject, onAtBoundary, theme, carColors }: SceneProps) {
     camLookRef.current.lerp(_lookTarget, alphaLook);
     state.camera.lookAt(camLookRef.current);
 
-    // ── Project proximity — 2D XZ distance ───────────────────────────────────
+    // ── Project proximity ─────────────────────────────────────────────────────
     let nearest: number | null = null;
     let minDist = Infinity;
     for (let i = 0; i < STATIONS.length; i++) {
@@ -483,10 +540,10 @@ function Scene({ onNearProject, onAtBoundary, theme, carColors }: SceneProps) {
       onNearProject(nearest);
     }
 
-    // ── Colour-panel boundary (near spawn) ───────────────────────────────────
+    // ── Colour-panel boundary ─────────────────────────────────────────────────
     const dx0 = posRef.current.x - 72;
     const dz0 = posRef.current.z - (-40);
-    const atBound = (dx0 * dx0 + dz0 * dz0) < 100; // radius 10
+    const atBound = (dx0 * dx0 + dz0 * dz0) < 100;
     if (atBound !== atBoundRef.current) {
       atBoundRef.current = atBound;
       onAtBoundary(atBound);
@@ -530,17 +587,23 @@ function Scene({ onNearProject, onAtBoundary, theme, carColors }: SceneProps) {
 
 // ── Exported component ────────────────────────────────────────────────────────
 interface ProjectWorldProps {
-  onNearProject: (idx: number | null) => void;
-  onAtBoundary:  (at: boolean) => void;
-  theme:         Theme;
-  carColors:     CarColors;
+  onNearProject:   (idx: number | null) => void;
+  onAtBoundary:    (at: boolean) => void;
+  onAutoArrived:   () => void;
+  theme:           Theme;
+  carColors:       CarColors;
+  autopilotTarget: number | null;
+  isManual:        boolean;
 }
 
 export default function ProjectWorld({
   onNearProject,
   onAtBoundary,
+  onAutoArrived,
   theme,
   carColors,
+  autopilotTarget,
+  isManual,
 }: ProjectWorldProps) {
   const bg = THEMES[theme].bg;
   return (
@@ -560,8 +623,11 @@ export default function ProjectWorld({
       <Scene
         onNearProject={onNearProject}
         onAtBoundary={onAtBoundary}
+        onAutoArrived={onAutoArrived}
         theme={theme}
         carColors={carColors}
+        autopilotTarget={autopilotTarget}
+        isManual={isManual}
       />
     </Canvas>
   );
