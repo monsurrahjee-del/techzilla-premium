@@ -138,7 +138,15 @@ export default function Portfolio({ active = false }: PortfolioProps) {
 
   const handleNext = () => {
     const next = (autoTargetIdx + 1) % STATIONS.length;
-    driveToStation(next);
+    // When wrapping from last station back to first, reset the car to the
+    // path start so it drives cleanly to station 0 instead of following the
+    // tail of the recorded path and confusingly passing near Party Place first.
+    if (next === 0 && autoTargetIdx === STATIONS.length - 1) {
+      setTourId(id => id + 1);
+      driveToStation(0);
+    } else {
+      driveToStation(next);
+    }
   };
 
   const handlePrev = () => {
@@ -335,13 +343,11 @@ export default function Portfolio({ active = false }: PortfolioProps) {
         {currentProject && (
           <>
             <div className={styles.previewWrap} style={{ borderColor: currentProject.accent + "55" }}>
-              <iframe
+              <img
                 key={currentProject.url}
-                src={`https://${currentProject.url}`}
-                title={`${currentProject.title} preview`}
-                className={styles.previewIframe}
-                sandbox="allow-scripts allow-same-origin allow-forms"
-                loading="lazy"
+                src={currentProject.image}
+                alt={`${currentProject.title} preview`}
+                className={styles.previewImg}
               />
               <div className={styles.previewOverlay}
                 style={{ background: `linear-gradient(to bottom, transparent 60%, ${isDark ? "#08080f" : "#f4f6ff"} 100%)` }} />
