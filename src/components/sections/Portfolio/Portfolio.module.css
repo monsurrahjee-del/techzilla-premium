@@ -639,8 +639,8 @@
 .modalLight .modeBtnDesc { color: rgba(20,20,60,0.5); }
 .modalLight .modeBtnDesc em { color: rgba(20,20,60,0.8); }
 
-/* ── Go to Project button ─────────────────────────────────────────────────── */
-.gotoBtn {
+/* ── Autopilot nav buttons wrapper ────────────────────────────────────────── */
+.navButtons {
   position: absolute;
   bottom: 30px;
   right: 28px;
@@ -648,58 +648,126 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 20px;
-  border-radius: 100px;
+}
+
+/* ── "Start Tour" initial pill ────────────────────────────────────────────── */
+.startTourBtn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 22px;
+  height: 42px;
+  border-radius: 9999px;
   border: none;
   cursor: pointer;
   font-family: "Geist", system-ui, sans-serif;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
-  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease, opacity 0.2s ease;
-  user-select: none;
+  letter-spacing: -0.005em;
   white-space: nowrap;
-  max-width: min(260px, 60vw);
+  transition: box-shadow 0.2s ease, transform 0.15s ease, opacity 0.15s ease;
+  user-select: none;
+}
+.startTourBtn:hover  { transform: translateY(-2px); }
+.startTourBtn:active { transform: scale(0.96); }
+
+.startTourDark {
+  background: #111118;
+  color: #ffffff;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.18), 0 4px 20px rgba(0,0,0,0.6);
+}
+.startTourDark:hover {
+  background: #18181f;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.26), 0 6px 26px rgba(0,0,0,0.65);
+}
+
+.startTourLight {
+  background: #0f0f22;
+  color: #ffffff;
+  box-shadow: 0 0 0 1px rgba(0,0,40,0.22), 0 4px 18px rgba(0,0,0,0.22);
+}
+.startTourLight:hover {
+  background: #1a1a32;
+  box-shadow: 0 0 0 1px rgba(0,0,60,0.3), 0 6px 22px rgba(0,0,0,0.28);
+}
+
+/* ── Arrow pair (prev / next) ─────────────────────────────────────────────── */
+.arrowPair {
+  display: flex;
+  align-items: stretch;
+  height: 42px;
+  border-radius: 9999px;
   overflow: hidden;
-  text-overflow: ellipsis;
-}
-.gotoBtn:hover:not(:disabled) {
-  transform: translateY(-2px);
-}
-.gotoBtn:active:not(:disabled) { transform: scale(0.97); }
-
-.gotoBtnDark {
-  background: linear-gradient(135deg, #4060ff 0%, #8040ff 100%);
-  color: #fff;
-  box-shadow: 0 4px 20px rgba(64,96,255,0.45), 0 0 0 1px rgba(255,255,255,0.12);
-}
-.gotoBtnDark:hover:not(:disabled) {
-  box-shadow: 0 6px 28px rgba(64,96,255,0.6), 0 0 0 1px rgba(255,255,255,0.18);
 }
 
-.gotoBtnLight {
-  background: linear-gradient(135deg, #3050ee 0%, #7030ee 100%);
-  color: #fff;
-  box-shadow: 0 4px 18px rgba(50,80,200,0.35);
+.arrowPairDark {
+  background: #111118;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.16), 0 4px 20px rgba(0,0,0,0.55);
 }
 
-.gotoBtnDisabled {
-  opacity: 0.55;
+.arrowPairLight {
+  background: #0f0f22;
+  box-shadow: 0 0 0 1px rgba(0,0,40,0.22), 0 4px 18px rgba(0,0,0,0.2);
+}
+
+.arrowBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.arrowBtn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.10);
+}
+.arrowBtn:active:not(:disabled) {
+  background: rgba(255,255,255,0.17);
+}
+.arrowBtn:disabled {
+  opacity: 0.35;
   cursor: not-allowed;
-  transform: none !important;
 }
 
-/* ── Manual / Auto toggle (floating pill) ─────────────────────────────────── */
-.manualToggle {
+.arrowDivider {
+  width: 1px;
+  background: rgba(255,255,255,0.14);
+  align-self: stretch;
+  flex-shrink: 0;
+}
+
+/* Driving spinner dot */
+.drivingDot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.55);
+  animation: blink 0.9s ease-in-out infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%       { opacity: 0.3; transform: scale(0.75); }
+}
+
+/* ── Mode toggle pill (🕹️ Manual / 🤖 Auto) ───────────────────────────────── */
+.modeToggle {
   position: absolute;
-  bottom: 80px;
+  bottom: 82px;
   right: 28px;
   z-index: 20;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
-  border-radius: 100px;
+  padding: 0 14px;
+  height: 34px;
+  border-radius: 9999px;
   border: none;
   cursor: pointer;
   font-family: "Geist", system-ui, sans-serif;
@@ -709,31 +777,32 @@
   transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
   user-select: none;
 }
-.manualToggle:hover { transform: translateY(-1px); }
-.manualToggle:active { transform: scale(0.97); }
+.modeToggle:hover  { transform: translateY(-1px); }
+.modeToggle:active { transform: scale(0.97); }
 
-.manualToggleDark {
-  background: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.65);
-  border: 1px solid rgba(255,255,255,0.14);
+.modeToggleDark {
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.62);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.12), 0 2px 10px rgba(0,0,0,0.4);
   backdrop-filter: blur(10px);
-  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+  -webkit-backdrop-filter: blur(10px);
 }
-.manualToggleDark:hover {
-  background: rgba(255,255,255,0.14);
-  color: rgba(255,255,255,0.9);
+.modeToggleDark:hover {
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.88);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.18), 0 3px 14px rgba(0,0,0,0.45);
 }
 
-.manualToggleLight {
-  background: rgba(20,20,60,0.10);
-  color: rgba(20,20,60,0.65);
-  border: 1px solid rgba(20,20,80,0.18);
+.modeToggleLight {
+  background: rgba(20,20,60,0.08);
+  color: rgba(20,20,60,0.60);
+  box-shadow: 0 0 0 1px rgba(20,20,80,0.16), 0 2px 10px rgba(0,0,0,0.08);
   backdrop-filter: blur(10px);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  -webkit-backdrop-filter: blur(10px);
 }
-.manualToggleLight:hover {
-  background: rgba(20,20,60,0.18);
-  color: rgba(20,20,60,0.9);
+.modeToggleLight:hover {
+  background: rgba(20,20,60,0.15);
+  color: rgba(20,20,60,0.88);
 }
 
 /* ── Responsive ───────────────────────────────────────────────────────────── */
@@ -750,8 +819,8 @@
   .dpad { display: flex; }
   .controlsHint { display: none; }
   .progressBar { bottom: 104px; }
-  .gotoBtn { bottom: 22px; right: 20px; font-size: 0.74rem; padding: 10px 14px; }
-  .manualToggle { bottom: 72px; right: 20px; }
+  .navButtons  { bottom: 22px; right: 20px; }
+  .modeToggle  { bottom: 74px; right: 20px; }
   .modalOptions { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {

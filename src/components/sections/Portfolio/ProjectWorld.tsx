@@ -9,7 +9,7 @@ import { projects } from "@/lib/projects";
 // ── Road surface Y (matches YUKA path y=20.75) ───────────────────────────────
 const ROAD_Y = 20.75;
 
-// ── Project stations: ground circle positions near representative buildings ──
+// ── Project stations ──────────────────────────────────────────────────────────
 export const STATIONS: { x: number; z: number; icon: string }[] = [
   { x:  75, z: -20, icon: "🎪" }, // 0 Party Place
   { x: 120, z: -10, icon: "✈️" }, // 1 Maser Travels
@@ -19,6 +19,91 @@ export const STATIONS: { x: number; z: number; icon: string }[] = [
   { x:  92, z: 108, icon: "🍽️" }, // 5 Zennyola Foods
 ];
 
+// ── Road-graph waypoints (junctions along city roads) ────────────────────────
+// These form a simplified grid following the city road layout
+type RoadNode = { x: number; z: number };
+
+const ROAD_NODES: RoadNode[] = [
+  { x:  72, z: -40 },  //  0  spawn / main junction
+  { x:  75, z: -40 },  //  1  station-0 approach
+  { x:  75, z: -20 },  //  2  station 0  (Party Place)
+  { x: 120, z: -40 },  //  3  station-1 approach / highway junction right
+  { x: 120, z: -10 },  //  4  station 1  (Maser Travels)
+  { x: 188, z: -40 },  //  5  station 2  (Loan Mgmt) — on highway
+  { x:  25, z: -40 },  //  6  station-3 approach / highway junction left
+  { x:  25, z: -85 },  //  7  station 3  (YCT Microfinance)
+  { x:   0, z: -40 },  //  8  highway junction far-left
+  { x: -60, z: -40 },  //  9  highway junction far-left-2
+  { x: -92, z: -40 },  // 10  station-4 approach
+  { x: -92, z:  30 },  // 11  station 4  (Malete Hostels)
+  { x:  72, z:   0 },  // 12  junction south of spawn
+  { x:  72, z:  80 },  // 13  junction south
+  { x:  92, z:  80 },  // 14  station-5 approach
+  { x:  92, z: 108 },  // 15  station 5  (Zennyola Foods)
+];
+
+// Bidirectional road edges
+const ROAD_EDGES: [number, number][] = [
+  // Main east-west highway at z = -40
+  [0, 1], [1, 3], [3, 5],   // spawn → st0-app → st1-app → station2
+  [0, 6], [6, 8], [8, 9], [9, 10], // spawn ← → far-left
+  // Station branches
+  [1, 2],   // st0 approach → station 0
+  [3, 4],   // station 1 approach → station 1
+  [6, 7],   // station 3 approach → station 3
+  [10, 11], // station 4 approach → station 4
+  // South road from spawn
+  [0, 12], [12, 13], [13, 14], [14, 15],
+];
+
+// BFS to find waypoint path between nearest nodes
+function findRoadPath(
+  sx: number, sz: number,
+  tx: number, tz: number,
+): RoadNode[] {
+  // Nearest start / end node
+  let startN = 0, endN = 0;
+  let minS = Infinity, minE = Infinity;
+  for (let i = 0; i < ROAD_NODES.length; i++) {
+    const n = ROAD_NODES[i];
+    const ds = (sx - n.x) ** 2 + (sz - n.z) ** 2;
+    const de = (tx - n.x) ** 2 + (tz - n.z) ** 2;
+    if (ds < minS) { minS = ds; startN = i; }
+    if (de < minE) { minE = de; endN = i; }
+  }
+
+  if (startN === endN) return [ROAD_NODES[endN], { x: tx, z: tz }];
+
+  // Build adjacency list
+  const adj: number[][] = ROAD_NODES.map(() => []);
+  for (const [a, b] of ROAD_EDGES) { adj[a].push(b); adj[b].push(a); }
+
+  // BFS
+  const prev = new Array<number>(ROAD_NODES.length).fill(-1);
+  const vis  = new Array<boolean>(ROAD_NODES.length).fill(false);
+  const q = [startN];
+  vis[startN] = true;
+  bfs: while (q.length) {
+    const cur = q.shift()!;
+    if (cur === endN) break bfs;
+    for (const nb of adj[cur]) {
+      if (!vis[nb]) { vis[nb] = true; prev[nb] = cur; q.push(nb); }
+    }
+  }
+
+  // Reconstruct
+  const idxPath: number[] = [];
+  let c = endN;
+  while (c !== -1) { idxPath.unshift(c); c = prev[c]; }
+
+  const waypoints: RoadNode[] = idxPath.map(i => ({ ...ROAD_NODES[i] }));
+  // Append exact target if it differs from the last road node
+  const last = ROAD_NODES[endN];
+  if (Math.abs(tx - last.x) > 3 || Math.abs(tz - last.z) > 3) {
+    waypoints.push({ x: tx, z: tz });
+  }
+  return waypoints;
+}
 
 // ── Car colour types ─────────────────────────────────────────────────────────
 export type CarColors = {
@@ -32,36 +117,24 @@ export type CarColors = {
 export type Theme = "dark" | "light";
 
 export type ThemeColors = {
-  bg:        string;
+  bg:         string;
   ambientInt: number;
   ambientCol: string;
-  dirInt:    number;
-  dirCol:    string;
-  fogCol:    string;
-  fogNear:   number;
-  fogFar:    number;
+  dirInt:     number;
+  dirCol:     string;
+  fogCol:     string;
+  fogNear:    number;
+  fogFar:     number;
 };
 
 const THEMES: Record<Theme, ThemeColors> = {
   dark: {
-    bg:          "#050508",
-    ambientInt:  0.4,
-    ambientCol:  "#8090c0",
-    dirInt:      0.8,
-    dirCol:      "#b0b8e0",
-    fogCol:      "#050508",
-    fogNear:     100,
-    fogFar:      420,
+    bg: "#050508", ambientInt: 0.4, ambientCol: "#8090c0",
+    dirInt: 0.8, dirCol: "#b0b8e0", fogCol: "#050508", fogNear: 100, fogFar: 420,
   },
   light: {
-    bg:          "#87ceeb",
-    ambientInt:  2.0,
-    ambientCol:  "#ffffff",
-    dirInt:      2.5,
-    dirCol:      "#fffde7",
-    fogCol:      "#87ceeb",
-    fogNear:     140,
-    fogFar:      620,
+    bg: "#87ceeb", ambientInt: 2.0, ambientCol: "#ffffff",
+    dirInt: 2.5, dirCol: "#fffde7", fogCol: "#87ceeb", fogNear: 140, fogFar: 620,
   },
 } as const;
 
@@ -69,28 +142,18 @@ const THEMES: Record<Theme, ThemeColors> = {
 function CityModel() {
   const { scene: cityScene  } = useGLTF("/models/city.glb");
   const { scene: houseScene } = useGLTF("/models/house.glb");
-
   const city  = useMemo(() => cityScene.clone(true),  [cityScene]);
   const house = useMemo(() => houseScene.clone(true), [houseScene]);
-
   useMemo(() => {
-    city.traverse((obj) => {
-      if ((obj as THREE.Mesh).isMesh) {
-        obj.castShadow    = false;
-        obj.receiveShadow = false;
-      }
+    city.traverse(obj => {
+      if ((obj as THREE.Mesh).isMesh) { obj.castShadow = false; obj.receiveShadow = false; }
     });
   }, [city]);
-
   return (
     <>
       <primitive object={city}  scale={[5, 5, 5]} />
-      <primitive
-        object={house}
-        scale={[5, 5, 5]}
-        position={[50, ROAD_Y - 1.04, 25]}
-        rotation={[0, Math.PI / 2, 0]}
-      />
+      <primitive object={house} scale={[5, 5, 5]}
+        position={[50, ROAD_Y - 1.04, 25]} rotation={[0, Math.PI / 2, 0]} />
     </>
   );
 }
@@ -100,15 +163,17 @@ function GroundCircle({
   index,
   accent,
   isNear,
+  isClose,
 }: {
-  index:  number;
-  accent: string;
-  isNear: boolean;
+  index:   number;
+  accent:  string;
+  isNear:  boolean;   // within 15 units — project card + ring brightness
+  isClose: boolean;   // within 30 units — hide floating label
 }) {
   const { x, z, icon } = STATIONS[index];
-  const project  = projects[index];
-  const ringRef  = useRef<THREE.Mesh>(null!);
-  const tmr      = useRef(Math.random() * Math.PI * 2);
+  const project = projects[index];
+  const ringRef = useRef<THREE.Mesh>(null!);
+  const tmr     = useRef(Math.random() * Math.PI * 2);
 
   useFrame((_, delta) => {
     tmr.current += delta * 1.6;
@@ -124,76 +189,50 @@ function GroundCircle({
       {/* Filled circle */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x, ROAD_Y + 0.01, z]}>
         <circleGeometry args={[4.5, 40]} />
-        <meshBasicMaterial
-          color={accent}
-          transparent
-          opacity={isNear ? 0.50 : 0.18}
-          depthWrite={false}
-        />
+        <meshBasicMaterial color={accent} transparent
+          opacity={isNear ? 0.50 : 0.18} depthWrite={false} />
       </mesh>
 
       {/* Pulsing outer ring */}
       <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[x, ROAD_Y + 0.02, z]}>
         <ringGeometry args={[4.7, 5.8, 40]} />
-        <meshBasicMaterial
-          color={accent}
-          transparent
-          opacity={0.4}
-          depthWrite={false}
-        />
+        <meshBasicMaterial color={accent} transparent opacity={0.4} depthWrite={false} />
       </mesh>
 
-      {/* Floating name label — hidden when car is near (would block screen) */}
-      <Html
-        position={[x, ROAD_Y + 8, z]}
-        center
-        distanceFactor={55}
-        style={{ pointerEvents: "none" }}
-        zIndexRange={[0, 10]}
-      >
-        <div
-          style={{
-            background: `${accent}55`,
-            border:     `1.5px solid ${accent}`,
-            borderRadius: "8px",
-            padding:    "5px 12px",
-            color:      "#fff",
-            fontSize:   "12px",
-            fontWeight: 700,
-            whiteSpace: "nowrap",
-            fontFamily: "system-ui, -apple-system, sans-serif",
-            textShadow: "0 1px 3px rgba(0,0,0,0.9)",
-            letterSpacing: "0.02em",
-            // Hide when car is close — it blocks the screen
-            opacity:    isNear ? 0 : 1,
-            transition: "opacity 0.3s ease",
-            pointerEvents: "none",
-          }}
-        >
+      {/* Floating name label — hidden when car is close (blocks screen) */}
+      <Html position={[x, ROAD_Y + 8, z]} center distanceFactor={55}
+        style={{ pointerEvents: "none" }} zIndexRange={[0, 10]}>
+        <div style={{
+          background: `${accent}55`,
+          border: `1.5px solid ${accent}`,
+          borderRadius: "8px",
+          padding: "5px 12px",
+          color: "#fff",
+          fontSize: "12px",
+          fontWeight: 700,
+          whiteSpace: "nowrap",
+          fontFamily: "system-ui, -apple-system, sans-serif",
+          textShadow: "0 1px 3px rgba(0,0,0,0.9)",
+          letterSpacing: "0.02em",
+          opacity:    isClose ? 0 : 1,
+          transition: "opacity 0.4s ease",
+          pointerEvents: "none",
+        }}>
           {icon} {project.title}
         </div>
       </Html>
 
-      {/* Glow light — only active when car is near */}
+      {/* Glow light — only when near */}
       {isNear && (
-        <pointLight
-          position={[x, ROAD_Y + 4, z]}
-          color={accent}
-          intensity={40}
-          distance={28}
-          decay={2}
-        />
+        <pointLight position={[x, ROAD_Y + 4, z]} color={accent}
+          intensity={40} distance={28} decay={2} />
       )}
     </group>
   );
 }
 
 // ── Ferrari car ───────────────────────────────────────────────────────────────
-function Car({
-  carRef,
-  colors,
-  theme,
-}: {
+function Car({ carRef, colors, theme }: {
   carRef:  React.RefObject<THREE.Group>;
   colors:  CarColors;
   theme:   Theme;
@@ -235,43 +274,32 @@ function Car({
   }, [carScene, carRef]);
 
   useEffect(() => {
-    const bodyMat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(colors.body), metalness: 0.9, roughness: 0.2,
-    });
-    const rimMat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(colors.rim), metalness: 1.0, roughness: 0.15,
-    });
-    const glassMat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(colors.glass), transparent: true,
-      opacity: colors.glassOpacity, metalness: 0.9, roughness: 0.05,
-    });
+    const bodyMat  = new THREE.MeshStandardMaterial({ color: new THREE.Color(colors.body),  metalness: 0.9, roughness: 0.2 });
+    const rimMat   = new THREE.MeshStandardMaterial({ color: new THREE.Color(colors.rim),   metalness: 1.0, roughness: 0.15 });
+    const glassMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(colors.glass), transparent: true, opacity: colors.glassOpacity, metalness: 0.9, roughness: 0.05 });
 
     const bodyPart  = carScene.getObjectByName("body")  as THREE.Mesh | undefined;
     const glassPart = carScene.getObjectByName("glass") as THREE.Mesh | undefined;
     if (bodyPart?.isMesh)  bodyPart.material  = bodyMat;
     if (glassPart?.isMesh) glassPart.material = glassMat;
 
-    (["rim_fl","rim_fr","rim_rr","rim_rl","trim"] as const).forEach((name) => {
+    (["rim_fl","rim_fr","rim_rr","rim_rl","trim"] as const).forEach(name => {
       const part = carScene.getObjectByName(name) as THREE.Mesh | undefined;
       if (part?.isMesh) part.material = rimMat;
     });
   }, [carScene, colors.body, colors.rim, colors.glass, colors.glassOpacity]);
 
-  const shadowTex = useMemo(
-    () => new THREE.TextureLoader().load("/models/ferrari_ao.png"), []
-  );
+  const shadowTex = useMemo(() => new THREE.TextureLoader().load("/models/ferrari_ao.png"), []);
 
   useFrame((_, delta) => {
     const dt  = Math.min(delta, 0.05);
     const spd = (carRef as any).__speedRef?.current ?? 0;
     const WHEEL_DIAM = 0.66;
     const angDelta   = (spd * dt * 0.12) * (2 / WHEEL_DIAM);
-
     flInner.current.rotation.x -= angDelta;
     frInner.current.rotation.x -= angDelta;
     if (wheelRL.current) wheelRL.current.rotation.x -= angDelta;
     if (wheelRR.current) wheelRR.current.rotation.x -= angDelta;
-
     const steer = frontAxleRef.current?.rotation.y ?? 0;
     if (wheelFLRoot.current) wheelFLRoot.current.rotation.z = steer;
     if (wheelFRRoot.current) wheelFRRoot.current.rotation.z = steer;
@@ -281,18 +309,10 @@ function Car({
     <group ref={carRef}>
       <group ref={frontAxleRef} />
       <primitive object={carScene} scale={[1.2, 1.2, 1.2]} position={[0, 0.01, 0]} />
-
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]} renderOrder={2}>
         <planeGeometry args={[3.15, 6.24]} />
-        <meshBasicMaterial
-          map={shadowTex}
-          transparent
-          opacity={0.75}
-          depthWrite={false}
-          color="black"
-        />
+        <meshBasicMaterial map={shadowTex} transparent opacity={0.75} depthWrite={false} color="black" />
       </mesh>
-
       {theme === "dark" && (
         <>
           <pointLight position={[ 0.26, 0.20, -1.0]} color="#fffadc" intensity={60} distance={25} decay={2} />
@@ -308,12 +328,25 @@ function Car({
 const _camTarget  = new THREE.Vector3();
 const _lookTarget = new THREE.Vector3();
 
-// ── Normalise angle to (-PI, PI] ─────────────────────────────────────────────
 function normaliseAngle(a: number): number {
   while (a >  Math.PI) a -= 2 * Math.PI;
   while (a < -Math.PI) a += 2 * Math.PI;
   return a;
 }
+
+// ── Scene constants ───────────────────────────────────────────────────────────
+const CITY_MIN_X = -120, CITY_MAX_X = 210, CITY_MIN_Z = -110, CITY_MAX_Z = 130;
+const MAX_SPEED   = 280, MAX_SPD_REV = -70;
+const ACCEL       = 140, ACCEL_REV  = 50;
+const DECEL       = 90,  BRAKE_POW  = 8;
+const STEER_SPD   = 1.8, MAX_STEER  = 0.55;
+const TURN_RAD    = 20,  MOV_SCALE  = 0.12;
+const ARRIVE_DIST = 8;   // stop within 8 units of waypoint
+const NEAR_DIST   = 15;  // project card trigger
+const CLOSE_DIST  = 30;  // label hide threshold
+
+const expEaseOut = (k: number) => (k === 1 ? 1 : -Math.pow(2, -10 * k) + 1);
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 // ── Main scene ────────────────────────────────────────────────────────────────
 interface SceneProps {
@@ -326,36 +359,9 @@ interface SceneProps {
   isManual:         boolean;
 }
 
-const expEaseOut = (k: number) => (k === 1 ? 1 : -Math.pow(2, -10 * k) + 1);
-const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-
-const CITY_MIN_X = -120;
-const CITY_MAX_X =  210;
-const CITY_MIN_Z = -110;
-const CITY_MAX_Z =  130;
-
-const MAX_SPEED   = 280;
-const MAX_SPD_REV = -70;
-const ACCEL       = 140;
-const ACCEL_REV   = 50;
-const DECEL       = 90;
-const BRAKE_POW   = 8;
-const STEER_SPD   = 1.8;
-const MAX_STEER   = 0.55;
-const TURN_RAD    = 20;
-const MOV_SCALE   = 0.12;
-
-// Arrival radius — stop here (slightly larger than proximity trigger)
-const ARRIVE_DIST = 10;
-
 function Scene({
-  onNearProject,
-  onAtBoundary,
-  onAutoArrived,
-  theme,
-  carColors,
-  autopilotTarget,
-  isManual,
+  onNearProject, onAtBoundary, onAutoArrived,
+  theme, carColors, autopilotTarget, isManual,
 }: SceneProps) {
   const t = THEMES[theme];
 
@@ -368,16 +374,35 @@ function Scene({
   const camPosRef    = useRef(new THREE.Vector3(72, ROAD_Y + 8, -40 + 16));
   const camLookRef   = useRef(new THREE.Vector3(72, ROAD_Y + 0.4, -40));
   const curProjRef   = useRef<number | null>(null);
+  const curCloseRef  = useRef<number | null>(null);
   const atBoundRef   = useRef(false);
   const arrivedRef   = useRef(false);
-  const [nearIdx, setNearIdx] = useState<number | null>(null);
 
-  // Reset arrived flag whenever autopilotTarget changes
+  // Autopilot waypoint state
+  const waypointPath = useRef<RoadNode[]>([]);
+  const waypointIdx  = useRef(0);
+
+  const [nearIdx,  setNearIdx]  = useState<number | null>(null);
+  const [closeIdx, setCloseIdx] = useState<number | null>(null);
+
+  // Compute road path whenever autopilot target changes
   useEffect(() => {
     arrivedRef.current = false;
+    if (autopilotTarget === null) {
+      waypointPath.current = [];
+      waypointIdx.current  = 0;
+      return;
+    }
+    const target = STATIONS[autopilotTarget];
+    const path = findRoadPath(
+      posRef.current.x, posRef.current.z,
+      target.x, target.z,
+    );
+    waypointPath.current = path;
+    waypointIdx.current  = 0;
   }, [autopilotTarget]);
 
-  // Keyboard + mobile d-pad — only in manual mode
+  // Keyboard + d-pad — manual mode only
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (!isManual) return;
@@ -410,47 +435,59 @@ function Scene({
     };
   }, [isManual]);
 
-  // When switching to manual, clear any autopilot key states
+  // Clear keys when switching to manual
   useEffect(() => {
-    if (isManual) {
-      keysRef.current = { up: false, down: false, left: false, right: false };
-    }
+    if (isManual) keysRef.current = { up: false, down: false, left: false, right: false };
   }, [isManual]);
 
   useFrame((state, delta) => {
     const dt   = Math.min(delta, 0.05);
     const keys = keysRef.current;
 
-    // ── Autopilot override ────────────────────────────────────────────────────
+    // ── Autopilot: waypoint navigation ───────────────────────────────────────
+    let autoAngleDiff  = 0;
+    let autoShouldDrive = false;
+
     if (!isManual && autopilotTarget !== null) {
-      const st  = STATIONS[autopilotTarget];
-      const dx  = st.x - posRef.current.x;
-      const dz  = st.z - posRef.current.z;
-      const dist = Math.sqrt(dx * dx + dz * dz);
+      const path = waypointPath.current;
+      let wpIdx  = waypointIdx.current;
 
-      if (dist > ARRIVE_DIST) {
-        // Not yet arrived — steer toward target
-        // Movement dir is (-sin(orient), -cos(orient)), so target angle:
-        const targetAngle = Math.atan2(-dx, -dz);
-        const angleDiff   = normaliseAngle(targetAngle - carOrientRef.current);
+      if (wpIdx < path.length) {
+        const wp   = path[wpIdx];
+        const dx   = wp.x - posRef.current.x;
+        const dz   = wp.z - posRef.current.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        const isLast = wpIdx === path.length - 1;
 
-        const STEER_DEAD = 0.08;
-        keys.up    = true;
-        keys.down  = false;
-        keys.left  = angleDiff >  STEER_DEAD;
-        keys.right = angleDiff < -STEER_DEAD;
+        // Advance waypoint when close enough
+        if (dist < (isLast ? ARRIVE_DIST : 12)) {
+          waypointIdx.current++;
+          wpIdx++;
+          if (wpIdx >= path.length && !arrivedRef.current) {
+            arrivedRef.current = true;
+            speedRef.current   = 0;
+            keysRef.current    = { up: false, down: false, left: false, right: false };
+            onAutoArrived();
+          }
+        }
 
-        arrivedRef.current = false;
-      } else {
-        // Arrived — stop car
-        keys.up = false; keys.down = false; keys.left = false; keys.right = false;
-        if (!arrivedRef.current) {
-          arrivedRef.current = true;
-          onAutoArrived();
+        if (wpIdx < path.length) {
+          const wp2  = path[wpIdx];
+          const dx2  = wp2.x - posRef.current.x;
+          const dz2  = wp2.z - posRef.current.z;
+          const dist2 = Math.sqrt(dx2 * dx2 + dz2 * dz2);
+          const targetAngle = Math.atan2(-dx2, -dz2);
+          autoAngleDiff    = normaliseAngle(targetAngle - carOrientRef.current);
+          autoShouldDrive  = dist2 > ARRIVE_DIST;
         }
       }
+
+      // Override keys (speed driven by autoShouldDrive, steer handled below)
+      keys.up    = autoShouldDrive;
+      keys.down  = false;
+      keys.left  = false;
+      keys.right = false;
     } else if (!isManual && autopilotTarget === null) {
-      // Auto mode but no target — keep keys cleared (car coasts to stop)
       keys.up = false; keys.down = false; keys.left = false; keys.right = false;
     }
 
@@ -476,13 +513,22 @@ function Scene({
     }
 
     // ── Steering ──────────────────────────────────────────────────────────────
-    if (keys.left)  wheelOrRef.current = clamp(wheelOrRef.current + dt * STEER_SPD, -MAX_STEER, MAX_STEER);
-    if (keys.right) wheelOrRef.current = clamp(wheelOrRef.current - dt * STEER_SPD, -MAX_STEER, MAX_STEER);
-    if (!keys.left && !keys.right) {
-      if (wheelOrRef.current > 0) {
-        wheelOrRef.current = clamp(wheelOrRef.current - dt * STEER_SPD, 0, MAX_STEER);
-      } else {
-        wheelOrRef.current = clamp(wheelOrRef.current + dt * STEER_SPD, -MAX_STEER, 0);
+    if (!isManual && autopilotTarget !== null) {
+      // Proportional steering: smoothly interpolate toward target angle
+      const targetWheel = clamp(autoAngleDiff * (MAX_STEER / 0.6), -MAX_STEER, MAX_STEER);
+      wheelOrRef.current = THREE.MathUtils.lerp(
+        wheelOrRef.current, targetWheel, Math.min(dt * 6, 1),
+      );
+    } else {
+      // Key-based steering (manual)
+      if (keys.left)  wheelOrRef.current = clamp(wheelOrRef.current + dt * STEER_SPD, -MAX_STEER, MAX_STEER);
+      if (keys.right) wheelOrRef.current = clamp(wheelOrRef.current - dt * STEER_SPD, -MAX_STEER, MAX_STEER);
+      if (!keys.left && !keys.right) {
+        if (wheelOrRef.current > 0) {
+          wheelOrRef.current = clamp(wheelOrRef.current - dt * STEER_SPD, 0, MAX_STEER);
+        } else {
+          wheelOrRef.current = clamp(wheelOrRef.current + dt * STEER_SPD, -MAX_STEER, 0);
+        }
       }
     }
 
@@ -492,7 +538,6 @@ function Scene({
 
     const newX = posRef.current.x + Math.sin(carOrientRef.current) * forwardDelta;
     const newZ = posRef.current.z + Math.cos(carOrientRef.current) * forwardDelta;
-
     posRef.current.x = clamp(newX, CITY_MIN_X, CITY_MAX_X);
     posRef.current.z = clamp(newZ, CITY_MIN_Z, CITY_MAX_Z);
 
@@ -503,8 +548,6 @@ function Scene({
       const sr = (carRef as any).__speedRef;
       if (sr) sr.current = speedRef.current;
     }
-
-    // ── Wheel steer visual ────────────────────────────────────────────────────
     const fa = (carRef as any).__frontAxle;
     if (fa?.current) fa.current.rotation.y = wheelOrRef.current;
 
@@ -520,24 +563,30 @@ function Scene({
     const alphaLook = 1 - Math.exp(-12 * dt);
     camPosRef.current.lerp(_camTarget, alphaPos);
     state.camera.position.copy(camPosRef.current);
-
     _lookTarget.set(posRef.current.x, ROAD_Y + 0.4, posRef.current.z);
     camLookRef.current.lerp(_lookTarget, alphaLook);
     state.camera.lookAt(camLookRef.current);
 
-    // ── Project proximity ─────────────────────────────────────────────────────
+    // ── Project proximity (card trigger: 15, label hide: 30) ─────────────────
     let nearest: number | null = null;
+    let nearestClose: number | null = null;
     let minDist = Infinity;
+    let minClose = Infinity;
     for (let i = 0; i < STATIONS.length; i++) {
       const dx   = posRef.current.x - STATIONS[i].x;
       const dz   = posRef.current.z - STATIONS[i].z;
       const dist = Math.sqrt(dx * dx + dz * dz);
-      if (dist < 15 && dist < minDist) { minDist = dist; nearest = i; }
+      if (dist < NEAR_DIST  && dist < minDist)  { minDist  = dist; nearest      = i; }
+      if (dist < CLOSE_DIST && dist < minClose) { minClose = dist; nearestClose = i; }
     }
     if (nearest !== curProjRef.current) {
       curProjRef.current = nearest;
       setNearIdx(nearest);
       onNearProject(nearest);
+    }
+    if (nearestClose !== curCloseRef.current) {
+      curCloseRef.current = nearestClose;
+      setCloseIdx(nearestClose);
     }
 
     // ── Colour-panel boundary ─────────────────────────────────────────────────
@@ -553,26 +602,22 @@ function Scene({
   return (
     <>
       <ambientLight intensity={t.ambientInt} color={t.ambientCol} />
-      <directionalLight
-        position={[-30, 60, 20]}
-        intensity={t.dirInt}
-        color={t.dirCol}
-        castShadow={false}
-      />
+      <directionalLight position={[-30, 60, 20]} intensity={t.dirInt}
+        color={t.dirCol} castShadow={false} />
       {theme === "dark" && (
-        <pointLight position={[72, ROAD_Y + 30, -40]} color="#6080ff" intensity={4} distance={200} decay={1} />
+        <pointLight position={[72, ROAD_Y + 30, -40]} color="#6080ff"
+          intensity={4} distance={200} decay={1} />
       )}
 
-      <Suspense fallback={null}>
-        <CityModel />
-      </Suspense>
+      <Suspense fallback={null}><CityModel /></Suspense>
 
       {projects.map((p, i) => (
         <GroundCircle
           key={i}
           index={i}
           accent={p.accent}
-          isNear={nearIdx === i}
+          isNear={nearIdx  === i}
+          isClose={closeIdx === i}
         />
       ))}
 
@@ -597,23 +642,13 @@ interface ProjectWorldProps {
 }
 
 export default function ProjectWorld({
-  onNearProject,
-  onAtBoundary,
-  onAutoArrived,
-  theme,
-  carColors,
-  autopilotTarget,
-  isManual,
+  onNearProject, onAtBoundary, onAutoArrived,
+  theme, carColors, autopilotTarget, isManual,
 }: ProjectWorldProps) {
   const bg = THEMES[theme].bg;
   return (
     <Canvas
-      camera={{
-        position: [72, ROAD_Y + 8, -40 + 16],
-        fov: 62,
-        near: 0.5,
-        far: 800,
-      }}
+      camera={{ position: [72, ROAD_Y + 8, -40 + 16], fov: 62, near: 0.5, far: 800 }}
       style={{ width: "100%", height: "100%" }}
       gl={{ antialias: false, alpha: false, powerPreference: "high-performance" }}
       dpr={[0.5, 0.9]}
@@ -633,7 +668,6 @@ export default function ProjectWorld({
   );
 }
 
-// ── Preload heavy assets ──────────────────────────────────────────────────────
 useGLTF.preload("/models/ferrari.glb");
 useGLTF.preload("/models/city.glb");
 useGLTF.preload("/models/house.glb");
