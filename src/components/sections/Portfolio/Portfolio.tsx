@@ -117,10 +117,13 @@ export default function Portfolio({ active = false }: PortfolioProps) {
   };
 
   // Billboard overlay — updated via DOM refs to avoid re-renders
-  const overlayRef   = useRef<HTMLDivElement>(null);
-  const iframeRefs   = useRef<(HTMLDivElement | null)[]>([]);
+  const overlayRef      = useRef<HTMLDivElement>(null);
+  const iframeRefs      = useRef<(HTMLDivElement | null)[]>([]);
+  const iframeElRefs    = useRef<(HTMLIFrameElement | null)[]>([]);  // actual <iframe> nodes
+  const iframeLoaded    = useRef<Set<number>>(new Set()); // lazy: only load src on first approach
+  const nearIdxRef      = useRef<number | null>(null);   // mirror of nearIdx without stale closure
   // Initialise from the module-level flag so hint stays gone after SPA re-mounts
-  const movedRef     = useRef(_portfolioMoved);
+  const movedRef        = useRef(_portfolioMoved);
 
   // Mount Three.js world when section becomes active
   useEffect(() => {
@@ -171,7 +174,15 @@ export default function Portfolio({ active = false }: PortfolioProps) {
   }, []);
 
   const handleNear = useCallback((idx: number | null) => {
+    nearIdxRef.current = idx;
     setNearIdx(idx);
+    // Lazy-load the iframe src the very first time the car approaches a billboard.
+    // All 6 iframes loading simultaneously is the single biggest perf cost.
+    if (idx !== null && !iframeLoaded.current.has(idx)) {
+      iframeLoaded.current.add(idx);
+      const ifrEl = iframeElRefs.current[idx];
+      if (ifrEl && !ifrEl.src) ifrEl.src = `https://${projects[idx].url}`;
+    }
   }, []);
 
   // D-pad
@@ -217,18 +228,15 @@ export default function Portfolio({ active = false }: PortfolioProps) {
             key={i}
             ref={el => { iframeRefs.current[i] = el; }}
             className={styles.billboardFrame}
-            style={{ display: "none", borderColor: p.accent + "88" }}
+            style={{ display: "none" }}
           >
+            {/* src is set lazily via iframeElRefs when the car first approaches */}
             <iframe
-              src={`https://${p.url}`}
+              ref={el => { iframeElRefs.current[i] = el; }}
               title={p.title}
               className={styles.billboardIframe}
               sandbox="allow-scripts allow-same-origin allow-forms"
-              loading="lazy"
             />
-            <div className={styles.billboardLabel} style={{ background: p.accent }}>
-              {i + 1}
-            </div>
           </div>
         ))}
       </div>

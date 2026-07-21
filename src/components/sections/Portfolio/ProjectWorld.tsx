@@ -553,22 +553,23 @@ const _vTR = new THREE.Vector3();
 const _vBR = new THREE.Vector3();
 const _vBL = new THREE.Vector3();
 
-// Throttle: only reproject every 3rd frame when car is far from billboards
-let _bbFrame = 0;
-
 function BillboardProjector({
   onProject,
+  nearIdx,
 }: {
   onProject: (positions: BillboardPos[]) => void;
+  nearIdx:   number | null;
 }) {
   const { camera, size } = useThree();
   const prev = useRef<string>("");
 
   useFrame(() => {
-    _bbFrame = (_bbFrame + 1) % 3;
-    if (_bbFrame !== 0) return; // run at ~20fps instead of 60fps
-
+    // Only project the billboard the car is closest to — nothing else is shown.
+    // Running every frame (not throttled) eliminates the 2-frame CSS lag/jitter.
     const out: BillboardPos[] = P_Z.map((pz, i) => {
+      // Cull immediately if this is not the nearest billboard
+      if (nearIdx !== i) return { x: 0, y: 0, w: 0, h: 0, visible: false, corners: null };
+
       const bx  = P_SIDE[i] * STATION_X;
       // Use the glass surface Z (from ProjectStation: z - 0.36)
       const bz  = pz - 0.36;
@@ -609,11 +610,9 @@ function BillboardProjector({
       return { x: cx, y: cy, w, h: maxY - minY, visible, corners };
     });
 
-    const key = out.map(p => `${p.visible ? 1 : 0},${Math.round(p.x)},${Math.round(p.y)},${Math.round(p.w)}`).join("|");
-    if (key !== prev.current) {
-      prev.current = key;
-      onProject(out);
-    }
+    // Always fire — Portfolio.tsx does cheap DOM style writes and the matrix3d
+    // must track the camera every frame to stay locked to the 3-D billboard.
+    onProject(out);
   });
 
   return null;
@@ -832,7 +831,7 @@ function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }
         <Car carRef={carRef} colors={carColors} theme={theme} />
       </Suspense>
 
-      <BillboardProjector onProject={onBillboardPos} />
+      <BillboardProjector onProject={onBillboardPos} nearIdx={nearIdx} />
 
       <fog attach="fog" args={[t.fogCol, t.fogNear, t.fogFar]} />
     </>
