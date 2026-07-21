@@ -23,87 +23,48 @@ export const STATIONS: { x: number; z: number; icon: string }[] = [
 ];
 
 // ── Road graph nodes ──────────────────────────────────────────────────────────
-// Two-row grid:
-//   NORTH ROW  z = -40  — approach nodes, facing building entrances
-//   MIDDLE ROW z =   0  — bypass road behind buildings, used when north row
-//                         edges are blocked; BFS routes via middle then turns
-//                         north into each station corridor
-//   SOUTH ROW  z =  80  — spawn road + Zennyola
+// Every node is on a confirmed open road surface — never inside a building.
+// Approach nodes are positioned so they are:
+//   • reachable without entering any building
+//   • within NEAR_DIST (15 units) of the station circle → project card triggers
+//   • close enough for the car to visually "touch" the circle (radius 4.5)
 //
-// N-S connector edges link every (x, north) ↔ (x, middle) column so BFS can
-// always detour around any blocked north-row segment.
-//
-// NEAR_DIST is raised to 25 so the project card triggers even when the car
-// stops at the middle-row node for a station whose north edge is blocked.
+//  Station ↔ Nearest approach node distances:
+//   Party Place  (x=75)  → node 0 (x=72):  dist = 3   ← inside circle radius ✓
+//   Maser        (x=120) → node 1 (x=112): dist = 8   < 15 ✓
+//   Loan Mgmt    (x=188) → node 2 (x=178): dist = 10  < 15 ✓
+//   YCT          (x=25)  → node 3 (x=34):  dist = 9   < 15 ✓
+//   Malete       (x=-92) → node 6 (x=-82): dist = 10  < 15 ✓
+//   Zennyola     (x=92,z=80) → node 9 (x=84,z=80): dist = 8 < 15 ✓
 type RoadNode = { x: number; z: number };
 
 const ROAD_NODES: RoadNode[] = [
-  // ── North row  z = -40 ───────────────────────────────────────────────
-  { x:  72, z: -40 },  //  0  Party Place approach + main junction
-  { x: 112, z: -40 },  //  1  Maser Travels approach
-  { x: 178, z: -40 },  //  2  Loan Mgmt approach
-  { x:  34, z: -40 },  //  3  YCT Microfinance approach
-  { x:   0, z: -40 },  //  4  west junction
-  { x: -60, z: -40 },  //  5  west junction 2
-  { x: -82, z: -40 },  //  6  Malete Hostels approach
-  // ── Middle row  z = 0  (bypass behind buildings) ─────────────────────
-  { x:  72, z:   0 },  //  7  main N-S junction (connects north ↔ south)
-  { x: 112, z:   0 },  //  8  Maser south connector
-  { x: 178, z:   0 },  //  9  Loan Mgmt south connector
-  { x:  34, z:   0 },  // 10  YCT south connector
-  { x:   0, z:   0 },  // 11  west junction mid
-  { x: -60, z:   0 },  // 12  west junction 2 mid
-  { x: -82, z:   0 },  // 13  Malete south connector
-  // ── South row  z = 80 ────────────────────────────────────────────────
-  { x:  72, z:  80 },  // 14  spawn / south junction
-  { x:  84, z:  80 },  // 15  Zennyola Foods approach
+  { x:  72, z: -40 },  // 0  E/W junction — also Party Place approach
+  { x: 112, z: -40 },  // 1  Maser Travels approach
+  { x: 178, z: -40 },  // 2  Loan Mgmt approach
+  { x:  34, z: -40 },  // 3  YCT approach
+  { x:   0, z: -40 },  // 4  west junction
+  { x: -60, z: -40 },  // 5  west junction 2
+  { x: -82, z: -40 },  // 6  Malete Hostels approach
+  { x:  72, z:   0 },  // 7  south junction 1
+  { x:  72, z:  80 },  // 8  south junction 2 / spawn
+  { x:  84, z:  80 },  // 9  Zennyola Foods approach
 ];
 
+// Every edge stays on a real road surface — no building corridors
 const ROAD_EDGES: [number, number][] = [
-  // North row E-W (z = -40)
-  [0, 1], [1, 2],                      // east: PP → Maser → Loan Mgmt
-  [0, 3], [3, 4], [4, 5], [5, 6],      // west: PP → YCT → 0 → -60 → Malete
-  // Middle row E-W (z = 0) — bypass corridor
-  [7, 8],  [8, 9],                      // east middle
-  [7, 10], [10, 11], [11, 12], [12, 13], // west middle
-  // N-S connectors — every x-column links north ↔ middle
-  [0, 7],  [1, 8],  [2, 9],
-  [3, 10], [4, 11], [5, 12], [6, 13],
-  // South road
-  [7, 14], [14, 15],
+  // East highway at z = -40
+  [0, 1], [1, 2],
+  // West highway at z = -40
+  [0, 3], [3, 4], [4, 5], [5, 6],
+  // South road (x≈72 southward, then east to Zennyola)
+  [0, 7], [7, 8], [8, 9],
 ];
 
-// ── Edge clear-path sampler ───────────────────────────────────────────────────
-// Returns true if every sampled point along the edge (a→b) passes isBuilding()
-// as a clear road surface.  Called once per edge when the path is computed.
-function edgeClear(
-  a: number, b: number,
-  scene: THREE.Scene,
-  excludeObj?: THREE.Object3D | null,
-): boolean {
-  const na = ROAD_NODES[a], nb = ROAD_NODES[b];
-  const dx = nb.x - na.x, dz = nb.z - na.z;
-  const len = Math.sqrt(dx * dx + dz * dz);
-  // Sample roughly every 6 world-units along the edge
-  const steps = Math.max(4, Math.ceil(len / 6));
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    if (isBuilding(na.x + dx * t, na.z + dz * t, scene, excludeObj)) return false;
-  }
-  return true;
-}
-
-// ── BFS path finder ───────────────────────────────────────────────────────────
-// When `scene` is supplied every candidate edge is validated against the
-// raycaster before being added to the adjacency list — the BFS therefore only
-// follows confirmed-clear road segments.
-// Falls back to unvalidated graph if the validated graph is disconnected (e.g.
-// all paths are blocked, which should not happen with the two-row layout).
+// BFS shortest path between the nearest road nodes to (sx,sz) and (tx,tz)
 function findRoadPath(
   sx: number, sz: number,
   tx: number, tz: number,
-  scene?: THREE.Scene | null,
-  excludeObj?: THREE.Object3D | null,
 ): RoadNode[] {
   let startN = 0, endN = 0;
   let minS = Infinity, minE = Infinity;
@@ -117,40 +78,25 @@ function findRoadPath(
 
   if (startN === endN) return [ROAD_NODES[endN]];
 
-  function buildAdj(validate: boolean): number[][] {
-    const a: number[][] = ROAD_NODES.map(() => []);
-    for (const [u, v] of ROAD_EDGES) {
-      const ok = !validate || !scene || edgeClear(u, v, scene, excludeObj);
-      if (ok) { a[u].push(v); a[v].push(u); }
+  const adj: number[][] = ROAD_NODES.map(() => []);
+  for (const [a, b] of ROAD_EDGES) { adj[a].push(b); adj[b].push(a); }
+
+  const prev = new Array<number>(ROAD_NODES.length).fill(-1);
+  const vis  = new Array<boolean>(ROAD_NODES.length).fill(false);
+  const q = [startN];
+  vis[startN] = true;
+  bfs: while (q.length) {
+    const cur = q.shift()!;
+    if (cur === endN) break bfs;
+    for (const nb of adj[cur]) {
+      if (!vis[nb]) { vis[nb] = true; prev[nb] = cur; q.push(nb); }
     }
-    return a;
   }
 
-  function bfsPath(adj: number[][]): RoadNode[] {
-    const prev = new Array<number>(ROAD_NODES.length).fill(-1);
-    const vis  = new Array<boolean>(ROAD_NODES.length).fill(false);
-    const q = [startN];
-    vis[startN] = true;
-    bfs: while (q.length) {
-      const cur = q.shift()!;
-      if (cur === endN) break bfs;
-      for (const nb of adj[cur]) {
-        if (!vis[nb]) { vis[nb] = true; prev[nb] = cur; q.push(nb); }
-      }
-    }
-    if (prev[endN] === -1 && endN !== startN) return []; // unreachable
-    const path: number[] = [];
-    let c = endN;
-    while (c !== -1) { path.unshift(c); c = prev[c]; }
-    return path.map(i => ({ ...ROAD_NODES[i] }));
-  }
-
-  // First try with building-validated edges
-  const validated = bfsPath(buildAdj(true));
-  if (validated.length > 0) return validated;
-
-  // Fallback: unvalidated (car's per-frame freeze will still stop it at walls)
-  return bfsPath(buildAdj(false));
+  const idxPath: number[] = [];
+  let c = endN;
+  while (c !== -1) { idxPath.unshift(c); c = prev[c]; }
+  return idxPath.map(i => ({ ...ROAD_NODES[i] }));
 }
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -383,9 +329,7 @@ const TURN_RAD    = 20,  MOV_SCALE   = 0.12;
 // Arrive at last waypoint when within this many units.
 // 12 units gives a comfortable road-stop before any building boundary.
 const ARRIVE_DIST = 12;
-// Raised to 25 so the project card still triggers when the car stops at a
-// middle-row bypass node (z=0) for stations whose north approach is blocked.
-const NEAR_DIST   = 25;
+const NEAR_DIST   = 15;  // project card trigger distance
 const CLOSE_DIST  = 30;  // label hide threshold
 // If the autopilot has been blocked by a building for this many seconds,
 // declare "arrived" (last waypoint) or advance (intermediate waypoint).
@@ -412,8 +356,8 @@ function Scene({
   const t = THEMES[theme];
 
   const carRef       = useRef<THREE.Group>(null!);
-  // Spawn at south road node 14 — well behind Party Place so the tour
-  // drives a visible route: south road → middle junction → stations.
+  // Spawn at south road node 8 — well behind Party Place so the tour
+  // drives a visible route: south road → junction → east highway → stations.
   const posRef       = useRef({ x: 72, z: 80 });
   const carOrientRef = useRef(0);
   const speedRef     = useRef(0);
@@ -428,31 +372,27 @@ function Scene({
   // Seconds the autopilot has been blocked by a building on the current segment
   const stuckTimerRef = useRef(0);
 
-  const waypointPath  = useRef<RoadNode[]>([]);
-  const waypointIdx   = useRef(0);
-  // Scene reference captured on first useFrame tick (state.scene unavailable in useEffect)
-  const sceneRef      = useRef<THREE.Scene | null>(null);
-  // Set to true when a new autopilot target is requested; the path is computed
-  // in useFrame once sceneRef is populated (so edge-validation raycasts work).
-  const pathNeededRef = useRef(false);
+  const waypointPath = useRef<RoadNode[]>([]);
+  const waypointIdx  = useRef(0);
 
   const [nearIdx,  setNearIdx]  = useState<number | null>(null);
   const [closeIdx, setCloseIdx] = useState<number | null>(null);
 
-  // Mark path as needed whenever the autopilot target changes.
-  // Actual BFS (with building-validated edges) runs in useFrame below.
+  // Recompute road path whenever autopilot target changes
   useEffect(() => {
     arrivedRef.current    = false;
     stuckTimerRef.current = 0;
     if (autopilotTarget === null) {
       waypointPath.current = [];
       waypointIdx.current  = 0;
-      pathNeededRef.current = false;
       return;
     }
-    waypointPath.current  = [];  // clear stale path immediately
-    waypointIdx.current   = 0;
-    pathNeededRef.current = true; // compute in useFrame once scene is ready
+    const target = STATIONS[autopilotTarget];
+    waypointPath.current = findRoadPath(
+      posRef.current.x, posRef.current.z,
+      target.x, target.z,
+    );
+    waypointIdx.current = 0;
   }, [autopilotTarget]);
 
   // Keyboard
@@ -495,24 +435,6 @@ function Scene({
   useFrame((state, delta) => {
     const dt   = Math.min(delta, 0.05);
     const keys = keysRef.current;
-
-    // ── Capture scene reference (only accessible here, not in useEffect) ──────
-    if (!sceneRef.current) sceneRef.current = state.scene;
-
-    // ── Lazy path computation with building-validated edges ───────────────────
-    // pathNeededRef is set by the autopilotTarget useEffect; we compute here so
-    // we can pass state.scene to edgeClear() for raycasting.
-    if (pathNeededRef.current && autopilotTarget !== null) {
-      pathNeededRef.current = false;
-      const target = STATIONS[autopilotTarget];
-      waypointPath.current = findRoadPath(
-        posRef.current.x, posRef.current.z,
-        target.x, target.z,
-        state.scene,
-        carRef.current,
-      );
-      waypointIdx.current = 0;
-    }
 
     // ── AUTOPILOT ─────────────────────────────────────────────────────────────
     let autopilotMoved = false;
