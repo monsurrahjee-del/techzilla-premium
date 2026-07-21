@@ -312,17 +312,29 @@ function Car({ carRef, colors, theme }: {
   );
 }
 
-// ── Road-rail snap: project point onto a segment, return clamped closest ──
-function snapToSegment(
-  px: number, pz: number,
-  ax: number, az: number,
-  bx: number, bz: number,
-): { x: number; z: number } {
-  const abx = bx - ax, abz = bz - az;
-  const len2 = abx * abx + abz * abz;
-  if (len2 < 0.001) return { x: ax, z: az };
-  const t = Math.max(0, Math.min(1, ((px - ax) * abx + (pz - az) * abz) / len2));
-  return { x: ax + t * abx, z: az + t * abz };
+// ── Building-collision detector ───────────────────────────────────────────────
+// Shoots a ray straight down from above the proposed (x, z) position.
+// Hits road surface at Y ≈ ROAD_Y; hits a building/bush roof at Y > ROAD_Y.
+// Returns true when the position is occupied by a structure taller than the road.
+const _bcRay    = new THREE.Raycaster();
+const _bcDown   = new THREE.Vector3(0, -1, 0);
+const _bcOrigin = new THREE.Vector3();
+const BLDG_Y_MARGIN = 1.5; // anything whose surface is > ROAD_Y + 1.5 is a building
+
+function isBuilding(
+  x: number,
+  z: number,
+  scene: THREE.Scene,
+  excludeObj?: THREE.Object3D | null,
+): boolean {
+  _bcOrigin.set(x, ROAD_Y + 40, z);
+  _bcRay.set(_bcOrigin, _bcDown);
+  const targets = excludeObj
+    ? scene.children.filter(c => c !== excludeObj)
+    : scene.children;
+  const hits = _bcRay.intersectObjects(targets, true);
+  if (hits.length === 0) return false;             // open air → treat as clear
+  return hits[0].point.y > ROAD_Y + BLDG_Y_MARGIN;
 }
 
 // ── Pre-allocated vectors ─────────────────────────────────────────────────────
@@ -480,9 +492,25 @@ function Scene({
           }
         } else {
           // Move directly along segment — no physics, no drift
-          const step = Math.min(AUTO_SPEED * dt, dist);
-          posRef.current.x += (dx / dist) * step;
-          posRef.current.z += (dz / dist) * step;
+          const step       = Math.min(AUTO_SPEED * dt, dist);
+          const proposedX  = posRef.current.x + (dx / dist) * step;
+          const proposedZ  = posRef.current.z + (dz / dist) * step;
+
+          if (!isBuilding(proposedX, proposedZ, state.scene, carRef.current)) {
+            // Clear road — move forward
+            posRef.current.x = proposedX;
+            posRef.current.z = proposedZ;
+          } else {
+            // Building ahead — skip this waypoint so the car stops short
+            waypointIdx.current++;
+            wpIdx++;
+            if (wpIdx >= path.length && !arrivedRef.current) {
+              arrivedRef.current = true;
+              speedRef.current   = 0;
+              keysRef.current    = { up: false, down: false, left: false, right: false };
+              onAutoArrived();
+            }
+          }
           // Smoothly rotate car to face travel direction
           const targetAngle  = Math.atan2(-dx, -dz);
           const angleDiff    = normaliseAngle(targetAngle - carOrientRef.current);
@@ -540,8 +568,11 @@ function Scene({
       carOrientRef.current -= (forwardDelta * TURN_RAD * 0.02) * wheelOrRef.current;
       const newX = posRef.current.x + Math.sin(carOrientRef.current) * forwardDelta;
       const newZ = posRef.current.z + Math.cos(carOrientRef.current) * forwardDelta;
-      posRef.current.x = clamp(newX, CITY_MIN_X, CITY_MAX_X);
-      posRef.current.z = clamp(newZ, CITY_MIN_Z, CITY_MAX_Z);
+      // Axis-separated building check: allow sliding along a wall
+      const cx = clamp(newX, CITY_MIN_X, CITY_MAX_X);
+      const cz = clamp(newZ, CITY_MIN_Z, CITY_MAX_Z);
+      if (!isBuilding(cx, posRef.current.z, state.scene, carRef.current)) posRef.current.x = cx;
+      if (!isBuilding(posRef.current.x, cz, state.scene, carRef.current)) posRef.current.z = cz;
     }
 
     // ── Sync car mesh ─────────────────────────────────────────────────────────
