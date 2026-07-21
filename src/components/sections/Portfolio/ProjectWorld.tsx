@@ -379,13 +379,15 @@ function Scene({
   const t = THEMES[theme];
 
   const carRef       = useRef<THREE.Group>(null!);
-  const posRef       = useRef({ x: 72, z: -40 });
+  // Spawn on the south road (node 9) — well behind Party Place so the tour
+  // drives a visible route: south road → main junction → east highway → Party Place.
+  const posRef       = useRef({ x: 72, z: 80 });
   const carOrientRef = useRef(0);
   const speedRef     = useRef(0);
   const wheelOrRef   = useRef(0);
   const keysRef      = useRef({ up: false, down: false, left: false, right: false });
-  const camPosRef    = useRef(new THREE.Vector3(72, ROAD_Y + 8, -40 + 16));
-  const camLookRef   = useRef(new THREE.Vector3(72, ROAD_Y + 0.4, -40));
+  const camPosRef    = useRef(new THREE.Vector3(72, ROAD_Y + 8, 80 + 16));
+  const camLookRef   = useRef(new THREE.Vector3(72, ROAD_Y + 0.4, 80));
   const curProjRef   = useRef<number | null>(null);
   const curCloseRef  = useRef<number | null>(null);
   const atBoundRef   = useRef(false);
@@ -395,7 +397,7 @@ function Scene({
   const waypointPath  = useRef<RoadNode[]>([]);
   const waypointIdx   = useRef(0);
   // Tracks the START of the current road segment so we can rail-snap during autopilot
-  const prevWpPos = useRef<{ x: number; z: number }>({ x: 72, z: -40 });
+  const prevWpPos = useRef<{ x: number; z: number }>({ x: 72, z: 80 });
 
   const [nearIdx,  setNearIdx]  = useState<number | null>(null);
   const [closeIdx, setCloseIdx] = useState<number | null>(null);
@@ -491,26 +493,14 @@ function Scene({
             onAutoArrived();
           }
         } else {
-          // Move directly along segment — no physics, no drift
-          const step       = Math.min(AUTO_SPEED * dt, dist);
-          const proposedX  = posRef.current.x + (dx / dist) * step;
-          const proposedZ  = posRef.current.z + (dz / dist) * step;
-
-          if (!isBuilding(proposedX, proposedZ, state.scene, carRef.current)) {
-            // Clear road — move forward
-            posRef.current.x = proposedX;
-            posRef.current.z = proposedZ;
-          } else {
-            // Building ahead — skip this waypoint so the car stops short
-            waypointIdx.current++;
-            wpIdx++;
-            if (wpIdx >= path.length && !arrivedRef.current) {
-              arrivedRef.current = true;
-              speedRef.current   = 0;
-              keysRef.current    = { up: false, down: false, left: false, right: false };
-              onAutoArrived();
-            }
-          }
+          // Move directly along segment — no physics, no drift.
+          // The road graph is pre-validated to only pass through real road
+          // segments, so we trust it unconditionally — no building check here.
+          // (Building checks caused the car to stop short or skip waypoints
+          //  when a road node happened to overlap a building collider.)
+          const step = Math.min(AUTO_SPEED * dt, dist);
+          posRef.current.x = posRef.current.x + (dx / dist) * step;
+          posRef.current.z = posRef.current.z + (dz / dist) * step;
           // Smoothly rotate car to face travel direction
           const targetAngle  = Math.atan2(-dx, -dz);
           const angleDiff    = normaliseAngle(targetAngle - carOrientRef.current);
@@ -682,7 +672,7 @@ export default function ProjectWorld({
   const bg = THEMES[theme].bg;
   return (
     <Canvas
-      camera={{ position: [72, ROAD_Y + 8, -40 + 16], fov: 62, near: 0.5, far: 800 }}
+      camera={{ position: [72, ROAD_Y + 8, 80 + 16], fov: 62, near: 0.5, far: 800 }}
       style={{ width: "100%", height: "100%" }}
       gl={{ antialias: false, alpha: false, powerPreference: "high-performance" }}
       dpr={[0.5, 0.9]}
