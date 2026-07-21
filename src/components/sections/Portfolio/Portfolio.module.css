@@ -805,6 +805,141 @@
   color: rgba(20,20,60,0.88);
 }
 
+/* ── Record path button (manual mode) ────────────────────────────────────── */
+.recordWrap {
+  position: absolute;
+  bottom: 82px;
+  left: 28px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.recordBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: 36px;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  font-family: "Geist", system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+  user-select: none;
+}
+.recordBtn:hover  { transform: translateY(-1px); }
+.recordBtn:active { transform: scale(0.97); }
+
+.recordBtnDark {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14), 0 2px 10px rgba(0,0,0,0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.recordBtnDark:hover {
+  background: rgba(255, 60, 60, 0.18);
+  color: #ff6060;
+  box-shadow: 0 0 0 1px rgba(255, 80, 80, 0.3), 0 3px 14px rgba(200,0,0,0.25);
+}
+
+.recordBtnLight {
+  background: rgba(20, 20, 60, 0.08);
+  color: rgba(20, 20, 60, 0.65);
+  box-shadow: 0 0 0 1px rgba(20, 20, 80, 0.18), 0 2px 10px rgba(0,0,0,0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.recordBtnLight:hover {
+  background: rgba(200, 30, 30, 0.12);
+  color: #cc2222;
+  box-shadow: 0 0 0 1px rgba(200, 40, 40, 0.3), 0 3px 12px rgba(180,0,0,0.15);
+}
+
+/* Red circle (record indicator) */
+.recordDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #e03030;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px rgba(220, 40, 40, 0.7);
+}
+
+/* Active recording button */
+.recordBtnActive {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: 36px;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  font-family: "Geist", system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+  user-select: none;
+}
+.recordBtnActive:hover  { transform: translateY(-1px); }
+.recordBtnActive:active { transform: scale(0.97); }
+
+.recordBtnActiveDark {
+  background: rgba(220, 40, 40, 0.22);
+  color: #ff7070;
+  box-shadow: 0 0 0 1px rgba(255, 80, 80, 0.35), 0 3px 14px rgba(200,0,0,0.3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.recordBtnActiveDark:hover {
+  background: rgba(220, 40, 40, 0.32);
+  box-shadow: 0 0 0 1px rgba(255, 100, 100, 0.5), 0 5px 18px rgba(200,0,0,0.4);
+}
+
+.recordBtnActiveLight {
+  background: rgba(200, 30, 30, 0.14);
+  color: #cc2222;
+  box-shadow: 0 0 0 1px rgba(200, 40, 40, 0.3), 0 3px 12px rgba(180,0,0,0.18);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.recordBtnActiveLight:hover {
+  background: rgba(200, 30, 30, 0.22);
+}
+
+/* Blinking red dot while recording is active */
+.recordingIndicator {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #e03030;
+  flex-shrink: 0;
+  animation: recordBlink 1s ease-in-out infinite;
+}
+@keyframes recordBlink {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%       { opacity: 0.25; transform: scale(0.8); }
+}
+
+.recordCount {
+  font-family: "Geist Mono", monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.recordCountDark  { color: rgba(255, 100, 100, 0.65); }
+.recordCountLight { color: rgba(180, 30, 30, 0.65); }
+
 /* ── Responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .header { padding: 18px 18px 0; }

@@ -16,8 +16,8 @@ export const STATIONS: { x: number; z: number; icon: string }[] = [
   { x: 120, z: -40, icon: "✈️" }, // 1 Maser Travels    — east highway
   { x: 188, z: -40, icon: "🏦" }, // 2 Loan Mgmt        — end of east highway
   { x:  25, z: -40, icon: "💳" }, // 3 YCT Microfinance — west highway
-  { x: -92, z: -40, icon: "🏨" }, // 4 Malete Hostels   — end of west highway
-  { x:  92, z:  80, icon: "🍽️" }, // 5 Zennyola Foods   — south road
+  { x: -88, z: -36, icon: "🏨" }, // 4 Malete Hostels   — near building on west side
+  { x:  92, z:  74, icon: "🍽️" }, // 5 Zennyola Foods   — near building on south road
 ];
 
 // ── Road-graph waypoints — every node is on a real city road ─────────────────
@@ -32,10 +32,10 @@ const ROAD_NODES: RoadNode[] = [
   { x:  25, z: -40 },  //  4  Station 3  (YCT)
   { x:   0, z: -40 },  //  5  west highway junction
   { x: -60, z: -40 },  //  6  west highway junction 2
-  { x: -92, z: -40 },  //  7  Station 4  (Malete Hostels) — west highway end
+  { x: -88, z: -36 },  //  7  Station 4  (Malete Hostels) — near building west side
   { x:  72, z:   0 },  //  8  south road junction 1
-  { x:  72, z:  80 },  //  9  south road junction 2
-  { x:  92, z:  80 },  // 10  Station 5  (Zennyola Foods) — south road end
+  { x:  72, z:  74 },  //  9  south road junction 2
+  { x:  92, z:  74 },  // 10  Station 5  (Zennyola Foods) — near building south road
 ];
 
 // Road edges — every segment travels along a real city road; no building entries
@@ -89,7 +89,6 @@ function findRoadPath(
   while (c !== -1) { idxPath.unshift(c); c = prev[c]; }
 
   // All navigation targets are road nodes, so we return the graph path as-is.
-  // We never append the raw target coords — that was the old source of off-road travel.
   return idxPath.map(i => ({ ...ROAD_NODES[i] }));
 }
 
@@ -174,16 +173,16 @@ function GroundCircle({
 
   return (
     <group>
-      {/* Filled circle */}
+      {/* Filled circle — radius reduced to 3.0 so it stays clear of building edges */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x, ROAD_Y + 0.01, z]}>
-        <circleGeometry args={[4.5, 40]} />
+        <circleGeometry args={[3.0, 40]} />
         <meshBasicMaterial color={accent} transparent
           opacity={isNear ? 0.50 : 0.18} depthWrite={false} />
       </mesh>
 
       {/* Pulsing outer ring */}
       <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[x, ROAD_Y + 0.02, z]}>
-        <ringGeometry args={[4.7, 5.8, 40]} />
+        <ringGeometry args={[3.2, 4.2, 40]} />
         <meshBasicMaterial color={accent} transparent opacity={0.4} depthWrite={false} />
       </mesh>
 
@@ -313,13 +312,10 @@ function Car({ carRef, colors, theme }: {
 }
 
 // ── Building-collision detector ───────────────────────────────────────────────
-// Shoots a ray straight down from above the proposed (x, z) position.
-// Hits road surface at Y ≈ ROAD_Y; hits a building/bush roof at Y > ROAD_Y.
-// Returns true when the position is occupied by a structure taller than the road.
 const _bcRay    = new THREE.Raycaster();
 const _bcDown   = new THREE.Vector3(0, -1, 0);
 const _bcOrigin = new THREE.Vector3();
-const BLDG_Y_MARGIN = 1.5; // anything whose surface is > ROAD_Y + 1.5 is a building
+const BLDG_Y_MARGIN = 1.5;
 
 function isBuilding(
   x: number,
@@ -333,7 +329,7 @@ function isBuilding(
     ? scene.children.filter(c => c !== excludeObj)
     : scene.children;
   const hits = _bcRay.intersectObjects(targets, true);
-  if (hits.length === 0) return false;             // open air → treat as clear
+  if (hits.length === 0) return false;
   return hits[0].point.y > ROAD_Y + BLDG_Y_MARGIN;
 }
 
@@ -354,9 +350,12 @@ const ACCEL       = 140, ACCEL_REV  = 50;
 const DECEL       = 90,  BRAKE_POW  = 8;
 const STEER_SPD   = 1.8, MAX_STEER  = 0.55;
 const TURN_RAD    = 20,  MOV_SCALE  = 0.12;
-const ARRIVE_DIST = 8;   // stop within 8 units of waypoint
-const NEAR_DIST   = 15;  // project card trigger
-const CLOSE_DIST  = 30;  // label hide threshold
+const ARRIVE_DIST = 8;
+const NEAR_DIST   = 15;
+const CLOSE_DIST  = 30;
+
+// Minimum distance (world-units) between consecutive recorded waypoints
+const RECORD_SAMPLE_DIST = 4;
 
 const expEaseOut = (k: number) => (k === 1 ? 1 : -Math.pow(2, -10 * k) + 1);
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -366,21 +365,21 @@ interface SceneProps {
   onNearProject:    (idx: number | null) => void;
   onAtBoundary:     (at: boolean) => void;
   onAutoArrived:    () => void;
+  onPositionSample?: (x: number, z: number) => void;
   theme:            Theme;
   carColors:        CarColors;
   autopilotTarget:  number | null;
   isManual:         boolean;
+  isRecording:      boolean;
 }
 
 function Scene({
-  onNearProject, onAtBoundary, onAutoArrived,
-  theme, carColors, autopilotTarget, isManual,
+  onNearProject, onAtBoundary, onAutoArrived, onPositionSample,
+  theme, carColors, autopilotTarget, isManual, isRecording,
 }: SceneProps) {
   const t = THEMES[theme];
 
   const carRef       = useRef<THREE.Group>(null!);
-  // Spawn on the south road (node 9) — well behind Party Place so the tour
-  // drives a visible route: south road → main junction → east highway → Party Place.
   const posRef       = useRef({ x: 72, z: 80 });
   const carOrientRef = useRef(0);
   const speedRef     = useRef(0);
@@ -393,10 +392,12 @@ function Scene({
   const atBoundRef   = useRef(false);
   const arrivedRef   = useRef(false);
 
+  // Recording: track last sampled position to enforce minimum distance
+  const lastSampleRef = useRef<{ x: number; z: number } | null>(null);
+
   // Autopilot waypoint state
   const waypointPath  = useRef<RoadNode[]>([]);
   const waypointIdx   = useRef(0);
-  // Tracks the START of the current road segment so we can rail-snap during autopilot
   const prevWpPos = useRef<{ x: number; z: number }>({ x: 72, z: 80 });
 
   const [nearIdx,  setNearIdx]  = useState<number | null>(null);
@@ -417,10 +418,15 @@ function Scene({
     );
     waypointPath.current = path;
     waypointIdx.current  = 0;
-    // Seed prevWpPos to the car's current position so the first rail segment
-    // runs from here → path[0], keeping us on-road from the very first frame.
     prevWpPos.current = { x: posRef.current.x, z: posRef.current.z };
   }, [autopilotTarget]);
+
+  // When recording starts/stops, reset the last-sample tracker
+  useEffect(() => {
+    if (isRecording) {
+      lastSampleRef.current = null;
+    }
+  }, [isRecording]);
 
   // Keyboard + d-pad — manual mode only
   useEffect(() => {
@@ -464,14 +470,12 @@ function Scene({
     const dt   = Math.min(delta, 0.05);
     const keys = keysRef.current;
 
-    // ── Autopilot: direct rail movement (physics-free, cannot enter buildings) ──
-    // The car's position is moved purely along the straight line between road
-    // nodes — no steering drift, no physics lag, geometrically on-road always.
+    // ── Autopilot: direct rail movement ──────────────────────────────────────
     let autopilotMoved = false;
     if (!isManual && autopilotTarget !== null) {
       const path  = waypointPath.current;
       let   wpIdx = waypointIdx.current;
-      const AUTO_SPEED = 22; // world-units / second
+      const AUTO_SPEED = 22;
 
       if (!arrivedRef.current && wpIdx < path.length) {
         const wp    = path[wpIdx];
@@ -481,7 +485,6 @@ function Scene({
         const isLast = wpIdx === path.length - 1;
 
         if (dist < (isLast ? ARRIVE_DIST : 5)) {
-          // Arrived at this waypoint — snap exactly to it and advance
           posRef.current.x = wp.x;
           posRef.current.z = wp.z;
           waypointIdx.current++;
@@ -493,25 +496,16 @@ function Scene({
             onAutoArrived();
           }
         } else {
-          // Move directly along segment — no physics, no drift.
-          // The road graph is pre-validated to only pass through real road
-          // segments, so we trust it unconditionally — no building check here.
-          // (Building checks caused the car to stop short or skip waypoints
-          //  when a road node happened to overlap a building collider.)
           const step = Math.min(AUTO_SPEED * dt, dist);
           posRef.current.x = posRef.current.x + (dx / dist) * step;
           posRef.current.z = posRef.current.z + (dz / dist) * step;
-          // Smoothly rotate car to face travel direction
           const targetAngle  = Math.atan2(-dx, -dz);
           const angleDiff    = normaliseAngle(targetAngle - carOrientRef.current);
           carOrientRef.current += angleDiff * Math.min(dt * 5, 1);
-          // Keep wheel-spin animation proportional to speed
           speedRef.current = AUTO_SPEED / MOV_SCALE;
-          // Smoothly straighten front wheels (since we're controlling heading directly)
           wheelOrRef.current = THREE.MathUtils.lerp(wheelOrRef.current, 0, Math.min(dt * 4, 1));
         }
       } else if (arrivedRef.current) {
-        // Gently coast to a halt
         speedRef.current = Math.max(0, speedRef.current - dt * DECEL);
         wheelOrRef.current = THREE.MathUtils.lerp(wheelOrRef.current, 0, Math.min(dt * 4, 1));
       }
@@ -558,11 +552,29 @@ function Scene({
       carOrientRef.current -= (forwardDelta * TURN_RAD * 0.02) * wheelOrRef.current;
       const newX = posRef.current.x + Math.sin(carOrientRef.current) * forwardDelta;
       const newZ = posRef.current.z + Math.cos(carOrientRef.current) * forwardDelta;
-      // Axis-separated building check: allow sliding along a wall
       const cx = clamp(newX, CITY_MIN_X, CITY_MAX_X);
       const cz = clamp(newZ, CITY_MIN_Z, CITY_MAX_Z);
       if (!isBuilding(cx, posRef.current.z, state.scene, carRef.current)) posRef.current.x = cx;
       if (!isBuilding(posRef.current.x, cz, state.scene, carRef.current)) posRef.current.z = cz;
+    }
+
+    // ── Path recording (manual mode only) ────────────────────────────────────
+    if (isManual && isRecording && onPositionSample) {
+      const { x, z } = posRef.current;
+      const last = lastSampleRef.current;
+      if (last === null) {
+        // Always capture the very first point
+        lastSampleRef.current = { x, z };
+        onPositionSample(x, z);
+      } else {
+        const dx = x - last.x;
+        const dz = z - last.z;
+        const distSq = dx * dx + dz * dz;
+        if (distSq >= RECORD_SAMPLE_DIST * RECORD_SAMPLE_DIST) {
+          lastSampleRef.current = { x, z };
+          onPositionSample(x, z);
+        }
+      }
     }
 
     // ── Sync car mesh ─────────────────────────────────────────────────────────
@@ -591,7 +603,7 @@ function Scene({
     camLookRef.current.lerp(_lookTarget, alphaLook);
     state.camera.lookAt(camLookRef.current);
 
-    // ── Project proximity (card trigger: 15, label hide: 30) ─────────────────
+    // ── Project proximity ─────────────────────────────────────────────────────
     let nearest: number | null = null;
     let nearestClose: number | null = null;
     let minDist = Infinity;
@@ -656,18 +668,20 @@ function Scene({
 
 // ── Exported component ────────────────────────────────────────────────────────
 interface ProjectWorldProps {
-  onNearProject:   (idx: number | null) => void;
-  onAtBoundary:    (at: boolean) => void;
-  onAutoArrived:   () => void;
-  theme:           Theme;
-  carColors:       CarColors;
-  autopilotTarget: number | null;
-  isManual:        boolean;
+  onNearProject:    (idx: number | null) => void;
+  onAtBoundary:     (at: boolean) => void;
+  onAutoArrived:    () => void;
+  onPositionSample?: (x: number, z: number) => void;
+  theme:            Theme;
+  carColors:        CarColors;
+  autopilotTarget:  number | null;
+  isManual:         boolean;
+  isRecording:      boolean;
 }
 
 export default function ProjectWorld({
-  onNearProject, onAtBoundary, onAutoArrived,
-  theme, carColors, autopilotTarget, isManual,
+  onNearProject, onAtBoundary, onAutoArrived, onPositionSample,
+  theme, carColors, autopilotTarget, isManual, isRecording,
 }: ProjectWorldProps) {
   const bg = THEMES[theme].bg;
   return (
@@ -683,10 +697,12 @@ export default function ProjectWorld({
         onNearProject={onNearProject}
         onAtBoundary={onAtBoundary}
         onAutoArrived={onAutoArrived}
+        onPositionSample={onPositionSample}
         theme={theme}
         carColors={carColors}
         autopilotTarget={autopilotTarget}
         isManual={isManual}
+        isRecording={isRecording}
       />
     </Canvas>
   );
