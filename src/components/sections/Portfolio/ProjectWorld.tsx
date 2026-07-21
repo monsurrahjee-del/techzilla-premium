@@ -1,19 +1,30 @@
 "use client";
 
-import { useRef, useEffect, useState, useMemo, useCallback, Suspense } from "react";
+import { useRef, useEffect, useState, useMemo, Suspense } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { projects } from "@/lib/projects";
 
-// ── Layout constants ────────────────────────────────────────────────────────
-const ROAD_HALF  = 5;
-const ROAD_LEN   = 240;
-const P_Z        = [-32, -68, -104, -140, -176, -212];
-const P_SIDE     = [ 1,  -1,    1,   -1,    1,   -1];
-const STATION_X  = 17;
+// ── Road surface Y — matches YUKA path y=20.75 from 3d-city-tour ────────────
+const ROAD_Y = 20.75;
 
-// ── Car color types ──────────────────────────────────────────────────────────
+// ── 6 project stations distributed around the city road loop ─────────────────
+// nx, nz = outward normal the billboard FACE points toward (toward the road/viewer)
+// Positions come from the YUKA waypoint network (city at scale 5):
+//   Loop: [72,-40] → [72,7.85] → [115,7.85] → [115,-22.5] → [192,-22.5]
+//         → [192,-88] → bridge → [-93.5,-88] → [-100,-88] → [-100,112]
+//         → [192.5,112] → [192.5,-63.5] → [72,-63.5] → [72,-40]
+const STATIONS: { x: number; z: number; nx: number; nz: number }[] = [
+  { x:  86, z: -50,  nx: -1, nz:  0 }, // 0 — east of N-S road at x=72  → faces west
+  { x: 115, z:  18,  nx:  0, nz: -1 }, // 1 — north of E-W road at z=7.85 → faces south
+  { x: 200, z: -55,  nx:  1, nz:  0 }, // 2 — east outer road at x=192    → faces east
+  { x:  50, z: -90,  nx:  0, nz:  1 }, // 3 — south E-W road at z=-88     → faces north
+  { x:-108, z:  20,  nx: -1, nz:  0 }, // 4 — west road at x=-100         → faces west
+  { x:  80, z: 120,  nx:  0, nz: -1 }, // 5 — north E-W road at z=112     → faces south
+];
+
+// ── Car colour types ─────────────────────────────────────────────────────────
 export type CarColors = {
   body:  string;
   rim:   string;
@@ -21,295 +32,105 @@ export type CarColors = {
   glassOpacity: number;
 };
 
-// ── Themes ──────────────────────────────────────────────────────────────────
+// ── Theme ────────────────────────────────────────────────────────────────────
 export type Theme = "dark" | "light";
 
 export type ThemeColors = {
   bg:           string;
-  ground:       string;
-  road:         string;
-  sidewalk:     string;
   ambientInt:   number;
   ambientCol:   string;
   dirInt:       number;
   dirCol:       string;
-  treeBase:     string;
-  treeDark:     string;
-  treeLight:    string;
-  buildBody:    string;
-  buildGlowInt: number;
-  roofCol:      string;
   fogCol:       string;
   fogNear:      number;
   fogFar:       number;
-  edgeStripe:   string;
-  dashCol:      string;
-  gateCol:      string;
 };
 
 const THEMES: Record<Theme, ThemeColors> = {
   dark: {
-    bg:            "#050508",
-    ground:        "#08080f",
-    road:          "#171720",
-    sidewalk:      "#111118",
-    ambientInt:    0.12,
-    ambientCol:    "#1a1a3a",
-    dirInt:        0.25,
-    dirCol:        "#8080b0",
-    treeBase:      "#3a2410",
-    treeDark:      "#142a14",
-    treeLight:     "#1a351a",
-    buildBody:     "#0e0e18",
-    buildGlowInt:  0.12,
-    roofCol:       "#1a1a28",
-    fogCol:        "#050508",
-    fogNear:       30,
-    fogFar:        110,
-    edgeStripe:    "#ffffff",
-    dashCol:       "#ffffff",
-    gateCol:       "#ffffff",
+    bg:          "#050508",
+    ambientInt:  0.35,
+    ambientCol:  "#8090c0",
+    dirInt:      0.7,
+    dirCol:      "#b0b8e0",
+    fogCol:      "#050508",
+    fogNear:     80,
+    fogFar:      380,
   },
   light: {
-    bg:            "#c8e6f5",
-    ground:        "#4a8a3c",
-    road:          "#86878f",
-    sidewalk:      "#9a9aaa",
-    ambientInt:    2.5,
-    ambientCol:    "#ffffff",
-    dirInt:        1.5,
-    dirCol:        "#fffde7",
-    treeBase:      "#6b3a1f",
-    treeDark:      "#2d7028",
-    treeLight:     "#3d8c38",
-    buildBody:     "#dce0f0",
-    buildGlowInt:  0.55,
-    roofCol:       "#c0c3d8",
-    fogCol:        "#c8e6f5",
-    fogNear:       50,
-    fogFar:        200,
-    edgeStripe:    "#cccccc",
-    dashCol:       "#cccccc",
-    gateCol:       "#ffffff",
+    bg:          "#87ceeb",
+    ambientInt:  2.0,
+    ambientCol:  "#ffffff",
+    dirInt:      2.5,
+    dirCol:      "#fffde7",
+    fogCol:      "#87ceeb",
+    fogNear:     120,
+    fogFar:      600,
   },
 } as const;
 
-// ── Pre-seeded random data ──────────────────────────────────────────────────
-const mkRng = (seed: number) => {
-  let s = seed;
-  return () => { s = (s * 16807 + 0) % 2147483647; return (s - 1) / 2147483646; };
+// ── City + House GLB ─────────────────────────────────────────────────────────
+function CityModel() {
+  const { scene: cityScene } = useGLTF("/models/city.glb");
+  const { scene: houseScene } = useGLTF("/models/house.glb");
+
+  const city  = useMemo(() => cityScene.clone(true),  [cityScene]);
+  const house = useMemo(() => houseScene.clone(true), [houseScene]);
+
+  return (
+    <>
+      {/* City at scale 5 — roads at y≈20.75 as per YUKA path */}
+      <primitive
+        object={city}
+        scale={[5, 5, 5]}
+        castShadow
+        receiveShadow
+      />
+      {/* Extra house placed at YUKA reference position (50, hei-1.04, 25) */}
+      <primitive
+        object={house}
+        scale={[5, 5, 5]}
+        position={[50, ROAD_Y - 1.04, 25]}
+        rotation={[0, Math.PI / 2, 0]}
+        castShadow
+        receiveShadow
+      />
+    </>
+  );
+}
+
+// ── Billboard 3-D → 2-D position type ────────────────────────────────────────
+export type BillboardPos = {
+  x: number; y: number; w: number; h: number; visible: boolean;
+  corners: [[number,number],[number,number],[number,number],[number,number]] | null;
 };
 
-const TREE_DATA = (() => {
-  const out: { x: number; z: number; scale: number }[] = [];
-  const r = mkRng(42);
-  for (let z = -8; z > -230; z -= 7) {
-    const nearStation = P_Z.some((pz) => Math.abs(pz - z) < 18);
-    const offset = r() * 3 + 0.5;
-    const scale  = r() * 0.5 + 0.75;
-    const scale2 = r() * 0.5 + 0.75;
-    if (!nearStation) {
-      out.push({ x: ROAD_HALF + 7 + offset,    z, scale });
-      out.push({ x: -(ROAD_HALF + 7 + offset), z, scale: scale2 });
-    }
-  }
-  return out;
-})();
+// Pre-allocated vectors — avoid per-frame GC
+const _vTL = new THREE.Vector3();
+const _vTR = new THREE.Vector3();
+const _vBR = new THREE.Vector3();
+const _vBL = new THREE.Vector3();
 
-const BUILDING_DATA = (() => {
-  const out: { x: number; z: number; w: number; h: number; d: number }[] = [];
-  const r = mkRng(99);
-  for (let z = -20; z > -230; z -= 22) {
-    const nearStation = P_Z.some((pz) => Math.abs(pz - z) < 20);
-    const w = r() * 3 + 3, h = r() * 10 + 5, d = r() * 3 + 3;
-    const w2 = r() * 3 + 3, h2 = r() * 10 + 5, d2 = r() * 3 + 3;
-    if (!nearStation) {
-      out.push({ x:  ROAD_HALF + 16, z, w, h, d });
-      out.push({ x: -(ROAD_HALF + 16), z, w: w2, h: h2, d: d2 });
-    }
-  }
-  return out;
-})();
-
-// ── Sub-components ──────────────────────────────────────────────────────────
-
-function Ground({ t }: { t: ThemeColors }) {
-  return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, -110]}>
-      <planeGeometry args={[220, ROAD_LEN + 20]} />
-      <meshStandardMaterial color={t.ground} roughness={1} metalness={0} />
-    </mesh>
-  );
-}
-
-function Road({ t }: { t: ThemeColors }) {
-  const dashes = useMemo(() => {
-    const d: number[] = [];
-    for (let z = -2; z > -230; z -= 9) d.push(z);
-    return d;
-  }, []);
-
-  return (
-    <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, -110]}>
-        <planeGeometry args={[ROAD_HALF * 2, ROAD_LEN]} />
-        <meshStandardMaterial color={t.road} roughness={0.95} metalness={0.05} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-(ROAD_HALF + 0.35), 0.003, -110]}>
-        <planeGeometry args={[0.25, ROAD_LEN]} />
-        <meshStandardMaterial color={t.edgeStripe} emissive={t.edgeStripe} emissiveIntensity={0.15} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[ROAD_HALF + 0.35, 0.003, -110]}>
-        <planeGeometry args={[0.25, ROAD_LEN]} />
-        <meshStandardMaterial color={t.edgeStripe} emissive={t.edgeStripe} emissiveIntensity={0.15} />
-      </mesh>
-      {dashes.map((z, i) => (
-        <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, z]}>
-          <planeGeometry args={[0.12, 4.5]} />
-          <meshStandardMaterial color={t.dashCol} emissive={t.dashCol} emissiveIntensity={0.12} />
-        </mesh>
-      ))}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[ROAD_HALF + 2, 0.001, -110]}>
-        <planeGeometry args={[4, ROAD_LEN]} />
-        <meshStandardMaterial color={t.sidewalk} roughness={1} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-(ROAD_HALF + 2), 0.001, -110]}>
-        <planeGeometry args={[4, ROAD_LEN]} />
-        <meshStandardMaterial color={t.sidewalk} roughness={1} />
-      </mesh>
-    </group>
-  );
-}
-
-function StreetLight({ z, side }: { z: number; side: number }) {
-  const x   = side * (ROAD_HALF + 2.2);
-  const arm = side * -1;
-  return (
-    <group position={[x, 0, z]}>
-      <mesh position={[0, 2.8, 0]}>
-        <cylinderGeometry args={[0.06, 0.09, 5.6, 8]} />
-        <meshStandardMaterial color="#5a5a6a" metalness={0.8} roughness={0.25} />
-      </mesh>
-      <mesh position={[0, 0.12, 0]}>
-        <cylinderGeometry args={[0.18, 0.22, 0.25, 8]} />
-        <meshStandardMaterial color="#3a3a4a" metalness={0.7} roughness={0.3} />
-      </mesh>
-      <mesh position={[arm * 1.0, 5.5, 0]} rotation={[0, 0, arm * -0.22]}>
-        <boxGeometry args={[2.1, 0.07, 0.07]} />
-        <meshStandardMaterial color="#5a5a6a" metalness={0.8} roughness={0.25} />
-      </mesh>
-      <mesh position={[arm * 2.0, 5.38, 0]}>
-        <boxGeometry args={[0.55, 0.22, 0.42]} />
-        <meshStandardMaterial color="#222230" roughness={0.9} />
-      </mesh>
-      <mesh position={[arm * 2.0, 5.22, 0]}>
-        <sphereGeometry args={[0.15, 8, 6]} />
-        <meshStandardMaterial color="#ffeaa0" emissive="#ffd97a" emissiveIntensity={6} />
-      </mesh>
-      <pointLight position={[arm * 2.0, 5.1, 0]} color="#ffd97a" intensity={18} distance={20} decay={2} />
-    </group>
-  );
-}
-
-function Tree({ x, z, scale, t }: { x: number; z: number; scale: number; t: ThemeColors }) {
-  return (
-    <group position={[x, 0, z]} scale={scale}>
-      <mesh position={[0, 1.0, 0]}>
-        <cylinderGeometry args={[0.12, 0.18, 2.0, 6]} />
-        <meshStandardMaterial color={t.treeBase} roughness={0.95} />
-      </mesh>
-      <mesh position={[0, 3.0, 0]}>
-        <coneGeometry args={[0.9, 2.8, 7]} />
-        <meshStandardMaterial color={t.treeDark} roughness={0.95} />
-      </mesh>
-      <mesh position={[0, 4.5, 0]}>
-        <coneGeometry args={[0.6, 2.0, 7]} />
-        <meshStandardMaterial color={t.treeLight} roughness={0.95} />
-      </mesh>
-    </group>
-  );
-}
-
-function Building({ x, z, w, h, d, t }: { x: number; z: number; w: number; h: number; d: number; t: ThemeColors }) {
-  const glowCol = useMemo(() => {
-    const cols = ["#ffe89a", "#a8d4ff", "#c0e0ff", "#fff8dc"];
-    return cols[Math.floor((Math.abs(x) + Math.abs(z)) % cols.length)];
-  }, [x, z]);
-
-  return (
-    <group position={[x, 0, z]}>
-      <mesh position={[0, h / 2, 0]}>
-        <boxGeometry args={[w, h, d]} />
-        <meshStandardMaterial color={t.buildBody} roughness={0.9} metalness={0.25} />
-      </mesh>
-      <mesh position={[0, h * 0.5, d / 2 + 0.02]}>
-        <boxGeometry args={[w * 0.55, h * 0.55, 0.05]} />
-        <meshStandardMaterial color="#000" emissive={glowCol} emissiveIntensity={t.buildGlowInt} transparent opacity={0.7} />
-      </mesh>
-      <mesh position={[0, h + 0.06, 0]}>
-        <boxGeometry args={[w + 0.1, 0.12, d + 0.1]} />
-        <meshStandardMaterial color={t.roofCol} metalness={0.6} roughness={0.4} />
-      </mesh>
-    </group>
-  );
-}
-
-function StartGate({ t }: { t: ThemeColors }) {
-  // Gate is placed well behind the car spawn point (spawn: z=5) so it never
-  // appears around the car in the opening view.
-  return (
-    <group position={[0, 0, -8]}>
-      <mesh position={[0, 3.2, 0]}>
-        <boxGeometry args={[ROAD_HALF * 2 + 2, 0.18, 0.45]} />
-        <meshStandardMaterial color={t.gateCol} emissive={t.gateCol} emissiveIntensity={1.2} />
-      </mesh>
-      <mesh position={[-(ROAD_HALF + 1.2), 1.6, 0]}>
-        <boxGeometry args={[0.18, 3.2, 0.45]} />
-        <meshStandardMaterial color={t.gateCol} emissive={t.gateCol} emissiveIntensity={1.2} />
-      </mesh>
-      <mesh position={[ROAD_HALF + 1.2, 1.6, 0]}>
-        <boxGeometry args={[0.18, 3.2, 0.45]} />
-        <meshStandardMaterial color={t.gateCol} emissive={t.gateCol} emissiveIntensity={1.2} />
-      </mesh>
-      <pointLight position={[0, 3.2, 0]} color="#ffffff" intensity={8} distance={14} decay={2} />
-    </group>
-  );
-}
-
-function EndMarker() {
-  return (
-    <group position={[0, 0, -222]}>
-      <mesh position={[0, 3.2, 0]}>
-        <boxGeometry args={[ROAD_HALF * 2 + 2, 0.18, 0.45]} />
-        <meshStandardMaterial color="#ff3366" emissive="#ff3366" emissiveIntensity={3} />
-      </mesh>
-      <mesh position={[-(ROAD_HALF + 1.2), 1.6, 0]}>
-        <boxGeometry args={[0.18, 3.2, 0.45]} />
-        <meshStandardMaterial color="#ff3366" emissive="#ff3366" emissiveIntensity={3} />
-      </mesh>
-      <mesh position={[ROAD_HALF + 1.2, 1.6, 0]}>
-        <boxGeometry args={[0.18, 3.2, 0.45]} />
-        <meshStandardMaterial color="#ff3366" emissive="#ff3366" emissiveIntensity={3} />
-      </mesh>
-      <pointLight position={[0, 3.2, 0]} color="#ff3366" intensity={18} distance={18} decay={2} />
-    </group>
-  );
-}
-
+// ── Project station ───────────────────────────────────────────────────────────
 function ProjectStation({
   index,
   accent,
   isNear,
-  t,
+  theme,
 }: {
   index:  number;
   accent: string;
   isNear: boolean;
-  t:      ThemeColors;
+  theme:  Theme;
 }) {
-  const z    = P_Z[index];
-  const side = P_SIDE[index];
-  const x    = side * STATION_X;
+  const { x, z, nx, nz } = STATIONS[index];
+
+  // Perpendicular axis (horizontal span of billboard)
+  const perpX = -nz;
+  const perpZ =  nx;
+
+  // Y-rotation so local +Z faces along (nx, nz) — billboard faces road
+  const yaw = Math.atan2(nx, nz);
 
   const glowRef  = useRef<THREE.PointLight>(null!);
   const frameRef = useRef<THREE.Mesh>(null!);
@@ -318,80 +139,134 @@ function ProjectStation({
   useFrame((_, delta) => {
     tmr.current += delta;
     if (glowRef.current)
-      glowRef.current.intensity = (isNear ? 40 : 12) + Math.sin(tmr.current * 1.8) * 5;
+      glowRef.current.intensity = (isNear ? 60 : 18) + Math.sin(tmr.current * 1.8) * 6;
     if (frameRef.current)
       (frameRef.current.material as THREE.MeshStandardMaterial).emissiveIntensity =
         (isNear ? 4.0 : 1.2) + Math.sin(tmr.current * 2.5) * 0.6;
   });
 
-  const edgeX      = side > 0 ? ROAD_HALF + 0.5 : -(ROAD_HALF + 0.5);
-  const connW      = Math.abs(x) - ROAD_HALF - 1.0;
-  const connCenterX = edgeX + side * (connW / 2);
+  const ry = ROAD_Y;
+  const panelY = ry + 5.6;
+
+  // Slight offset in facing direction (so glass is "in front" of the board)
+  const glassOffX = nx * 0.06;
+  const glassOffZ = nz * 0.06;
+
+  // Station pad glow color changes when near
+  const padEmissive = isNear ? 1.0 : 0.15;
+
+  // Pole base: slightly behind the face (inward from road)
+  const poleX = x - nx * 0.5;
+  const poleZ = z - nz * 0.5;
+
+  // Point light in front, toward road
+  const lightX = x + nx * 2;
+  const lightZ = z + nz * 2;
+
+  // Connector strip: from road-edge inward ~3 units, perpendicular to facing
+  // drawn as a thin glowing line in the accent colour
+  const connLen = 4;
+  const connX = x - nx * (connLen / 2);
+  const connZ = z - nz * (connLen / 2);
 
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[connCenterX, 0.001, z]}>
-        <planeGeometry args={[connW, 5.5]} />
-        <meshStandardMaterial color={t.road} roughness={0.95} />
+      {/* Glowing pad on road surface */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x, ry + 0.01, z]}>
+        <circleGeometry args={[5.5, 48]} />
+        <meshStandardMaterial
+          color={accent}
+          emissive={accent}
+          emissiveIntensity={padEmissive}
+          transparent
+          opacity={0.35}
+          depthWrite={false}
+        />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[connCenterX, 0.004, z]}>
-        <planeGeometry args={[connW, 0.32]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={isNear ? 1.8 : 0.7} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[connCenterX, 0.004, z + 2.5]}>
-        <planeGeometry args={[connW, 0.12]} />
-        <meshStandardMaterial color={t.edgeStripe} emissive={t.edgeStripe} emissiveIntensity={0.2} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[connCenterX, 0.004, z - 2.5]}>
-        <planeGeometry args={[connW, 0.12]} />
-        <meshStandardMaterial color={t.edgeStripe} emissive={t.edgeStripe} emissiveIntensity={0.2} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.003, z]}>
-        <circleGeometry args={[6.5, 48]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.1} transparent opacity={0.38} />
-      </mesh>
-      <mesh position={[x, 2.5, z - 0.5]}>
-        <cylinderGeometry args={[0.1, 0.14, 5, 8]} />
+
+      {/* Accent stripe approaching the station */}
+      <group position={[connX, ry + 0.02, connZ]} rotation={[0, yaw, 0]}>
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.4, connLen]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={isNear ? 2.0 : 0.8} />
+        </mesh>
+      </group>
+
+      {/* Pole */}
+      <mesh position={[poleX, ry + 3, poleZ]}>
+        <cylinderGeometry args={[0.1, 0.14, 6, 8]} />
         <meshStandardMaterial color="#3a3a4a" metalness={0.8} roughness={0.25} />
       </mesh>
-      <mesh position={[x, 5.6, z - 0.5]}>
+      <mesh position={[poleX, ry + 0.12, poleZ]}>
+        <cylinderGeometry args={[0.18, 0.22, 0.25, 8]} />
+        <meshStandardMaterial color="#2a2a3a" metalness={0.7} roughness={0.3} />
+      </mesh>
+
+      {/* Billboard back panel */}
+      <mesh
+        position={[x - nx * 0.09, panelY, z - nz * 0.09]}
+        rotation={[0, yaw, 0]}
+      >
         <boxGeometry args={[6.0, 3.6, 0.18]} />
         <meshStandardMaterial color="#06060e" roughness={0.9} metalness={0.2} />
       </mesh>
-      <mesh position={[x, 5.6, z - 0.36]}>
+
+      {/* Glowing frame border */}
+      <mesh
+        ref={frameRef}
+        position={[x + glassOffX * 0.5, panelY, z + glassOffZ * 0.5]}
+        rotation={[0, yaw, 0]}
+      >
+        <boxGeometry args={[6.1, 3.7, 0.06]} />
+        <meshStandardMaterial
+          color={accent}
+          emissive={accent}
+          emissiveIntensity={1.2}
+          transparent
+          opacity={0.7}
+        />
+      </mesh>
+
+      {/* Glass display screen */}
+      <mesh
+        position={[x + glassOffX, panelY, z + glassOffZ]}
+        rotation={[0, yaw, 0]}
+      >
         <boxGeometry args={[5.6, 3.2, 0.04]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={isNear ? 0.08 : 0.22} transparent opacity={0.18} />
+        <meshStandardMaterial
+          color="#000010"
+          emissive="#1a1aff"
+          emissiveIntensity={theme === "dark" ? 0.06 : 0.02}
+          transparent
+          opacity={0.88}
+          metalness={0.9}
+          roughness={0.05}
+        />
       </mesh>
-      <mesh ref={frameRef} position={[x, 5.6, z - 0.28]}>
-        <boxGeometry args={[6.2, 3.8, 0.06]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.2} />
-      </mesh>
-      <mesh position={[x, 5.6, z - 0.26]}>
-        <circleGeometry args={[0.7, 28]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={4} />
-      </mesh>
-      <pointLight ref={glowRef} position={[x, 2.5, z]} color={accent} intensity={12} distance={26} decay={2} />
+
+      {/* Station glow light */}
+      <pointLight
+        ref={glowRef}
+        position={[lightX, panelY, lightZ]}
+        color={accent}
+        intensity={18}
+        distance={22}
+        decay={2}
+      />
+
+      {/* Ground glow beneath station */}
+      <pointLight
+        position={[x, ry + 1, z]}
+        color={accent}
+        intensity={isNear ? 30 : 8}
+        distance={12}
+        decay={2}
+      />
     </group>
   );
 }
 
-// ── Ferrari 458 GLB Car ───────────────────────────────────────────────────────
-// Wheel animation matches CarControls.js (shliamin/JS-3D-Car) exactly:
-//
-//   setupWheels():
-//     - frontLeftWheelRoot  = wheel_fl  (the GLB node — steers on Z axis)
-//     - frontLeftWheel      = new Group (children moved here — rolls on X axis)
-//     frontLeftWheelRoot.add(frontLeftWheel)
-//
-//   update():
-//     frontLeftWheel.rotation.x   -= wheelDelta        (rolling, via inner group)
-//     frontLeftWheelRoot.rotation.z = wheelOrientation  (steering, via outer node)
-//     backLeftWheel.rotation.x    -= wheelDelta         (rolling only, no steering)
-//
-// The rim meshes (rim_fl etc.) are children of their wheel nodes and therefore
-// rotate automatically — they must NOT be animated separately.
-// ─────────────────────────────────────────────────────────────────────────────
-
+// ── Ferrari car ───────────────────────────────────────────────────────────────
 function Car({
   carRef,
   colors,
@@ -403,23 +278,16 @@ function Car({
 }) {
   const frontAxleRef = useRef<THREE.Group>(null!);
 
-  // Outer wheel ROOT nodes — receive steering rotation on Z axis (CarControls.js wheelTurnAxis='z')
   const wheelFLRoot = useRef<THREE.Object3D | null>(null);
   const wheelFRRoot = useRef<THREE.Object3D | null>(null);
-
-  // Inner Groups (children of wheel root moved here) — receive rolling rotation on X axis
-  // Persistent refs so the groups aren't recreated on re-render
-  const flInner = useRef(new THREE.Group());
-  const frInner = useRef(new THREE.Group());
-
-  // Rear wheels — rolling only, no steering
-  const wheelRL = useRef<THREE.Object3D | null>(null);
-  const wheelRR = useRef<THREE.Object3D | null>(null);
+  const flInner     = useRef(new THREE.Group());
+  const frInner     = useRef(new THREE.Group());
+  const wheelRL     = useRef<THREE.Object3D | null>(null);
+  const wheelRR     = useRef<THREE.Object3D | null>(null);
 
   const { scene: gltfScene } = useGLTF("/models/ferrari.glb");
   const carScene = useMemo(() => gltfScene.clone(true), [gltfScene]);
 
-  // ── Mirror CarControls.js setupWheels() ───────────────────────────────────
   useEffect(() => {
     const flRoot = carScene.getObjectByName("wheel_fl");
     const frRoot = carScene.getObjectByName("wheel_fr");
@@ -429,13 +297,9 @@ function Car({
     wheelRL.current     = carScene.getObjectByName("wheel_rl") ?? null;
     wheelRR.current     = carScene.getObjectByName("wheel_rr") ?? null;
 
-    // Separate rolling from steering — exactly CarControls.js setupWheels():
-    //   while (frontLeftWheelRoot.children.length > 0)
-    //     frontLeftWheel.add(frontLeftWheelRoot.children[0]);
-    //   frontLeftWheelRoot.add(frontLeftWheel);
     if (flRoot) {
       const inner = flInner.current;
-      while (inner.children.length > 0) inner.remove(inner.children[0]); // clear stale children if remounted
+      while (inner.children.length > 0) inner.remove(inner.children[0]);
       while (flRoot.children.length > 0) inner.add(flRoot.children[0]);
       flRoot.add(inner);
     }
@@ -450,7 +314,6 @@ function Car({
     (carRef as any).__speedRef  = { current: 0 };
   }, [carScene, carRef]);
 
-  // ── Apply car colours ──────────────────────────────────────────────────────
   useEffect(() => {
     const bodyMat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(colors.body), metalness: 0.9, roughness: 0.2,
@@ -483,23 +346,15 @@ function Car({
     const dt  = Math.min(delta, 0.05);
     const spd = (carRef as any).__speedRef?.current ?? 0;
 
-    // ── Wheel rolling — CarControls.js formula ────────────────────────────
-    // Car moves: Δpos = spd * dt * MOV_SCALE  (world units per frame)
-    // Wheel rotates: Δθ = Δpos / wheel_radius = Δpos * 2 / wheel_diameter
-    // At scale 2.4 the ferrari wheel diameter ≈ 0.55 * 2.4 = 1.32 world units
-    // Subtract angDelta so forward motion → front of wheel descends (correct roll)
-    const MOV_SCALE  = 0.07;   // must match Scene's MOV_SCALE
-    const WHEEL_DIAM = 1.32;   // world units: model ~0.55 * scale 2.4
+    const MOV_SCALE  = 0.07;
+    const WHEEL_DIAM = 1.32;
     const angDelta   = (spd * dt * MOV_SCALE) * (2 / WHEEL_DIAM);
 
-    // Inner groups (front) and direct nodes (rear) — rolling on X axis
     flInner.current.rotation.x -= angDelta;
     frInner.current.rotation.x -= angDelta;
     if (wheelRL.current) wheelRL.current.rotation.x -= angDelta;
     if (wheelRR.current) wheelRR.current.rotation.x -= angDelta;
 
-    // ── Steering — wheelTurnAxis = 'z' (CarControls.js default for ferrari.glb) ─
-    // frontAxleRef carries the steer angle in its .rotation.y (set by Scene's useFrame)
     const steer = frontAxleRef.current?.rotation.y ?? 0;
     if (wheelFLRoot.current) wheelFLRoot.current.rotation.z = steer;
     if (wheelFRRoot.current) wheelFRRoot.current.rotation.z = steer;
@@ -507,45 +362,28 @@ function Car({
 
   return (
     <group ref={carRef}>
-      {/* Steer-angle data carrier — zero geometry, invisible */}
       <group ref={frontAxleRef} />
-
-      {/* Ferrari 458 Italia GLB — scale 2.4 (bigger than before) */}
       <primitive object={carScene} scale={[2.4, 2.4, 2.4]} position={[0, 0.01, 0]} />
 
-      {/* AO contact shadow — sized to match car footprint at scale 2.4.
-          color="black" prevents white fringing on transparent texture edges.
-          Shadow size = reference footprint × (2.4/1.8) factor: [6.29, 12.48] */}
+      {/* AO contact shadow */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]} renderOrder={2}>
         <planeGeometry args={[6.29, 12.48]} />
         <meshBasicMaterial map={shadowTex} transparent opacity={0.75} depthWrite={false} color="black" />
       </mesh>
 
-      {/* Headlight beams — only in dark theme */}
+      {/* Headlight beams — dark only */}
       {theme === "dark" && (
         <>
-          <pointLight position={[0.52,  0.38, -2.0]} color="#fffadc" intensity={80} distance={32} decay={2} />
-          <pointLight position={[-0.52, 0.38, -2.0]} color="#fffadc" intensity={80} distance={32} decay={2} />
-          <pointLight position={[0,     0.60, -5.0]} color="#ffffff"  intensity={50} distance={25} decay={2} />
+          <pointLight position={[ 0.52, 0.38, -2.0]} color="#fffadc" intensity={120} distance={40} decay={2} />
+          <pointLight position={[-0.52, 0.38, -2.0]} color="#fffadc" intensity={120} distance={40} decay={2} />
+          <pointLight position={[0,     0.60, -5.0]} color="#ffffff"  intensity={80}  distance={30} decay={2} />
         </>
       )}
     </group>
   );
 }
 
-// ── Billboard 3-D → 2-D Projector ──────────────────────────────────────────
-// corners: [TL, TR, BR, BL] projected screen positions of the display glass
-export type BillboardPos = {
-  x: number; y: number; w: number; h: number; visible: boolean;
-  corners: [[number,number],[number,number],[number,number],[number,number]] | null;
-};
-
-// Pre-allocated vectors — avoid per-frame GC pressure
-const _vTL = new THREE.Vector3();
-const _vTR = new THREE.Vector3();
-const _vBR = new THREE.Vector3();
-const _vBL = new THREE.Vector3();
-
+// ── Billboard 3-D → 2-D Projector ────────────────────────────────────────────
 function BillboardProjector({
   onProject,
   nearIdx,
@@ -554,104 +392,109 @@ function BillboardProjector({
   nearIdx:   number | null;
 }) {
   const { camera, size } = useThree();
-  const prev = useRef<string>("");
 
   useFrame(() => {
-    // Only project the billboard the car is closest to — nothing else is shown.
-    // Running every frame (not throttled) eliminates the 2-frame CSS lag/jitter.
-    const out: BillboardPos[] = P_Z.map((pz, i) => {
-      // Cull immediately if this is not the nearest billboard
+    const hw  = 2.8;
+    const top = ROAD_Y + 7.2;
+    const bot = ROAD_Y + 4.0;
+
+    const out: BillboardPos[] = STATIONS.map(({ x, z, nx, nz }, i) => {
       if (nearIdx !== i) return { x: 0, y: 0, w: 0, h: 0, visible: false, corners: null };
 
-      const bx  = P_SIDE[i] * STATION_X;
-      // Use the glass surface Z (from ProjectStation: z - 0.36)
-      const bz  = pz - 0.36;
-      const top = 7.2;    // 5.6 + 1.6
-      const bot = 4.0;    // 5.6 - 1.6
-      const hw  = 2.8;    // half-width
+      // Perpendicular axis (horizontal span of billboard)
+      const perpX = -nz;
+      const perpZ =  nx;
 
-      // Project 4 corners of the display glass
-      _vTL.set(bx - hw, top, bz); _vTL.project(camera);
-      _vTR.set(bx + hw, top, bz); _vTR.project(camera);
-      _vBR.set(bx + hw, bot, bz); _vBR.project(camera);
-      _vBL.set(bx - hw, bot, bz); _vBL.project(camera);
+      // Glass face is offset slightly toward the viewer (in normal direction)
+      const gx = x + nx * 0.06;
+      const gz = z + nz * 0.06;
 
-      // Cull if any corner is behind the camera
+      _vTL.set(gx - hw * perpX, top, gz - hw * perpZ); _vTL.project(camera);
+      _vTR.set(gx + hw * perpX, top, gz + hw * perpZ); _vTR.project(camera);
+      _vBR.set(gx + hw * perpX, bot, gz + hw * perpZ); _vBR.project(camera);
+      _vBL.set(gx - hw * perpX, bot, gz - hw * perpZ); _vBL.project(camera);
+
       if (_vTL.z >= 1 || _vTR.z >= 1 || _vBR.z >= 1 || _vBL.z >= 1)
         return { x: 0, y: 0, w: 0, h: 0, visible: false, corners: null };
 
-      const toSX = (v: THREE.Vector3) => ((v.x + 1) / 2) * size.width;
-      const toSY = (v: THREE.Vector3) => ((-v.y + 1) / 2) * size.height;
-
-      const corners: [[number,number],[number,number],[number,number],[number,number]] = [
-        [toSX(_vTL), toSY(_vTL)],
-        [toSX(_vTR), toSY(_vTR)],
-        [toSX(_vBR), toSY(_vBR)],
-        [toSX(_vBL), toSY(_vBL)],
+      // NDC → pixel
+      const ndcToPixel = (v: THREE.Vector3): [number, number] => [
+        ( v.x * 0.5 + 0.5) * size.width,
+        (-v.y * 0.5 + 0.5) * size.height,
       ];
 
-      // Bounding-box centre + approx width for legacy compat / visibility check
-      const xs = corners.map(c => c[0]);
-      const ys = corners.map(c => c[1]);
-      const minX = Math.min(...xs), maxX = Math.max(...xs);
-      const minY = Math.min(...ys), maxY = Math.max(...ys);
-      const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
-      const w  = maxX - minX;
+      const corners: [[number,number],[number,number],[number,number],[number,number]] = [
+        ndcToPixel(_vTL),
+        ndcToPixel(_vTR),
+        ndcToPixel(_vBR),
+        ndcToPixel(_vBL),
+      ];
 
-      const visible = w > 20 && cx > -size.width * 0.2 && cx < size.width * 1.2
-                              && cy > -size.height * 0.2 && cy < size.height * 1.2;
-      return { x: cx, y: cy, w, h: maxY - minY, visible, corners };
+      const xs = corners.map((c) => c[0]);
+      const ys = corners.map((c) => c[1]);
+      const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+      const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+      const w  = Math.max(...xs) - Math.min(...xs);
+
+      const visible =
+        w > 20 &&
+        cx > -size.width * 0.2 && cx < size.width * 1.2 &&
+        cy > -size.height * 0.2 && cy < size.height * 1.2;
+
+      return { x: cx, y: cy, w, h: Math.max(...ys) - Math.min(...ys), visible, corners };
     });
 
-    // Always fire — Portfolio.tsx does cheap DOM style writes and the matrix3d
-    // must track the camera every frame to stay locked to the 3-D billboard.
     onProject(out);
   });
 
   return null;
 }
 
-// ── Main scene ───────────────────────────────────────────────────────────────
-// Physics ported from JS-3D-Car's CarControls.js
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Main scene ────────────────────────────────────────────────────────────────
 interface SceneProps {
-  onNearProject:     (idx: number | null) => void;
-  onBillboardPos:    (pos: BillboardPos[]) => void;
-  onAtBoundary:      (at: boolean) => void;
-  theme:             Theme;
-  carColors:         CarColors;
+  onNearProject:  (idx: number | null) => void;
+  onBillboardPos: (pos: BillboardPos[]) => void;
+  onAtBoundary:   (at: boolean) => void;
+  theme:          Theme;
+  carColors:      CarColors;
 }
 
-// Helper from CarControls.js — eases deceleration
 const expEaseOut = (k: number) => (k === 1 ? 1 : -Math.pow(2, -10 * k) + 1);
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+// City road loop extents (at scale 5, based on YUKA waypoints + margin)
+const CITY_MIN_X = -120;
+const CITY_MAX_X =  210;
+const CITY_MIN_Z = -110;
+const CITY_MAX_Z =  130;
 
 function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }: SceneProps) {
   const t = THEMES[theme];
 
-  const carRef        = useRef<THREE.Group>(null!);
-  const posRef        = useRef({ x: 0, z: 5 });
-  const carOrientRef  = useRef(0);           // yaw — mirrors CarControls.carOrientation
-  const speedRef      = useRef(0);           // in CarControls speed units (km/h scale)
-  const wheelOrRef    = useRef(0);           // steering angle (rad)
-  const keysRef       = useRef({ up: false, down: false, left: false, right: false });
-  const camPosRef     = useRef(new THREE.Vector3(0, 14, 20));
-  const camLookRef    = useRef(new THREE.Vector3(0, 0.5, 0));
-  const curProjectRef    = useRef<number | null>(null);
-  const atBoundaryRef    = useRef(false);
+  // Start position = YUKA start waypoint [72, hei, -40]
+  const carRef       = useRef<THREE.Group>(null!);
+  const posRef       = useRef({ x: 72, z: -40 });
+  const carOrientRef = useRef(0);
+  const speedRef     = useRef(0);
+  const wheelOrRef   = useRef(0);
+  const keysRef      = useRef({ up: false, down: false, left: false, right: false });
+  const camPosRef    = useRef(new THREE.Vector3(72, ROAD_Y + 14, -40 + 20));
+  const camLookRef   = useRef(new THREE.Vector3(72, ROAD_Y + 0.5, -40));
+  const curProjRef   = useRef<number | null>(null);
+  const atBoundRef   = useRef(false);
   const [nearIdx, setNearIdx] = useState<number | null>(null);
 
-  // ── CarControls.js constants — matched to JS-3D-Car feel ─────────────────
-  const MAX_SPEED   = 200;          // matches JS-3D-Car maxSpeed
-  const MAX_SPD_REV = -50;          // matches JS-3D-Car maxSpeedReverse
-  const ACCEL       = 80;           // fast launch feel — JS-3D-Car uses 60, boosted for this world
-  const ACCEL_REV   = 40;           // ≈ acceleration * 0.5
-  const DECEL       = 70;           // snappy coast-down
-  const BRAKE_POW   = 10;           // multiplied with DECEL on brake
-  const STEER_SPD   = 1.5;          // rad/s (CarControls: steeringWheelSpeed)
-  const MAX_STEER   = 0.6;          // rad  (CarControls: maxSteeringRotation)
-  const TURN_RAD    = 22;           // (CarControls: turningRadius; scaled for our world)
-  const MOV_SCALE   = 0.07;         // world-unit multiplier — higher = faster visual movement
+  // CarControls.js constants
+  const MAX_SPEED   = 200;
+  const MAX_SPD_REV = -50;
+  const ACCEL       = 80;
+  const ACCEL_REV   = 40;
+  const DECEL       = 70;
+  const BRAKE_POW   = 10;
+  const STEER_SPD   = 1.5;
+  const MAX_STEER   = 0.6;
+  const TURN_RAD    = 22;
+  const MOV_SCALE   = 0.07;
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -666,9 +509,13 @@ function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }
       if (["ArrowLeft",  "a","A"].includes(e.key)) keysRef.current.left  = false;
       if (["ArrowRight", "d","D"].includes(e.key)) keysRef.current.right = false;
     };
+    // Mobile d-pad fires a custom event from Portfolio.tsx
     const carKey = (e: Event) => {
-      const ce = e as CustomEvent;
-      keysRef.current[ce.detail.key as keyof typeof keysRef.current] = ce.detail.pressed;
+      const { key, pressed } = (e as CustomEvent<{ key: string; pressed: boolean }>).detail;
+      if (key === "up")    keysRef.current.up    = pressed;
+      if (key === "down")  keysRef.current.down  = pressed;
+      if (key === "left")  keysRef.current.left  = pressed;
+      if (key === "right") keysRef.current.right = pressed;
     };
     window.addEventListener("keydown",  down);
     window.addEventListener("keyup",    up);
@@ -684,22 +531,18 @@ function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }
     const dt   = Math.min(delta, 0.05);
     const keys = keysRef.current;
 
-    // ── Speed — CarControls.js update() logic ───────────────────────────────
+    // ── Speed ──────────────────────────────────────────────────────────────
     if (keys.up) {
       speedRef.current = clamp(speedRef.current + dt * ACCEL, MAX_SPD_REV, MAX_SPEED);
     }
     if (keys.down) {
       if (speedRef.current > 0) {
-        // Brake hard first — bring car to a full stop before reversing
         speedRef.current = clamp(speedRef.current - dt * DECEL * BRAKE_POW, 0, MAX_SPEED);
       } else {
-        // Already stopped (or already in reverse) — accelerate in reverse
         speedRef.current = clamp(speedRef.current - dt * ACCEL_REV, MAX_SPD_REV, MAX_SPEED);
       }
     }
     if (!keys.up && !keys.down) {
-      // Normal coast-down: no brakePower multiplier (CarControls.js: brakingDeceleration=1 by default,
-      // only becomes brakePower when brake key is held). Using BRAKE_POW here made stops violent.
       if (speedRef.current > 0) {
         const k = expEaseOut(speedRef.current / MAX_SPEED);
         speedRef.current = clamp(speedRef.current - k * dt * DECEL, 0, MAX_SPEED);
@@ -709,13 +552,9 @@ function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }
       }
     }
 
-    // ── Steering — accumulates & decays (CarControls.js) ───────────────────
-    if (keys.left) {
-      wheelOrRef.current = clamp(wheelOrRef.current + dt * STEER_SPD, -MAX_STEER, MAX_STEER);
-    }
-    if (keys.right) {
-      wheelOrRef.current = clamp(wheelOrRef.current - dt * STEER_SPD, -MAX_STEER, MAX_STEER);
-    }
+    // ── Steering ────────────────────────────────────────────────────────────
+    if (keys.left)  wheelOrRef.current = clamp(wheelOrRef.current + dt * STEER_SPD, -MAX_STEER, MAX_STEER);
+    if (keys.right) wheelOrRef.current = clamp(wheelOrRef.current - dt * STEER_SPD, -MAX_STEER, MAX_STEER);
     if (!keys.left && !keys.right) {
       if (wheelOrRef.current > 0) {
         wheelOrRef.current = clamp(wheelOrRef.current - dt * STEER_SPD, 0, MAX_STEER);
@@ -724,103 +563,97 @@ function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }
       }
     }
 
-    // ── Movement — CarControls.js convention ───────────────────────────────
-    // forwardDelta is negative when moving forward (car drives in -Z at orientation 0)
+    // ── Movement ─────────────────────────────────────────────────────────────
     const forwardDelta = -speedRef.current * dt * MOV_SCALE;
-
-    // Orientation change: matches CarControls line
-    //   carOrientation -= (forwardDelta * turningRadius * 0.02) * wheelOrientation
     carOrientRef.current -= (forwardDelta * TURN_RAD * 0.02) * wheelOrRef.current;
 
     posRef.current.x += Math.sin(carOrientRef.current) * forwardDelta;
     posRef.current.z += Math.cos(carOrientRef.current) * forwardDelta;
 
-    // Bounds
-    posRef.current.x = clamp(posRef.current.x, -55, 55);
-    posRef.current.z = clamp(posRef.current.z, -225, 8);
+    // Soft city boundary clamp
+    posRef.current.x = clamp(posRef.current.x, CITY_MIN_X, CITY_MAX_X);
+    posRef.current.z = clamp(posRef.current.z, CITY_MIN_Z, CITY_MAX_Z);
 
-    // ── Sync car mesh ───────────────────────────────────────────────────────
+    // ── Sync car mesh ────────────────────────────────────────────────────────
     if (carRef.current) {
-      carRef.current.position.set(posRef.current.x, 0, posRef.current.z);
-      carRef.current.rotation.y = carOrientRef.current;  // no PI offset — front is at -Z
+      carRef.current.position.set(posRef.current.x, ROAD_Y, posRef.current.z);
+      carRef.current.rotation.y = carOrientRef.current;
       const sr = (carRef as any).__speedRef;
       if (sr) sr.current = speedRef.current;
     }
 
-    // ── Visual front-wheel steer (matches frontAxle convention) ────────────
+    // ── Wheel steer visual ───────────────────────────────────────────────────
     const fa = (carRef as any).__frontAxle;
-    if (fa?.current) {
-      fa.current.rotation.y = wheelOrRef.current;  // positive = left, same sign as carOrientation increase
-    }
+    if (fa?.current) fa.current.rotation.y = wheelOrRef.current;
 
-    // ── Camera — follows from +Z (behind car whose front is at -Z) ─────────
-    const camDist   = 16;
-    const camHeight = 12;
+    // ── Chase camera — follows from behind car ───────────────────────────────
+    const camDist   = 18;
+    const camHeight = ROAD_Y + 13;
     const camTarget = new THREE.Vector3(
       posRef.current.x + Math.sin(carOrientRef.current) * camDist,
       camHeight,
-      posRef.current.z + Math.cos(carOrientRef.current) * camDist
+      posRef.current.z + Math.cos(carOrientRef.current) * camDist,
     );
-    // Frame-rate-independent exponential decay lerp — smooth at any FPS.
-    // k=9 → ~half-life of ~77ms; camera reaches 95% in ~330ms.
     const alphaPos  = 1 - Math.exp(-9  * dt);
     const alphaLook = 1 - Math.exp(-11 * dt);
     camPosRef.current.lerp(camTarget, alphaPos);
     state.camera.position.copy(camPosRef.current);
 
-    const lookTarget = new THREE.Vector3(posRef.current.x, 0.6, posRef.current.z);
+    const lookTarget = new THREE.Vector3(posRef.current.x, ROAD_Y + 0.6, posRef.current.z);
     camLookRef.current.lerp(lookTarget, alphaLook);
     state.camera.lookAt(camLookRef.current);
 
-    // ── Project proximity ───────────────────────────────────────────────────
+    // ── Project proximity — 2-D distance in XZ ──────────────────────────────
     let nearest: number | null = null;
-    for (let i = 0; i < P_Z.length; i++) {
-      if (Math.abs(posRef.current.z - P_Z[i]) < 14) { nearest = i; break; }
+    let minDist = Infinity;
+    for (let i = 0; i < STATIONS.length; i++) {
+      const dx   = posRef.current.x - STATIONS[i].x;
+      const dz   = posRef.current.z - STATIONS[i].z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist < 20 && dist < minDist) { minDist = dist; nearest = i; }
     }
-    if (nearest !== curProjectRef.current) {
-      curProjectRef.current = nearest;
+    if (nearest !== curProjRef.current) {
+      curProjRef.current = nearest;
       setNearIdx(nearest);
       onNearProject(nearest);
     }
 
-    // ── Boundary detection — show colour panel at start or end ─────────────
-    const atBoundary = posRef.current.z >= 6 || posRef.current.z <= -222;
-    if (atBoundary !== atBoundaryRef.current) {
-      atBoundaryRef.current = atBoundary;
-      onAtBoundary(atBoundary);
+    // ── Boundary (near start position = colour panel) ───────────────────────
+    const dx0 = posRef.current.x - 72;
+    const dz0 = posRef.current.z - (-40);
+    const atBound = Math.sqrt(dx0*dx0 + dz0*dz0) < 10;
+    if (atBound !== atBoundRef.current) {
+      atBoundRef.current = atBound;
+      onAtBoundary(atBound);
     }
   });
-
-  const lights = useMemo(() => {
-    const arr: { z: number; side: number }[] = [];
-    for (let z = 4; z > -230; z -= 22) {
-      arr.push({ z, side: 1 });
-      arr.push({ z: z - 11, side: -1 });
-    }
-    return arr;
-  }, []);
 
   return (
     <>
       <ambientLight intensity={t.ambientInt} color={t.ambientCol} />
-      <directionalLight position={[25, 40, 15]} intensity={t.dirInt} color={t.dirCol} castShadow={false} />
+      <directionalLight
+        position={[-30, 60, 20]}
+        intensity={t.dirInt}
+        color={t.dirCol}
+        castShadow={false}
+      />
+      {/* Extra fill light for dark theme so the Ferrari looks great */}
+      {theme === "dark" && (
+        <pointLight position={[72, ROAD_Y + 30, -40]} color="#6080ff" intensity={4} distance={200} decay={1} />
+      )}
 
-      <Ground t={t} />
-      <Road   t={t} />
-      <StartGate t={t} />
-      <EndMarker />
+      <Suspense fallback={null}>
+        <CityModel />
+      </Suspense>
 
-      {lights.map((l, i) => (
-        <StreetLight key={i} z={l.z} side={l.side} />
-      ))}
-      {TREE_DATA.map((tr, i) => (
-        <Tree key={i} x={tr.x} z={tr.z} scale={tr.scale} t={t} />
-      ))}
-      {BUILDING_DATA.map((b, i) => (
-        <Building key={i} x={b.x} z={b.z} w={b.w} h={b.h} d={b.d} t={t} />
-      ))}
       {projects.map((p, i) => (
-        <ProjectStation key={i} index={i} accent={p.accent} isNear={nearIdx === i} t={t} />
+        <ProjectStation
+          key={i}
+          index={i}
+          accent={p.accent}
+          isNear={nearIdx === i}
+          theme={theme}
+        />
       ))}
 
       <Suspense fallback={null}>
@@ -834,7 +667,7 @@ function Scene({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }
   );
 }
 
-// ── Exported component ───────────────────────────────────────────────────────
+// ── Exported component ────────────────────────────────────────────────────────
 interface ProjectWorldProps {
   onNearProject:  (idx: number | null) => void;
   onBillboardPos: (pos: BillboardPos[]) => void;
@@ -843,16 +676,26 @@ interface ProjectWorldProps {
   carColors:      CarColors;
 }
 
-export default function ProjectWorld({ onNearProject, onBillboardPos, onAtBoundary, theme, carColors }: ProjectWorldProps) {
+export default function ProjectWorld({
+  onNearProject,
+  onBillboardPos,
+  onAtBoundary,
+  theme,
+  carColors,
+}: ProjectWorldProps) {
   const bg = THEMES[theme].bg;
   return (
     <Canvas
-      camera={{ position: [0, 14, 20], fov: 62, near: 0.1, far: 220 }}
+      camera={{
+        position: [72, ROAD_Y + 14, -40 + 22],
+        fov: 62,
+        near: 0.5,
+        far: 800,
+      }}
       style={{ width: "100%", height: "100%" }}
       gl={{ antialias: false, alpha: false, powerPreference: "high-performance" }}
-      dpr={[0.5, 0.85]}
+      dpr={[0.5, 0.9]}
       performance={{ min: 0.3 }}
-      flat
     >
       <color attach="background" args={[bg]} />
       <Scene
@@ -865,3 +708,8 @@ export default function ProjectWorld({ onNearProject, onBillboardPos, onAtBounda
     </Canvas>
   );
 }
+
+// ── Preload heavy assets ──────────────────────────────────────────────────────
+useGLTF.preload("/models/ferrari.glb");
+useGLTF.preload("/models/city.glb");
+useGLTF.preload("/models/house.glb");
