@@ -24,8 +24,14 @@ export default function Home() {
   const [vaporFading,      setVaporFading]      = useState(false);
   const [vaporDone,        setVaporDone]        = useState(false);
 
-  const frozenScrollRef = useRef(0);
-  const vaporActiveRef  = useRef(false);
+  const frozenScrollRef          = useRef(0);
+  const vaporActiveRef           = useRef(false);
+  // Services-at-100% hold: lock scroll for 2 s before the user can proceed
+  // to Our Work. Fires both after vapor completes (first visit) and when the
+  // user scrolls back to 100% on repeat visits (session already done).
+  const servicesHoldRef          = useRef(false);
+  const servicesHoldTriggeredRef = useRef(false); // one-shot per scroll-in
+  const [servicesHolding, setServicesHolding] = useState(false);
 
   // Session key persists across reloads within the same browser tab.
   // Once vapor has played once, it never plays again for the rest of the session.
@@ -135,6 +141,33 @@ export default function Home() {
         vaporTriggered = false;
       }
 
+      // ── Services-at-100% hold (repeat visits) ──────────────────────────────
+      // On first visit the vapor lock already parks the page at raw=0.75;
+      // the 2-second hold fires inside handleVaporComplete instead.
+      // On repeat visits (sessionAlreadyDone) vapor never runs, so we add the
+      // hold here when the user first scrolls into the services→portfolio seam.
+      const SERVICES_BOUNDARY = 0.75;
+      if (raw < SERVICES_BOUNDARY - 0.03) {
+        // Reset one-shot so the hold fires again if the user scrolls back up
+        servicesHoldTriggeredRef.current = false;
+      }
+      if (
+        raw >= SERVICES_BOUNDARY &&
+        sessionAlreadyDone &&
+        !servicesHoldTriggeredRef.current &&
+        !isInitialEval
+      ) {
+        servicesHoldTriggeredRef.current = true;
+        servicesHoldRef.current          = true;
+        const sMax = document.documentElement.scrollHeight - window.innerHeight;
+        frozenScrollRef.current          = Math.round(sMax * SERVICES_BOUNDARY);
+        setServicesHolding(true);
+        setTimeout(() => {
+          servicesHoldRef.current = false;
+          setServicesHolding(false);
+        }, 2000);
+      }
+
       if (raw >= VAPOR_RAW && !vaporTriggered && !isInitialEval && !vaporActiveRef.current) {
         vaporTriggered = true;
         // Freeze at the 100 % boundary of the services scroll range (raw = 0.75)
@@ -155,8 +188,8 @@ export default function Home() {
       const max = document.documentElement.scrollHeight - window.innerHeight;
       if (!max) return;
 
-      // Lock scroll in BOTH directions while vapour is animating
-      if (vaporActiveRef.current) {
+      // Lock scroll while vapour is animating OR during the 2-s services hold
+      if (vaporActiveRef.current || servicesHoldRef.current) {
         window.scrollTo(0, frozenScrollRef.current);
         return;
       }
@@ -214,6 +247,35 @@ export default function Home() {
     };
   }, [vaporRevealed, vaporDone]);
 
+  /* Block ALL wheel/touch scroll during the 2-s services hold */
+  useEffect(() => {
+    if (!servicesHolding) return;
+
+    const blockWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    };
+    let touchStartY = 0;
+    const onTouchStart = (e: TouchEvent) => { touchStartY = e.touches[0]?.clientY ?? 0; };
+    const blockTouch = (e: TouchEvent) => {
+      const dy = (e.touches[0]?.clientY ?? 0) - touchStartY;
+      if (dy > 0) {
+        e.preventDefault();
+        window.scrollTo(0, frozenScrollRef.current);
+      }
+    };
+
+    window.addEventListener("wheel",      blockWheel,   { passive: false, capture: true });
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove",  blockTouch,   { passive: false });
+
+    return () => {
+      window.removeEventListener("wheel",      blockWheel,   { capture: true } as EventListenerOptions);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove",  blockTouch);
+    };
+  }, [servicesHolding]);
+
   // On mount: if vapor already played this session, mark it done immediately so
   // the Services section is shown without waiting for the animation (handles
   // reload-at-Our-Work and navigate-back-from-Our-Work cases).
@@ -238,6 +300,17 @@ export default function Home() {
       setVaporRevealed(false);
       setVaporFading(false);
     }, 650);
+
+    // Hold the page at services 100% for 2 seconds so the user can see the
+    // section before it snaps to Our Work. frozenScrollRef is already set to
+    // the raw=0.75 position by the vapor trigger — reuse it here.
+    servicesHoldTriggeredRef.current = true;
+    servicesHoldRef.current          = true;
+    setServicesHolding(true);
+    setTimeout(() => {
+      servicesHoldRef.current = false;
+      setServicesHolding(false);
+    }, 2000);
   };
 
   return (
