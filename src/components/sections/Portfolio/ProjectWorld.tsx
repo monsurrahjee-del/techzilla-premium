@@ -663,8 +663,19 @@ function Scene({
       const newZ = posRef.current.z + Math.cos(carOrientRef.current) * forwardDelta;
       const cx = clamp(newX, CITY_MIN_X, CITY_MAX_X);
       const cz = clamp(newZ, CITY_MIN_Z, CITY_MAX_Z);
-      if (!isBuilding(cx, posRef.current.z, state.scene, carRef.current)) posRef.current.x = cx;
-      if (!isBuilding(posRef.current.x, cz, state.scene, carRef.current)) posRef.current.z = cz;
+      // Only run the (expensive) building raycaster when the car is actually
+      // moving. At rest forwardDelta ≈ 0 so cx ≈ posRef.current.x and
+      // cz ≈ posRef.current.z — the collision check would always pass anyway.
+      // Skipping it when stationary eliminates two full scene-graph traversals
+      // per frame, which was the primary cause of main-thread stalls that made
+      // the cursor feel sluggish everywhere on the page.
+      if (Math.abs(forwardDelta) > 0.001) {
+        if (!isBuilding(cx, posRef.current.z, state.scene, carRef.current)) posRef.current.x = cx;
+        if (!isBuilding(posRef.current.x, cz, state.scene, carRef.current)) posRef.current.z = cz;
+      } else {
+        posRef.current.x = cx;
+        posRef.current.z = cz;
+      }
     }
 
     // ── Sync car mesh ─────────────────────────────────────────────────────────

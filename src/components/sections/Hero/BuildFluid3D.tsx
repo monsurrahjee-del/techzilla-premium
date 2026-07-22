@@ -1,8 +1,8 @@
 /* eslint-disable react/no-unknown-property */
 "use client";
 
-import { useRef, Suspense } from "react";
-import { Canvas, useFrame, createPortal } from "@react-three/fiber";
+import { useRef, Suspense, useEffect } from "react";
+import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
 import { Text3D, Center, Environment, useFBO } from "@react-three/drei";
 
 // THREE.ACESFilmicToneMapping = 4  (avoids importing three which has no bundled types)
@@ -18,6 +18,17 @@ if (typeof window !== "undefined") {
       _mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
       _mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
     },
+    { passive: true }
+  );
+}
+
+// Module-level ref so BuildMesh can react to the hero-section-active event
+// without creating per-render closures. Starts true (hero is the first section).
+let _heroActive = true;
+if (typeof window !== "undefined") {
+  window.addEventListener(
+    "hero-section-active",
+    (e) => { _heroActive = (e as CustomEvent<{ heroActive: boolean }>).detail.heroActive; },
     { passive: true }
   );
 }
@@ -51,6 +62,20 @@ function BuildMesh() {
   const buffer = useFBO();
   const bgScene = useRef<any>(null);
 
+  // When the hero section becomes active again, kick-start the render loop.
+  // With frameloop="demand" the loop stops as soon as useFrame stops calling
+  // invalidate(); listening here restarts it.
+  const { invalidate } = useThree();
+  useEffect(() => {
+    const handler = (e: Event) => {
+      if ((e as CustomEvent<{ heroActive: boolean }>).detail.heroActive) {
+        invalidate();
+      }
+    };
+    window.addEventListener("hero-section-active", handler, { passive: true });
+    return () => window.removeEventListener("hero-section-active", handler);
+  }, [invalidate]);
+
   // Lazily create the scene once on the client
   if (typeof window !== "undefined" && bgScene.current === null) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -58,8 +83,15 @@ function BuildMesh() {
     bgScene.current = new Scene();
   }
 
-  useFrame(({ gl, camera, clock }) => {
+  useFrame(({ gl, camera, clock, invalidate }) => {
     if (!groupRef.current || !bgScene.current) return;
+
+    // When the hero section is not active, skip all rendering work.
+    // This stops the expensive FBO pass (bg → glass refraction) from
+    // running while the user is looking at About / Services / Portfolio.
+    // `invalidate` is NOT called, so with frameloop="demand" no further
+    // frames are scheduled until the hero becomes active again.
+    if (!_heroActive) return;
 
     // Weighted mouse follow — stiffness makes it feel physical, not linear
     groupRef.current.rotation.y +=
@@ -75,6 +107,9 @@ function BuildMesh() {
     gl.setRenderTarget(buffer);
     gl.render(bgScene.current, camera);
     gl.setRenderTarget(null);
+
+    // Keep the loop alive while the hero is active.
+    invalidate();
   });
 
   if (!bgScene.current) return null;
@@ -131,6 +166,12 @@ function BuildMesh() {
 export default function BuildFluid3D() {
   return (
     <Canvas
+      // frameloop="demand" means R3F only renders when invalidate() is called.
+      // BuildMesh calls invalidate() inside useFrame while the hero is active,
+      // creating a self-sustaining loop. When the hero leaves the viewport the
+      // loop drains to zero, freeing the GPU and main-thread budget for other
+      // sections (Our Work 3-D city, About WebGL, etc.).
+      frameloop="demand"
       camera={{ position: [0, 0, 10], fov: 44 }}
       gl={{
         alpha: true,

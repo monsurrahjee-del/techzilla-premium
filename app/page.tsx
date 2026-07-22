@@ -263,9 +263,10 @@ export default function Home() {
             position: "fixed",
             inset: 0,
             zIndex: 200,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            // No flex layout here — VaporizeTextCycle already centres the text
+            // via alignment="center". flex + align-items:center collapses the
+            // child's height:100% to ~20 px (canvas minHeight), making the
+            // canvas too small and rendering the text invisible.
             pointerEvents: "none",
             opacity: vaporFading ? 0 : 1,
             transition: "opacity 0.6s ease",
