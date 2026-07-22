@@ -13,7 +13,10 @@
   height: 0;
   pointer-events: none;
   z-index: 9999;
-  mix-blend-mode: difference;
+  /* mix-blend-mode: difference removed — it forces software compositing over
+     the Three.js canvas every frame, breaking GPU compositing for the whole
+     page and making cursor movement feel lagged. The cursor is white on a dark
+     site so it stays visible without blending. */
   will-change: transform;
   /* NO transform here — JS writes translate3d(x, y, 0) via style.transform in mousemove */
 }

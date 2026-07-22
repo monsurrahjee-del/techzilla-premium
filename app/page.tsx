@@ -114,18 +114,22 @@ export default function Home() {
       }
 
       /* ── Vapor trigger ───────────────────────────────────────────────────── */
-      // Skip on the initial load evaluation so that a page reload from the bottom
-      // of the page (e.g. from the work section) does not re-play the vapor.
-      // Always mark triggered when raw>=0.99 — even on initial load — so
-      // scrolling back from Our Work then forward again never re-fires the overlay.
-      if (raw >= 0.99) {
+      // Fires at 94% through the services section (raw 0.433→0.75).
+      // 0.433 + 0.94*(0.75−0.433) ≈ 0.731
+      const VAPOR_RAW = 0.433 + 0.94 * (0.75 - 0.433); // ≈ 0.731
+
+      // Reset the one-shot flag when the user scrolls back below the threshold
+      // so coming from Our Work back to Services will fire the overlay again.
+      if (raw < VAPOR_RAW - 0.02) {
+        vaporTriggered = false;
+      }
+
+      if (raw >= VAPOR_RAW && !vaporTriggered && !isInitialEval && !vaporActiveRef.current) {
         vaporTriggered = true;
-        if (!isInitialEval) {
-          frozenScrollRef.current = window.scrollY;
-          vaporActiveRef.current  = true;
-          window.dispatchEvent(new CustomEvent("services-section-active", { detail: { active: false } }));
-          startTransition(() => setVaporRevealed(true));
-        }
+        frozenScrollRef.current = window.scrollY;
+        vaporActiveRef.current  = true;
+        window.dispatchEvent(new CustomEvent("services-section-active", { detail: { active: false } }));
+        startTransition(() => setVaporRevealed(true));
       }
     };
 
@@ -133,8 +137,8 @@ export default function Home() {
       const max = document.documentElement.scrollHeight - window.innerHeight;
       if (!max) return;
 
-      // Block backward scroll while vapour is animating
-      if (vaporActiveRef.current && window.scrollY < frozenScrollRef.current - 1) {
+      // Lock scroll in BOTH directions while vapour is animating
+      if (vaporActiveRef.current) {
         window.scrollTo(0, frozenScrollRef.current);
         return;
       }
@@ -145,9 +149,14 @@ export default function Home() {
     window.addEventListener("scroll", onScroll, { passive: true });
 
     // Evaluate on load (e.g. browser scroll restore after refresh).
-    // isInitialEval stays true during this call so vapor is not re-triggered.
+    // isInitialEval stays true during this call so vapor never shows on reload.
+    // Pre-mark triggered if already at/past threshold so a stray post-load
+    // scroll event (browser scroll-restore jitter) cannot fire the overlay.
     const initMax = document.documentElement.scrollHeight - window.innerHeight;
-    driveFrame(initMax > 0 ? window.scrollY / initMax : 0);
+    const initRaw = initMax > 0 ? window.scrollY / initMax : 0;
+    const VAPOR_RAW_INIT = 0.433 + 0.94 * (0.75 - 0.433);
+    if (initRaw >= VAPOR_RAW_INIT) vaporTriggered = true;
+    driveFrame(initRaw);
     isInitialEval = false; // allow vapor to trigger on subsequent user scrolls
 
     return () => window.removeEventListener("scroll", onScroll);
