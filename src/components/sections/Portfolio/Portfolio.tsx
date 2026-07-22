@@ -7,6 +7,9 @@ import { projects } from "@/lib/projects";
 import type { Theme, CarColors } from "./ProjectWorld";
 import { STATIONS } from "./ProjectWorld";
 
+const RCCG_IDX   = STATIONS.length - 1; // last station — locked until Zennyola visited
+const UNLOCK_IDX = STATIONS.length - 2; // Zennyola
+
 const ProjectWorld = dynamic(() => import("./ProjectWorld"), { ssr: false });
 
 // ── Module-level flag: survives SPA navigation re-mounts ────────────────────
@@ -67,6 +70,9 @@ export default function Portfolio({ active = false }: PortfolioProps) {
 
   // ── Tour ID — increments each time "Start Tour" is pressed ──────────────
   const [tourId, setTourId] = useState(0);
+
+  // ── RCCG unlock — becomes true once car visits Zennyola (station UNLOCK_IDX) ─
+  const [rccgUnlocked, setRccgUnlocked] = useState(false);
 
   const carColors: CarColors = {
     body:         BODY_COLORS[bodyIdx].hex,
@@ -138,6 +144,8 @@ export default function Portfolio({ active = false }: PortfolioProps) {
 
   const handleNext = () => {
     const next = (autoTargetIdx + 1) % STATIONS.length;
+    // RCCG is the last station and is locked until Zennyola has been visited.
+    if (next === RCCG_IDX && !rccgUnlocked) return;
     // When wrapping from last station back to first, reset the car to the
     // path start so it drives cleanly to station 0 instead of following the
     // tail of the recorded path and confusingly passing near Party Place first.
@@ -181,6 +189,8 @@ export default function Portfolio({ active = false }: PortfolioProps) {
   const handleNear = useCallback((idx: number | null) => {
     nearIdxRef.current = idx;
     setNearIdx(idx);
+    // Unlock RCCG (last station) once Zennyola (UNLOCK_IDX) has been visited
+    if (idx === UNLOCK_IDX) setRccgUnlocked(true);
   }, []);
 
   // ── D-pad (manual only) ───────────────────────────────────────────────────
@@ -222,6 +232,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
             autopilotTarget={autopilotTarget}
             autopilotTourId={tourId}
             isManual={isManual}
+            rccgUnlocked={rccgUnlocked}
           />
         )}
       </div>
@@ -385,11 +396,14 @@ export default function Portfolio({ active = false }: PortfolioProps) {
 
       {/* ── Progress dots ── */}
       <div className={styles.progressBar}>
-        {projects.map((p, i) => (
-          <div key={i}
-            className={`${styles.dot} ${nearIdx === i ? styles.activeDot : ""}`}
-            style={nearIdx === i ? { background: p.accent } : undefined} />
-        ))}
+        {projects.map((p, i) => {
+          if (i === RCCG_IDX && !rccgUnlocked) return null;
+          return (
+            <div key={i}
+              className={`${styles.dot} ${nearIdx === i ? styles.activeDot : ""}`}
+              style={nearIdx === i ? { background: p.accent } : undefined} />
+          );
+        })}
       </div>
 
       {/* ── Keyboard hint (manual only) ── */}

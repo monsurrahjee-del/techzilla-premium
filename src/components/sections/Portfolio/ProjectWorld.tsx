@@ -386,11 +386,12 @@ interface SceneProps {
   autopilotTarget: number | null;  // station index to stop at; null = idle/manual
   autopilotTourId: number;         // increments each time "Start Tour" is pressed
   isManual:        boolean;
+  rccgUnlocked:    boolean;          // false until Zennyola (station n-2) is visited
 }
 
 function Scene({
   onNearProject, onAtBoundary, onAutoArrived,
-  theme, carColors, autopilotTarget, autopilotTourId, isManual,
+  theme, carColors, autopilotTarget, autopilotTourId, isManual, rccgUnlocked,
 }: SceneProps) {
   const t = THEMES[theme];
 
@@ -632,6 +633,8 @@ function Scene({
     let minDist = Infinity;
     let minClose = Infinity;
     for (let i = 0; i < STATIONS.length; i++) {
+      // Skip the RCCG station (last) until it has been unlocked by visiting Zennyola
+      if (i === STATIONS.length - 1 && !rccgUnlocked) continue;
       const dx   = posRef.current.x - STATIONS[i].x;
       const dz   = posRef.current.z - STATIONS[i].z;
       const dist = Math.sqrt(dx * dx + dz * dz);
@@ -670,15 +673,19 @@ function Scene({
 
       <Suspense fallback={null}><CityModel /></Suspense>
 
-      {projects.map((p, i) => (
-        <GroundCircle
-          key={i}
-          index={i}
-          accent={p.accent}
-          isNear={nearIdx  === i}
-          isClose={closeIdx === i}
-        />
-      ))}
+      {projects.map((p, i) => {
+        // Hide the RCCG ground circle until unlocked
+        if (i === projects.length - 1 && !rccgUnlocked) return null;
+        return (
+          <GroundCircle
+            key={i}
+            index={i}
+            accent={p.accent}
+            isNear={nearIdx  === i}
+            isClose={closeIdx === i}
+          />
+        );
+      })}
 
       <Suspense fallback={null}>
         <Car carRef={carRef} colors={carColors} theme={theme} />
@@ -699,11 +706,12 @@ interface ProjectWorldProps {
   autopilotTarget: number | null;
   autopilotTourId: number;
   isManual:        boolean;
+  rccgUnlocked:    boolean;
 }
 
 export default function ProjectWorld({
   onNearProject, onAtBoundary, onAutoArrived,
-  theme, carColors, autopilotTarget, autopilotTourId, isManual,
+  theme, carColors, autopilotTarget, autopilotTourId, isManual, rccgUnlocked,
 }: ProjectWorldProps) {
   const bg = THEMES[theme].bg;
   return (
@@ -727,6 +735,7 @@ export default function ProjectWorld({
         autopilotTarget={autopilotTarget}
         autopilotTourId={autopilotTourId}
         isManual={isManual}
+        rccgUnlocked={rccgUnlocked}
       />
     </Canvas>
   );
