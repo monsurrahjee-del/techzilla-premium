@@ -138,6 +138,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
   }, []);
 
   const handleStartTour = () => {
+    setRccgUnlocked(false); // re-lock RCCG at every tour start
     setTourId(id => id + 1);
     driveToStation(0);
   };
@@ -150,6 +151,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
     // path start so it drives cleanly to station 0 instead of following the
     // tail of the recorded path and confusingly passing near Party Place first.
     if (next === 0 && autoTargetIdx === STATIONS.length - 1) {
+      setRccgUnlocked(false); // re-lock RCCG when tour loops back to beginning
       setTourId(id => id + 1);
       driveToStation(0);
     } else {
@@ -164,7 +166,9 @@ export default function Portfolio({ active = false }: PortfolioProps) {
 
   const handleAutoArrived = useCallback(() => {
     setAutoPhase("arrived");
-  }, []);
+    // Auto mode: unlock RCCG only once the car actually stops at Zennyola
+    if (autoTargetIdx === UNLOCK_IDX) setRccgUnlocked(true);
+  }, [autoTargetIdx]);
 
   // ── Hint: hide after first move (manual only) ─────────────────────────────
   useEffect(() => {
@@ -189,9 +193,10 @@ export default function Portfolio({ active = false }: PortfolioProps) {
   const handleNear = useCallback((idx: number | null) => {
     nearIdxRef.current = idx;
     setNearIdx(idx);
-    // Unlock RCCG (last station) once Zennyola (UNLOCK_IDX) has been visited
-    if (idx === UNLOCK_IDX) setRccgUnlocked(true);
-  }, []);
+    // Manual mode only: unlock RCCG when car reaches Zennyola.
+    // Auto mode uses handleAutoArrived so it only fires after the car fully stops.
+    if (mode === 'manual' && idx === UNLOCK_IDX) setRccgUnlocked(true);
+  }, [mode]);
 
   // ── D-pad (manual only) ───────────────────────────────────────────────────
   const fireCarKey = (key: string, pressed: boolean) => {
