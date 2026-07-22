@@ -67,11 +67,12 @@ export const projects: Project[] = [
     url: "zennyola.vercel.app",
     accent: "#F43F5E",
     glow: "rgba(244,63,94,0.35)",
+  },
 
   {
     title: "RCCG Living Word Forney",
     category: "Church & Ministry Platform",
-    tech: ["React", "WordPress", "Ministry"],
+    tech: ["Next.js", "Tailwind CSS", "React"],
     image: "/portfolio/church/home.png",
     url: "rccglivingwordforney.org",
     accent: "#7C3AED",
