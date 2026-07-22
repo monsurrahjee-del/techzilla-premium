@@ -16,9 +16,9 @@ import {
   useEffect,
   useState,
 } from "react";
-import DotGrid     from "@/components/ui/DotGrid";
-import VapourWords from "@/components/ui/VapourWords";
-import styles      from "./ServicesIntro.module.css";
+import DotGrid            from "@/components/ui/DotGrid";
+import VaporizeTextCycle, { Tag } from "@/components/ui/VaporizeTextCycle";
+import styles             from "./ServicesIntro.module.css";
 
 /* ── star geometry ─────────────────────────────────────────────────────────── */
 
@@ -28,7 +28,7 @@ const INNER_RATIO = 0.26; // lower = sharper spikes (matches reference images)
 function starPoints(cx: number, cy: number, outer: number, inner: number): string {
   const pts: string[] = [];
   for (let i = 0; i < SPIKES; i++) {
-    const a1 = (i / SPIKES)       * Math.PI * 2 - Math.PI / 2;
+    const a1 = (i / SPIKES)         * Math.PI * 2 - Math.PI / 2;
     const a2 = ((i + 0.5) / SPIKES) * Math.PI * 2 - Math.PI / 2;
     pts.push(
       `${(cx + outer * Math.cos(a1)).toFixed(2)},${(cy + outer * Math.sin(a1)).toFixed(2)}`,
@@ -63,6 +63,20 @@ const ServicesIntro = forwardRef<ServicesIntroHandle, Props>(
     const polyRef   = useRef<SVGPolygonElement>(null);
     const [mounted, setMounted] = useState(false);
     const [fading,  setFading]  = useState(false);
+
+    /* Dynamic font size — responsive to viewport, capped at 380 px.
+       Mirrors the calculation that was previously in page.tsx. */
+    const [fontSize, setFontSize] = useState("240px");
+    useEffect(() => {
+      const calc = () => {
+        const byWidth  = Math.floor((window.innerWidth  * 0.8) / (8 * 0.52));
+        const byHeight = Math.floor(window.innerHeight  * 0.38);
+        setFontSize(`${Math.min(byWidth, byHeight, 380)}px`);
+      };
+      calc();
+      window.addEventListener("resize", calc);
+      return () => window.removeEventListener("resize", calc);
+    }, []);
 
     /* mount / unmount with fade */
     useEffect(() => {
@@ -107,7 +121,7 @@ const ServicesIntro = forwardRef<ServicesIntroHandle, Props>(
         ].join(" ")}
         aria-hidden="true"
       >
-        {/* ── animated background always visible through the star hole ── */}
+        {/* ── animated DotGrid background ── */}
         <div className={styles.bg}>
           <DotGrid
             dotSize={4}
@@ -123,16 +137,51 @@ const ServicesIntro = forwardRef<ServicesIntroHandle, Props>(
           />
         </div>
 
-        {/* ── vapour text — shown once star fully open ── */}
+        {/* ── VaporizeTextCycle — canvas-based glowing word-by-word reveal ──
+            Uses position:absolute + inset:0 on the wrapper (NOT flex) so the
+            inner div's height:100% resolves to the full overlay height.
+            flex + align-items:center would collapse that height to ~20 px
+            (canvas minHeight), making the canvas too small to render text.
+            The glow filter matches the reference at commit c2645b9. ── */}
         {vapourActive && (
-          <VapourWords active={vapourActive} onComplete={onVapourComplete} />
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 20,
+              pointerEvents: "none",
+              filter:
+                "brightness(2.6) " +
+                "drop-shadow(0 0 12px rgba(255,255,255,1)) " +
+                "drop-shadow(0 0 50px rgba(255,255,255,0.85)) " +
+                "drop-shadow(0 0 100px rgba(255,255,255,0.6))",
+            }}
+          >
+            <VaporizeTextCycle
+              texts={["The", "Services", "We", "Provide"]}
+              font={{
+                fontFamily: "Geist, system-ui, sans-serif",
+                fontSize,
+                fontWeight: 900,
+              }}
+              color="rgb(255, 255, 255)"
+              spread={4}
+              density={2}
+              animation={{ vaporizeDuration: 1.0, fadeInDuration: 0.5, waitDuration: 0.3 }}
+              direction="left-to-right"
+              alignment="center"
+              tag={Tag.H1}
+              forceActive={true}
+              onComplete={onVapourComplete}
+            />
+          </div>
         )}
 
-        {/* ── SVG blue overlay with sunburst hole ─────────────────────────
+        {/* ── SVG blue overlay with sunburst hole ─────────────────────────────
             At progress=1 the star covers the entire viewport, so the blue
             rect is fully masked out — visually indistinguishable from hidden.
-            We fade the rect's opacity to 0 when vapourActive so there's no
-            hard edge remaining during the text phase.
+            Fade rect opacity to 0 when vapourActive so there's no hard edge
+            remaining during the text phase.
         ── */}
         <svg
           className={styles.svg}
