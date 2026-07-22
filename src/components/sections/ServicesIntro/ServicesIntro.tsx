@@ -1,18 +1,17 @@
 "use client";
 
 /**
- * ServicesIntro — scroll-driven star/sunburst mask reveal.
+ * ServicesIntro — DotGrid background + VaporizeTextCycle word reveal.
  *
  * Phase sequence (driven by page.tsx):
- *   visible=true, vapourActive=false  → blue overlay with expanding star hole
- *   visible=true, vapourActive=true   → star at max, vapour text plays over DotGrid
+ *   visible=true, vapourActive=false  → dark DotGrid overlay fades in
+ *   visible=true, vapourActive=true   → glowing VaporizeTextCycle text plays
  *   visible=false                     → overlay fades out
  */
 
 import {
   forwardRef,
   useImperativeHandle,
-  useRef,
   useEffect,
   useState,
 } from "react";
@@ -20,52 +19,27 @@ import DotGrid            from "@/components/ui/DotGrid";
 import VaporizeTextCycle, { Tag } from "@/components/ui/VaporizeTextCycle";
 import styles             from "./ServicesIntro.module.css";
 
-/* ── star geometry ─────────────────────────────────────────────────────────── */
-
-const SPIKES      = 24;
-const INNER_RATIO = 0.26; // lower = sharper spikes (matches reference images)
-
-function starPoints(cx: number, cy: number, outer: number, inner: number): string {
-  const pts: string[] = [];
-  for (let i = 0; i < SPIKES; i++) {
-    const a1 = (i / SPIKES)         * Math.PI * 2 - Math.PI / 2;
-    const a2 = ((i + 0.5) / SPIKES) * Math.PI * 2 - Math.PI / 2;
-    pts.push(
-      `${(cx + outer * Math.cos(a1)).toFixed(2)},${(cy + outer * Math.sin(a1)).toFixed(2)}`,
-      `${(cx + inner * Math.cos(a2)).toFixed(2)},${(cy + inner * Math.sin(a2)).toFixed(2)}`,
-    );
-  }
-  return pts.join(" ");
-}
-
-function maxRadius(vw: number, vh: number) {
-  // Slightly beyond the corner diagonal so blue fully disappears
-  return Math.sqrt((vw / 2) ** 2 + (vh / 2) ** 2) * 1.12;
-}
-
-/* ── imperative handle exposed to page.tsx ─────────────────────────────────── */
+/* ── imperative handle (kept for API compat with page.tsx ref) ─────────────── */
 
 export interface ServicesIntroHandle {
-  /** Advance star from 0 (tiny) to 1 (fully open) */
+  /** No-op — star mask removed; kept so page.tsx ref calls are harmless. */
   setStarProgress: (p: number) => void;
 }
 
 /* ── component ─────────────────────────────────────────────────────────────── */
 
 interface Props {
-  visible: boolean;      // true during star_reveal OR vapour_active
-  vapourActive: boolean; // true only during vapour_active
+  visible: boolean;      // true while overlay should be on screen
+  vapourActive: boolean; // true when text should play
   onVapourComplete: () => void;
 }
 
 const ServicesIntro = forwardRef<ServicesIntroHandle, Props>(
   ({ visible, vapourActive, onVapourComplete }, ref) => {
-    const polyRef   = useRef<SVGPolygonElement>(null);
     const [mounted, setMounted] = useState(false);
     const [fading,  setFading]  = useState(false);
 
-    /* Dynamic font size — responsive to viewport, capped at 380 px.
-       Mirrors the calculation that was previously in page.tsx. */
+    /* Dynamic font size — responsive to viewport, capped at 380 px. */
     const [fontSize, setFontSize] = useState("240px");
     useEffect(() => {
       const calc = () => {
@@ -82,7 +56,6 @@ const ServicesIntro = forwardRef<ServicesIntroHandle, Props>(
     useEffect(() => {
       if (visible) {
         setMounted(true);
-        // next frame: trigger show class so CSS transition fires
         const raf = requestAnimationFrame(() => setFading(false));
         return () => cancelAnimationFrame(raf);
       } else {
@@ -92,23 +65,9 @@ const ServicesIntro = forwardRef<ServicesIntroHandle, Props>(
       }
     }, [visible]);
 
-    /* set tiny star on first paint */
-    const initStar = () => {
-      if (typeof window === "undefined" || !polyRef.current) return;
-      const vw = window.innerWidth, vh = window.innerHeight;
-      polyRef.current.setAttribute("points", starPoints(vw / 2, vh / 2, 40, 11));
-    };
-
-    /* expose imperative handle */
+    /* no-op handle — page.tsx may call setStarProgress; just ignore it */
     useImperativeHandle(ref, () => ({
-      setStarProgress: (p: number) => {
-        if (!polyRef.current || typeof window === "undefined") return;
-        const vw = window.innerWidth, vh = window.innerHeight;
-        const cx = vw / 2, cy = vh / 2;
-        const outer = 40 + (maxRadius(vw, vh) - 40) * Math.min(1, p);
-        const inner = outer * INNER_RATIO;
-        polyRef.current.setAttribute("points", starPoints(cx, cy, outer, inner));
-      },
+      setStarProgress: () => { /* star mask removed */ },
     }));
 
     if (!mounted) return null;
@@ -121,7 +80,7 @@ const ServicesIntro = forwardRef<ServicesIntroHandle, Props>(
         ].join(" ")}
         aria-hidden="true"
       >
-        {/* ── animated DotGrid background ── */}
+        {/* ── DotGrid background fills the full overlay ── */}
         <div className={styles.bg}>
           <DotGrid
             dotSize={4}
@@ -138,11 +97,11 @@ const ServicesIntro = forwardRef<ServicesIntroHandle, Props>(
         </div>
 
         {/* ── VaporizeTextCycle — canvas-based glowing word-by-word reveal ──
-            Uses position:absolute + inset:0 on the wrapper (NOT flex) so the
-            inner div's height:100% resolves to the full overlay height.
-            flex + align-items:center would collapse that height to ~20 px
-            (canvas minHeight), making the canvas too small to render text.
-            The glow filter matches the reference at commit c2645b9. ── */}
+            Wrapper uses position:absolute + inset:0 (NOT flex) so the inner
+            div's height:100% resolves to the full overlay height.
+            flex + align-items:center collapses that to ~20 px (canvas
+            minHeight), making the canvas too small to render anything.
+            Glow filter matches the reference from commit c2645b9. ── */}
         {vapourActive && (
           <div
             style={{
@@ -176,36 +135,6 @@ const ServicesIntro = forwardRef<ServicesIntroHandle, Props>(
             />
           </div>
         )}
-
-        {/* ── SVG blue overlay with sunburst hole ─────────────────────────────
-            At progress=1 the star covers the entire viewport, so the blue
-            rect is fully masked out — visually indistinguishable from hidden.
-            Fade rect opacity to 0 when vapourActive so there's no hard edge
-            remaining during the text phase.
-        ── */}
-        <svg
-          className={styles.svg}
-          xmlns="http://www.w3.org/2000/svg"
-          ref={(el) => { if (el) initStar(); }}
-        >
-          <defs>
-            <mask id="star-hole-mask">
-              {/* white = blue visible; black = hole (transparent) */}
-              <rect width="100%" height="100%" fill="white" />
-              <polygon ref={polyRef} fill="black" />
-            </mask>
-          </defs>
-          <rect
-            width="100%"
-            height="100%"
-            fill="#1778a2"
-            mask="url(#star-hole-mask)"
-            style={{
-              opacity: vapourActive ? 0 : 1,
-              transition: "opacity 0.4s ease",
-            }}
-          />
-        </svg>
       </div>
     );
   }

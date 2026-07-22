@@ -197,8 +197,13 @@ export default function Home() {
     // Evaluate on load (e.g. browser scroll restore after refresh).
     const initMax = document.documentElement.scrollHeight - window.innerHeight;
     const initRaw = initMax > 0 ? window.scrollY / initMax : 0;
-    // Pre-mark triggered if at/past threshold OR session already completed
-    if (initRaw >= VAPOR_RAW || sessionAlreadyDone) vaporTriggered = true;
+    // Pre-mark triggered if at/past threshold OR session already completed.
+    // Also set vaporDone so Services content is immediately active (no vapor
+    // will play, so we must not leave active={false} on <Services>).
+    if (initRaw >= VAPOR_RAW || sessionAlreadyDone) {
+      vaporTriggered = true;
+      startTransition(() => setVaporDone(true));
+    }
     driveFrame(initRaw);
     isInitialEval = false;
 
