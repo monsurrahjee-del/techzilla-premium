@@ -134,7 +134,15 @@ export default function Home() {
       // Reset the one-shot flag ONLY when clearly scrolling forward into services
       // from the about direction — never when scrolling back from the portfolio
       // section. Also never reset when the session already has the completion flag.
-      if (raw < VAPOR_RAW - 0.02 && raw < 0.62 && !sessionAlreadyDone) {
+      // Check sessionStorage live (not just the mount-time snapshot) so that if
+      // the vapor completed this very visit and the user scrolls back to Hero,
+      // vaporTriggered is not cleared and the animation won't fire again.
+      if (
+        raw < VAPOR_RAW - 0.02 &&
+        raw < 0.62 &&
+        !sessionAlreadyDone &&
+        !sessionStorage.getItem(VAPOR_SESSION_KEY)
+      ) {
         vaporTriggered = false;
       }
 
