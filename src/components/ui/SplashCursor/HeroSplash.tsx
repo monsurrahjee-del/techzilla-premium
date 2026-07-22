@@ -38,9 +38,16 @@ export default function HeroSplash() {
     <SplashCursor
       hidden={hidden}
       paused={paused}
+      // Reduced from default 1440 → 512 to avoid GPU contention that makes
+      // the custom cursor feel laggy (compositor thread shares the GPU with
+      // the WebGL fluid sim — a 1440-resolution dye texture was eating all
+      // the compositor budget on every frame).
+      DYE_RESOLUTION={512}
+      SIM_RESOLUTION={64}
       DENSITY_DISSIPATION={3.5}
       VELOCITY_DISSIPATION={2}
       PRESSURE={0.1}
+      PRESSURE_ITERATIONS={10}
       CURL={3}
       SPLAT_RADIUS={0.2}
       SPLAT_FORCE={6000}

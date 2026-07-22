@@ -27,6 +27,10 @@ export default function Home() {
   const frozenScrollRef = useRef(0);
   const vaporActiveRef  = useRef(false);
 
+  // Session key persists across reloads within the same browser tab.
+  // Once vapor has played once, it never plays again for the rest of the session.
+  const VAPOR_SESSION_KEY = "tz_vapor_done";
+
   /* Font size for the vapor overlay */
   const [vaporFontSize, setVaporFontSize] = useState("240px");
   useEffect(() => {
@@ -57,7 +61,12 @@ export default function Home() {
     const portfolio = portfolioRef.current;
     if (!hero || !about || !services || !portfolio) return;
 
-    let vaporTriggered = false;
+    // If the vapor has already played this browser session, pre-mark as triggered
+    // so it never fires again regardless of scroll direction (handles the
+    // "scroll back from Our Work" and "reload at Our Work" cases).
+    const sessionAlreadyDone =
+      typeof sessionStorage !== "undefined" && !!sessionStorage.getItem(VAPOR_SESSION_KEY);
+    let vaporTriggered = sessionAlreadyDone;
     let isInitialEval  = true; // skip vapor trigger on browser scroll-restore at mount
 
     const supportsScrollDriven =
@@ -118,15 +127,21 @@ export default function Home() {
       // 0.433 + 0.94*(0.75−0.433) ≈ 0.731
       const VAPOR_RAW = 0.433 + 0.94 * (0.75 - 0.433); // ≈ 0.731
 
-      // Reset the one-shot flag when the user scrolls back below the threshold
-      // so coming from Our Work back to Services will fire the overlay again.
-      if (raw < VAPOR_RAW - 0.02) {
+      // Reset the one-shot flag ONLY when clearly scrolling forward into services
+      // from the about direction — never when scrolling back from the portfolio
+      // section (raw >= 0.70 means user came from Our Work, keep it triggered).
+      // Also never reset when the session already has the completion flag.
+      if (raw < VAPOR_RAW - 0.02 && raw < 0.70 && !sessionAlreadyDone) {
         vaporTriggered = false;
       }
 
       if (raw >= VAPOR_RAW && !vaporTriggered && !isInitialEval && !vaporActiveRef.current) {
         vaporTriggered = true;
-        frozenScrollRef.current = window.scrollY;
+        // Freeze at the 100 % boundary of the services scroll range (raw = 0.75)
+        // rather than at the trigger point (94 %). This locks the page at the
+        // clean services→portfolio boundary while the vapor animation plays.
+        const currentMax = document.documentElement.scrollHeight - window.innerHeight;
+        frozenScrollRef.current = Math.round(currentMax * 0.75);
         vaporActiveRef.current  = true;
         window.dispatchEvent(new CustomEvent("services-section-active", { detail: { active: false } }));
         startTransition(() => setVaporRevealed(true));
@@ -155,7 +170,8 @@ export default function Home() {
     const initMax = document.documentElement.scrollHeight - window.innerHeight;
     const initRaw = initMax > 0 ? window.scrollY / initMax : 0;
     const VAPOR_RAW_INIT = 0.433 + 0.94 * (0.75 - 0.433);
-    if (initRaw >= VAPOR_RAW_INIT) vaporTriggered = true;
+    // Pre-mark triggered if at/past threshold OR session already completed
+    if (initRaw >= VAPOR_RAW_INIT || sessionAlreadyDone) vaporTriggered = true;
     driveFrame(initRaw);
     isInitialEval = false; // allow vapor to trigger on subsequent user scrolls
 
@@ -195,8 +211,22 @@ export default function Home() {
     };
   }, [vaporRevealed, vaporDone]);
 
+  // On mount: if vapor already played this session, mark it done immediately so
+  // the Services section is shown without waiting for the animation (handles
+  // reload-at-Our-Work and navigate-back-from-Our-Work cases).
+  useEffect(() => {
+    if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(VAPOR_SESSION_KEY)) {
+      setVaporDone(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /* Vapor cycle complete */
   const handleVaporComplete = () => {
+    // Persist completion so the animation never re-fires for the rest of the session
+    if (typeof sessionStorage !== "undefined") {
+      sessionStorage.setItem(VAPOR_SESSION_KEY, "1");
+    }
     vaporActiveRef.current = false;
     setVaporDone(true);
     window.dispatchEvent(new CustomEvent("services-section-active", { detail: { active: true } }));
