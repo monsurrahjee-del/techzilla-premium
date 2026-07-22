@@ -71,6 +71,10 @@ export default function Portfolio({ active = false }: PortfolioProps) {
   // ── Tour ID — increments each time "Start Tour" is pressed ──────────────
   const [tourId, setTourId] = useState(0);
 
+  // ── Rewind ID — increments each time "Prev" is pressed so the scene can
+  //    rewind waypointIdx to just before the target station ─────────────────
+  const [rewindId, setRewindId] = useState(0);
+
   // ── RCCG unlock — becomes true once car visits Zennyola (station UNLOCK_IDX) ─
   const [rccgUnlocked, setRccgUnlocked] = useState(false);
 
@@ -161,6 +165,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
 
   const handlePrev = () => {
     const prev = (autoTargetIdx - 1 + STATIONS.length) % STATIONS.length;
+    setRewindId(id => id + 1);   // signal Scene to rewind waypointIdx before driving
     driveToStation(prev);
   };
 
@@ -236,6 +241,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
             carColors={carColors}
             autopilotTarget={autopilotTarget}
             autopilotTourId={tourId}
+            autopilotRewindId={rewindId}
             isManual={isManual}
             rccgUnlocked={rccgUnlocked}
           />

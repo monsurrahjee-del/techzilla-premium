@@ -378,20 +378,21 @@ function getLookaheadPoint(
 
 // ── Main scene ────────────────────────────────────────────────────────────────
 interface SceneProps {
-  onNearProject:   (idx: number | null) => void;
-  onAtBoundary:    (at: boolean) => void;
-  onAutoArrived:   () => void;
-  theme:           Theme;
-  carColors:       CarColors;
-  autopilotTarget: number | null;  // station index to stop at; null = idle/manual
-  autopilotTourId: number;         // increments each time "Start Tour" is pressed
-  isManual:        boolean;
-  rccgUnlocked:    boolean;          // false until Zennyola (station n-2) is visited
+  onNearProject:    (idx: number | null) => void;
+  onAtBoundary:     (at: boolean) => void;
+  onAutoArrived:    () => void;
+  theme:            Theme;
+  carColors:        CarColors;
+  autopilotTarget:  number | null;  // station index to stop at; null = idle/manual
+  autopilotTourId:  number;         // increments each time "Start Tour" is pressed
+  autopilotRewindId: number;        // increments each time "Prev" is pressed
+  isManual:         boolean;
+  rccgUnlocked:     boolean;          // false until Zennyola (station n-2) is visited
 }
 
 function Scene({
   onNearProject, onAtBoundary, onAutoArrived,
-  theme, carColors, autopilotTarget, autopilotTourId, isManual, rccgUnlocked,
+  theme, carColors, autopilotTarget, autopilotTourId, autopilotRewindId, isManual, rccgUnlocked,
 }: SceneProps) {
   const t = THEMES[theme];
 
@@ -437,6 +438,27 @@ function Scene({
     if (autopilotTarget === null) return;
     arrivedRef.current = false;
   }, [autopilotTarget]);
+
+  // When "Prev" is pressed, rewind waypointIdx to just before the target station
+  // so the car drives a short forward approach instead of going all the way around.
+  useEffect(() => {
+    if (rewindId === 0 || autopilotTarget === null) return;
+    const target = STATIONS[autopilotTarget];
+    // Find the waypoint in RECORDED_PATH closest to this station
+    let bestIdx = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < RECORDED_PATH.length; i++) {
+      const dx = RECORDED_PATH[i].x - target.x;
+      const dz = RECORDED_PATH[i].z - target.z;
+      const d = dx * dx + dz * dz;
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    }
+    // Back up ~40 waypoints so the car has a clean run-up
+    waypointIdx.current = Math.max(0, bestIdx - 40);
+    posRef.current = { ...RECORDED_PATH[waypointIdx.current] };
+    arrivedRef.current = false;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autopilotRewindId]);
 
   // Keyboard + d-pad — manual mode only
   useEffect(() => {
@@ -698,20 +720,21 @@ function Scene({
 
 // ── Exported component ────────────────────────────────────────────────────────
 interface ProjectWorldProps {
-  onNearProject:   (idx: number | null) => void;
-  onAtBoundary:    (at: boolean) => void;
-  onAutoArrived:   () => void;
-  theme:           Theme;
-  carColors:       CarColors;
-  autopilotTarget: number | null;
-  autopilotTourId: number;
-  isManual:        boolean;
-  rccgUnlocked:    boolean;
+  onNearProject:     (idx: number | null) => void;
+  onAtBoundary:      (at: boolean) => void;
+  onAutoArrived:     () => void;
+  theme:             Theme;
+  carColors:         CarColors;
+  autopilotTarget:   number | null;
+  autopilotTourId:   number;
+  autopilotRewindId: number;
+  isManual:          boolean;
+  rccgUnlocked:      boolean;
 }
 
 export default function ProjectWorld({
   onNearProject, onAtBoundary, onAutoArrived,
-  theme, carColors, autopilotTarget, autopilotTourId, isManual, rccgUnlocked,
+  theme, carColors, autopilotTarget, autopilotTourId, autopilotRewindId, isManual, rccgUnlocked,
 }: ProjectWorldProps) {
   const bg = THEMES[theme].bg;
   return (
@@ -734,6 +757,7 @@ export default function ProjectWorld({
         carColors={carColors}
         autopilotTarget={autopilotTarget}
         autopilotTourId={autopilotTourId}
+        autopilotRewindId={autopilotRewindId}
         isManual={isManual}
         rccgUnlocked={rccgUnlocked}
       />
