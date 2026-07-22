@@ -23,27 +23,32 @@ export default function Home() {
   const heroActiveRef       = useRef(true);
   const servicesPrimaryRef  = useRef(false);
   const portfolioActiveRef  = useRef(false);
-  const [aboutActive,      setAboutActive]      = useState(false);
-  const [portfolioActive,  setPortfolioActive]  = useState(false);
-  const [vaporRevealed,    setVaporRevealed]    = useState(false);
-  const [vaporFading,      setVaporFading]      = useState(false);
-  const [vaporDone,        setVaporDone]        = useState(false);
-  const [vapourActive,     setVapourActive]     = useState(false);
+  const [aboutActive,     setAboutActive]     = useState(false);
+  const [portfolioActive, setPortfolioActive] = useState(false);
+  const [vaporRevealed,   setVaporRevealed]   = useState(false);
+  const [vaporFading,     setVaporFading]     = useState(false);
+  const [vaporDone,       setVaporDone]       = useState(false);
+  const [vapourActive,    setVapourActive]    = useState(false);
 
   const frozenScrollRef          = useRef(0);
   const vaporActiveRef           = useRef(false);
+
+  // Services 2-s hold
   const servicesHoldRef          = useRef(false);
   const servicesHoldTriggeredRef = useRef(false);
   const [servicesHolding, setServicesHolding] = useState(false);
 
-  // Chess reveal state
-  const chessActiveRef         = useRef(false);
-  const chessTriggeredRef      = useRef(false); // one-shot per session
+  // Portfolio 2-s hold (before chess reveal)
+  const portfolioHoldRef          = useRef(false);
+  const portfolioHoldTriggeredRef = useRef(false);
+  const [portfolioHolding, setPortfolioHolding] = useState(false);
 
-  // Session key persists across reloads within the same browser tab.
+  // Chess reveal
+  const chessActiveRef = useRef(false);
+
   const VAPOR_SESSION_KEY = "tz_vapor_done";
 
-  /* Scroll-driven state logic */
+  /* ── Scroll-driven state logic ─────────────────────────────────────────── */
   useEffect(() => {
     const hero      = heroRef.current;
     const about     = aboutRef.current;
@@ -60,14 +65,12 @@ export default function Home() {
       typeof CSS !== "undefined" &&
       CSS.supports("animation-timeline", "scroll()");
 
-    const VAPOR_RAW = 1 / 3 + 0.90 * (2 / 3 - 1 / 3);
+    const VAPOR_RAW         = 1 / 3 + 0.90 * (2 / 3 - 1 / 3);
     const SERVICES_BOUNDARY = 2 / 3;
-
-    // Chess reveal triggers near the very end of the portfolio scroll range
-    const CHESS_RAW = 0.97;
+    const PORTFOLIO_FULL    = 0.97; // portfolio fully slid into view
 
     const driveFrame = (raw: number) => {
-      /* ── Safari fallback: JS transforms ──────────────────────────────────── */
+      /* ── Safari fallback ─────────────────────────────────────────────── */
       if (!supportsScrollDriven) {
         const p1 = Math.min(1, Math.max(0, raw / (1 / 3)));
         const p2 = Math.min(1, Math.max(0, (raw - 1 / 3) / (1 / 3)));
@@ -80,7 +83,7 @@ export default function Home() {
         portfolio.style.transform = `translateX(${((1 - p3) * -100).toFixed(3)}%)`;
       }
 
-      /* ── Hero / SplashCursor ──────────────────────────────────────────────── */
+      /* ── Hero ─────────────────────────────────────────────────────────── */
       const heroNowActive = raw < 0.233;
       if (heroNowActive !== heroActiveRef.current) {
         heroActiveRef.current = heroNowActive;
@@ -89,14 +92,14 @@ export default function Home() {
         );
       }
 
-      /* ── LiquidEther (About WebGL) ───────────────────────────────────────── */
+      /* ── About ────────────────────────────────────────────────────────── */
       const aboutNowActive = raw >= 0.233 && raw < 0.433;
       if (aboutNowActive !== aboutActiveRef.current) {
         aboutActiveRef.current = aboutNowActive;
         startTransition(() => setAboutActive(aboutNowActive));
       }
 
-      /* ── ServiceThreeHeading (Three.js) ─────────────────────────────────── */
+      /* ── Services ─────────────────────────────────────────────────────── */
       const servicesNowPrimary = raw >= 0.433 && raw < SERVICES_BOUNDARY;
       if (servicesNowPrimary !== servicesPrimaryRef.current) {
         servicesPrimaryRef.current = servicesNowPrimary;
@@ -105,14 +108,14 @@ export default function Home() {
         );
       }
 
-      /* ── Portfolio Three.js ──────────────────────────────────────────────── */
+      /* ── Portfolio Three.js ───────────────────────────────────────────── */
       const portfolioNowActive = raw >= 0.80;
       if (portfolioNowActive !== portfolioActiveRef.current) {
         portfolioActiveRef.current = portfolioNowActive;
         startTransition(() => setPortfolioActive(portfolioNowActive));
       }
 
-      /* ── Vapor trigger ───────────────────────────────────────────────────── */
+      /* ── Vapor trigger reset ──────────────────────────────────────────── */
       if (
         raw < VAPOR_RAW - 0.02 &&
         raw < 0.62 &&
@@ -122,7 +125,7 @@ export default function Home() {
         vaporTriggered = false;
       }
 
-      /* ── Services-at-100% hold (repeat visits) ──────────────────────────── */
+      /* ── Services-at-100% hold (repeat visits after vapor) ───────────── */
       if (raw < SERVICES_BOUNDARY - 0.03) {
         servicesHoldTriggeredRef.current = false;
       }
@@ -135,7 +138,7 @@ export default function Home() {
         servicesHoldTriggeredRef.current = true;
         servicesHoldRef.current          = true;
         const sMax = document.documentElement.scrollHeight - window.innerHeight;
-        frozenScrollRef.current          = Math.round(sMax * SERVICES_BOUNDARY);
+        frozenScrollRef.current = Math.round(sMax * SERVICES_BOUNDARY);
         setServicesHolding(true);
         setTimeout(() => {
           servicesHoldRef.current = false;
@@ -143,6 +146,7 @@ export default function Home() {
         }, 2000);
       }
 
+      /* ── Vapor reveal ─────────────────────────────────────────────────── */
       if (raw >= VAPOR_RAW && !vaporTriggered && !isInitialEval && !vaporActiveRef.current) {
         vaporTriggered = true;
         const currentMax = document.documentElement.scrollHeight - window.innerHeight;
@@ -153,24 +157,31 @@ export default function Home() {
         setTimeout(() => setVapourActive(true), 120);
       }
 
-      /* ── Chess Reveal trigger ────────────────────────────────────────────── */
-      // Allow re-trigger if user dismissed (scrolled back) and re-scrolls forward
-      if (raw < CHESS_RAW - 0.05) {
-        chessTriggeredRef.current = false;
+      /* ── Portfolio-at-100% hold → then chess reveal ───────────────────── */
+      // Reset one-shot when user scrolls back from portfolio
+      if (raw < PORTFOLIO_FULL - 0.06) {
+        portfolioHoldTriggeredRef.current = false;
       }
       if (
-        raw >= CHESS_RAW &&
-        !chessTriggeredRef.current &&
+        raw >= PORTFOLIO_FULL &&
+        !portfolioHoldTriggeredRef.current &&
         !isInitialEval &&
         !vaporActiveRef.current &&
         !chessActiveRef.current
       ) {
-        chessTriggeredRef.current = true;
-        chessActiveRef.current    = true;
-        // Freeze scroll at max (portfolio fully visible)
-        const cMax = document.documentElement.scrollHeight - window.innerHeight;
-        frozenScrollRef.current = Math.round(cMax * 1.0);
-        chessRef.current?.activate();
+        portfolioHoldTriggeredRef.current = true;
+        portfolioHoldRef.current          = true;
+        const pMax = document.documentElement.scrollHeight - window.innerHeight;
+        frozenScrollRef.current = Math.round(pMax); // hold at very bottom
+        setPortfolioHolding(true);
+
+        // After 2 s hold, slide in the chess section
+        setTimeout(() => {
+          portfolioHoldRef.current = false;
+          setPortfolioHolding(false);
+          chessActiveRef.current = true;
+          chessRef.current?.activate();
+        }, 2000);
       }
     };
 
@@ -178,7 +189,12 @@ export default function Home() {
       const max = document.documentElement.scrollHeight - window.innerHeight;
       if (!max) return;
 
-      if (vaporActiveRef.current || servicesHoldRef.current || chessActiveRef.current) {
+      if (
+        vaporActiveRef.current    ||
+        servicesHoldRef.current   ||
+        portfolioHoldRef.current  ||
+        chessActiveRef.current
+      ) {
         window.scrollTo(0, frozenScrollRef.current);
         return;
       }
@@ -188,10 +204,10 @@ export default function Home() {
 
     window.addEventListener("scroll", onScroll, { passive: true });
 
-    // Chess reveal dismissed → user can scroll back
+    /* Chess events ──────────────────────────────────────────────────────── */
     const onChessDismissed = () => {
-      chessActiveRef.current    = false;
-      chessTriggeredRef.current = false;
+      chessActiveRef.current            = false;
+      portfolioHoldTriggeredRef.current = false; // allow re-trigger on scroll forward
     };
     const onChessComplete = () => {
       chessActiveRef.current = false;
@@ -199,7 +215,7 @@ export default function Home() {
     window.addEventListener("chess-reveal-dismissed", onChessDismissed);
     window.addEventListener("chess-reveal-complete",  onChessComplete);
 
-    // Evaluate on load
+    /* Initial evaluation ────────────────────────────────────────────────── */
     const initMax = document.documentElement.scrollHeight - window.innerHeight;
     const initRaw = initMax > 0 ? window.scrollY / initMax : 0;
     if (initRaw >= VAPOR_RAW || sessionAlreadyDone) {
@@ -214,70 +230,74 @@ export default function Home() {
       window.removeEventListener("chess-reveal-dismissed", onChessDismissed);
       window.removeEventListener("chess-reveal-complete",  onChessComplete);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* Block ALL wheel/touch scroll during vapour */
+  /* ── Block wheel/touch during vapour ───────────────────────────────────── */
   useEffect(() => {
     if (!vaporRevealed || vaporDone) return;
-
-    const blockUpWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-    };
-
-    let touchStartY = 0;
-    const onTouchStart = (e: TouchEvent) => {
-      touchStartY = e.touches[0]?.clientY ?? 0;
-    };
-    const blockUpTouch = (e: TouchEvent) => {
-      const dy = (e.touches[0]?.clientY ?? 0) - touchStartY;
-      if (dy > 0) {
+    const blockWheel = (e: WheelEvent) => { e.preventDefault(); e.stopImmediatePropagation(); };
+    let ty = 0;
+    const onTS = (e: TouchEvent) => { ty = e.touches[0]?.clientY ?? 0; };
+    const blockTouch = (e: TouchEvent) => {
+      if ((e.touches[0]?.clientY ?? 0) - ty > 0) {
         e.preventDefault();
         window.scrollTo(0, frozenScrollRef.current);
       }
     };
-
-    window.addEventListener("wheel",      blockUpWheel, { passive: false, capture: true });
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove",  blockUpTouch, { passive: false });
-
+    window.addEventListener("wheel",      blockWheel,  { passive: false, capture: true });
+    window.addEventListener("touchstart", onTS,        { passive: true });
+    window.addEventListener("touchmove",  blockTouch,  { passive: false });
     return () => {
-      window.removeEventListener("wheel",      blockUpWheel, { capture: true } as EventListenerOptions);
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchmove",  blockUpTouch);
+      window.removeEventListener("wheel",      blockWheel,  { capture: true } as EventListenerOptions);
+      window.removeEventListener("touchstart", onTS);
+      window.removeEventListener("touchmove",  blockTouch);
     };
   }, [vaporRevealed, vaporDone]);
 
-  /* Block ALL wheel/touch scroll during the 2-s services hold */
+  /* ── Block wheel/touch during services 2-s hold ────────────────────────── */
   useEffect(() => {
     if (!servicesHolding) return;
-
-    const blockWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-    };
-    let touchStartY = 0;
-    const onTouchStart = (e: TouchEvent) => { touchStartY = e.touches[0]?.clientY ?? 0; };
+    const blockWheel = (e: WheelEvent) => { e.preventDefault(); e.stopImmediatePropagation(); };
+    let ty = 0;
+    const onTS = (e: TouchEvent) => { ty = e.touches[0]?.clientY ?? 0; };
     const blockTouch = (e: TouchEvent) => {
-      const dy = (e.touches[0]?.clientY ?? 0) - touchStartY;
-      if (dy > 0) {
+      if ((e.touches[0]?.clientY ?? 0) - ty > 0) {
         e.preventDefault();
         window.scrollTo(0, frozenScrollRef.current);
       }
     };
-
-    window.addEventListener("wheel",      blockWheel,   { passive: false, capture: true });
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove",  blockTouch,   { passive: false });
-
+    window.addEventListener("wheel",      blockWheel,  { passive: false, capture: true });
+    window.addEventListener("touchstart", onTS,        { passive: true });
+    window.addEventListener("touchmove",  blockTouch,  { passive: false });
     return () => {
-      window.removeEventListener("wheel",      blockWheel,   { capture: true } as EventListenerOptions);
-      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("wheel",      blockWheel,  { capture: true } as EventListenerOptions);
+      window.removeEventListener("touchstart", onTS);
       window.removeEventListener("touchmove",  blockTouch);
     };
   }, [servicesHolding]);
 
-  // On mount: if vapor already played this session, mark done
+  /* ── Block wheel/touch during portfolio 2-s hold ───────────────────────── */
+  useEffect(() => {
+    if (!portfolioHolding) return;
+    const blockWheel = (e: WheelEvent) => { e.preventDefault(); e.stopImmediatePropagation(); };
+    let ty = 0;
+    const onTS = (e: TouchEvent) => { ty = e.touches[0]?.clientY ?? 0; };
+    const blockTouch = (e: TouchEvent) => {
+      e.preventDefault();
+      window.scrollTo(0, frozenScrollRef.current);
+    };
+    window.addEventListener("wheel",      blockWheel,  { passive: false, capture: true });
+    window.addEventListener("touchstart", onTS,        { passive: true });
+    window.addEventListener("touchmove",  blockTouch,  { passive: false });
+    return () => {
+      window.removeEventListener("wheel",      blockWheel,  { capture: true } as EventListenerOptions);
+      window.removeEventListener("touchstart", onTS);
+      window.removeEventListener("touchmove",  blockTouch);
+    };
+  }, [portfolioHolding]);
+
+  /* ── On mount: sync vapor session state ────────────────────────────────── */
   useEffect(() => {
     if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(VAPOR_SESSION_KEY)) {
       setVaporDone(true);
@@ -285,7 +305,7 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* Vapor cycle complete */
+  /* ── Vapor complete ─────────────────────────────────────────────────────── */
   const handleVaporComplete = () => {
     if (typeof sessionStorage !== "undefined") {
       sessionStorage.setItem(VAPOR_SESSION_KEY, "1");
@@ -299,7 +319,6 @@ export default function Home() {
       setVaporRevealed(false);
       setVaporFading(false);
     }, 650);
-
     servicesHoldTriggeredRef.current = true;
     servicesHoldRef.current          = true;
     setServicesHolding(true);
@@ -334,7 +353,7 @@ export default function Home() {
         onVapourComplete={handleVaporComplete}
       />
 
-      {/* Chess Reveal — fixed overlay that appears after Our Work */}
+      {/* Chess Reveal — slides up from below after Our Work holds for 2s */}
       <ChessReveal ref={chessRef} />
     </main>
   );
