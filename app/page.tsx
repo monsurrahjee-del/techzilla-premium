@@ -9,6 +9,11 @@ import ServicesIntro from "@/components/sections/ServicesIntro/ServicesIntro";
 import type { ServicesIntroHandle } from "@/components/sections/ServicesIntro/ServicesIntro";
 import styles        from "./page.module.css";
 
+// Module-level flag — resets on every page reload, persists for the lifetime
+// of this JS module (i.e. until the user reloads or navigates away).
+// This is the sole gate: vapor plays once per page load, never twice.
+let vaporPlayedThisLoad = false;
+
 export default function Home() {
   const heroRef      = useRef<HTMLDivElement>(null);
   const aboutRef     = useRef<HTMLDivElement>(null);
@@ -36,9 +41,6 @@ export default function Home() {
   const servicesHoldTriggeredRef = useRef(false); // one-shot per scroll-in
   const [servicesHolding, setServicesHolding] = useState(false);
 
-  // Session key persists across reloads within the same browser tab.
-  // Once vapor has played once, it never plays again for the rest of the session.
-  const VAPOR_SESSION_KEY = "tz_vapor_done";
 
   /* Scroll-driven state logic
      Visual transforms are handled by CSS scroll-driven animations on
@@ -60,12 +62,10 @@ export default function Home() {
     const portfolio = portfolioRef.current;
     if (!hero || !about || !services || !portfolio) return;
 
-    // If the vapor has already played this browser session, pre-mark as triggered
-    // so it never fires again regardless of scroll direction (handles the
-    // "scroll back from Our Work" and "reload at Our Work" cases).
-    const sessionAlreadyDone =
-      typeof sessionStorage !== "undefined" && !!sessionStorage.getItem(VAPOR_SESSION_KEY);
-    let vaporTriggered = sessionAlreadyDone;
+    // If vapor has already played this page load, pre-mark as triggered so it
+    // never fires again for the rest of this load (handles "scroll back from
+    // Our Work" without re-triggering).
+    let vaporTriggered = vaporPlayedThisLoad;
     let isInitialEval  = true; // skip vapor trigger on browser scroll-restore at mount
 
     const supportsScrollDriven =
@@ -131,33 +131,26 @@ export default function Home() {
       }
 
       /* ── Vapor trigger ───────────────────────────────────────────────────── */
-      // Reset the one-shot flag ONLY when clearly scrolling forward into services
-      // from the about direction — never when scrolling back from the portfolio
-      // section. Also never reset when the session already has the completion flag.
-      // Check sessionStorage live (not just the mount-time snapshot) so that if
-      // the vapor completed this very visit and the user scrolls back to Hero,
-      // vaporTriggered is not cleared and the animation won't fire again.
-      if (
-        raw < VAPOR_RAW - 0.02 &&
-        raw < 0.62 &&
-        !sessionAlreadyDone &&
-        !sessionStorage.getItem(VAPOR_SESSION_KEY)
-      ) {
+      // Reset the one-shot flag only when scrolling back above the threshold AND
+      // vapor has not yet played this page load. Once vaporPlayedThisLoad is true
+      // (set inside handleVaporComplete) this block never fires, so scrolling back
+      // to Hero or About can never re-arm the trigger for this load.
+      if (raw < VAPOR_RAW - 0.02 && raw < 0.62 && !vaporPlayedThisLoad) {
         vaporTriggered = false;
       }
 
-      // ── Services-at-100% hold (repeat visits) ──────────────────────────────
-      // On first visit the vapor lock already parks the page at raw=SERVICES_BOUNDARY;
-      // the 2-second hold fires inside handleVaporComplete instead.
-      // On repeat visits (sessionAlreadyDone) vapor never runs, so we add the
-      // hold here when the user first scrolls into the services→portfolio seam.
+      // ── Services-at-100% hold (after vapor has played this load) ───────────
+      // On first entry the vapor lock parks the page at SERVICES_BOUNDARY and
+      // the 2-s hold fires inside handleVaporComplete.
+      // On subsequent scroll-ins (vapor already done this load) we add the hold
+      // here so the user still gets the 2-s pause before portfolio appears.
       if (raw < SERVICES_BOUNDARY - 0.03) {
         // Reset one-shot so the hold fires again if the user scrolls back up
         servicesHoldTriggeredRef.current = false;
       }
       if (
         raw >= SERVICES_BOUNDARY &&
-        sessionAlreadyDone &&
+        vaporPlayedThisLoad &&
         !servicesHoldTriggeredRef.current &&
         !isInitialEval
       ) {
@@ -205,10 +198,10 @@ export default function Home() {
     // Evaluate on load (e.g. browser scroll restore after refresh).
     const initMax = document.documentElement.scrollHeight - window.innerHeight;
     const initRaw = initMax > 0 ? window.scrollY / initMax : 0;
-    // Pre-mark triggered if at/past threshold OR session already completed.
-    // Also set vaporDone so Services content is immediately active (no vapor
-    // will play, so we must not leave active={false} on <Services>).
-    if (initRaw >= VAPOR_RAW || sessionAlreadyDone) {
+    // Pre-mark triggered if browser restores scroll to at/past the threshold on
+    // load — so vapor doesn't fire immediately on a reload-at-Our-Work.
+    // Also mark vaporDone so Services content is active without waiting.
+    if (initRaw >= VAPOR_RAW) {
       vaporTriggered = true;
       startTransition(() => setVaporDone(true));
     }
@@ -279,22 +272,10 @@ export default function Home() {
     };
   }, [servicesHolding]);
 
-  // On mount: if vapor already played this session, mark it done immediately so
-  // the Services section is shown without waiting for the animation (handles
-  // reload-at-Our-Work and navigate-back-from-Our-Work cases).
-  useEffect(() => {
-    if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(VAPOR_SESSION_KEY)) {
-      setVaporDone(true);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   /* Vapor cycle complete */
   const handleVaporComplete = () => {
-    // Persist completion so the animation never re-fires for the rest of the session
-    if (typeof sessionStorage !== "undefined") {
-      sessionStorage.setItem(VAPOR_SESSION_KEY, "1");
-    }
+    // Mark as played for the rest of this page load (module-level — resets on reload).
+    vaporPlayedThisLoad = true;
     vaporActiveRef.current = false;
     setVapourActive(false);
     setVaporDone(true);
