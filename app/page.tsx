@@ -7,6 +7,8 @@ import Services      from "@/components/sections/Services/Services";
 import Portfolio     from "@/components/sections/Portfolio/Portfolio";
 import ServicesIntro from "@/components/sections/ServicesIntro/ServicesIntro";
 import type { ServicesIntroHandle } from "@/components/sections/ServicesIntro/ServicesIntro";
+import ChessReveal   from "@/components/sections/ChessReveal/ChessReveal";
+import type { ChessRevealHandle } from "@/components/sections/ChessReveal/ChessReveal";
 import styles        from "./page.module.css";
 
 export default function Home() {
@@ -15,6 +17,7 @@ export default function Home() {
   const servicesRef  = useRef<HTMLDivElement>(null);
   const portfolioRef = useRef<HTMLDivElement>(null);
   const introRef     = useRef<ServicesIntroHandle>(null);
+  const chessRef     = useRef<ChessRevealHandle>(null);
 
   const aboutActiveRef      = useRef(false);
   const heroActiveRef       = useRef(true);
@@ -29,30 +32,18 @@ export default function Home() {
 
   const frozenScrollRef          = useRef(0);
   const vaporActiveRef           = useRef(false);
-  // Services-at-100% hold: lock scroll for 2 s before the user can proceed
-  // to Our Work. Fires both after vapor completes (first visit) and when the
-  // user scrolls back to 100% on repeat visits (session already done).
   const servicesHoldRef          = useRef(false);
-  const servicesHoldTriggeredRef = useRef(false); // one-shot per scroll-in
+  const servicesHoldTriggeredRef = useRef(false);
   const [servicesHolding, setServicesHolding] = useState(false);
 
+  // Chess reveal state
+  const chessActiveRef         = useRef(false);
+  const chessTriggeredRef      = useRef(false); // one-shot per session
+
   // Session key persists across reloads within the same browser tab.
-  // Once vapor has played once, it never plays again for the rest of the session.
   const VAPOR_SESSION_KEY = "tz_vapor_done";
 
-  /* Scroll-driven state logic
-     Visual transforms are handled by CSS scroll-driven animations on
-     Chrome/Edge/Firefox (scroll(root block) — compositor-threaded, true 1:1).
-     JS here only manages state flags: WebGL activation, vapor trigger, etc.
-     Safari fallback: the JS assignments below also set the transforms.
-
-     Scrollable range: 300vh (400vh total − 100vh viewport).
-       0%   → 33.33%  =   0 → 100vh  (about slides in from right, hero fades)
-      33.33% → 66.66%  = 100 → 200vh  (services scales in)
-      66.66% → 100%    = 200 → 300vh  (portfolio slides in from left)
-
-     SERVICES_BOUNDARY = 2/3 (≈ 0.6667): the exact point where services
-     reaches 100% and portfolio has NOT yet started sliding in.           */
+  /* Scroll-driven state logic */
   useEffect(() => {
     const hero      = heroRef.current;
     const about     = aboutRef.current;
@@ -60,26 +51,20 @@ export default function Home() {
     const portfolio = portfolioRef.current;
     if (!hero || !about || !services || !portfolio) return;
 
-    // If the vapor has already played this browser session, pre-mark as triggered
-    // so it never fires again regardless of scroll direction (handles the
-    // "scroll back from Our Work" and "reload at Our Work" cases).
     const sessionAlreadyDone =
       typeof sessionStorage !== "undefined" && !!sessionStorage.getItem(VAPOR_SESSION_KEY);
     let vaporTriggered = sessionAlreadyDone;
-    let isInitialEval  = true; // skip vapor trigger on browser scroll-restore at mount
+    let isInitialEval  = true;
 
     const supportsScrollDriven =
       typeof CSS !== "undefined" &&
       CSS.supports("animation-timeline", "scroll()");
 
-    // Services is fully visible at raw = 2/3 (CSS range 33.33% → 66.66%).
-    // Trigger vapor at 90% through the services animation — well within the
-    // services section and clearly before the portfolio boundary.
-    // 1/3 + 0.90*(2/3 − 1/3) = 1/3 + 0.30 = 0.633
-    const VAPOR_RAW = 1 / 3 + 0.90 * (2 / 3 - 1 / 3); // ≈ 0.633
+    const VAPOR_RAW = 1 / 3 + 0.90 * (2 / 3 - 1 / 3);
+    const SERVICES_BOUNDARY = 2 / 3;
 
-    // Services is fully visible (portfolio not yet started) at exactly 2/3.
-    const SERVICES_BOUNDARY = 2 / 3; // ≈ 0.6667
+    // Chess reveal triggers near the very end of the portfolio scroll range
+    const CHESS_RAW = 0.97;
 
     const driveFrame = (raw: number) => {
       /* ── Safari fallback: JS transforms ──────────────────────────────────── */
@@ -112,9 +97,6 @@ export default function Home() {
       }
 
       /* ── ServiceThreeHeading (Three.js) ─────────────────────────────────── */
-      // Active from when services starts animating in until the services/portfolio
-      // boundary (2/3). Stop exactly at SERVICES_BOUNDARY so Three.js isn't
-      // running while portfolio is already visible.
       const servicesNowPrimary = raw >= 0.433 && raw < SERVICES_BOUNDARY;
       if (servicesNowPrimary !== servicesPrimaryRef.current) {
         servicesPrimaryRef.current = servicesNowPrimary;
@@ -131,12 +113,6 @@ export default function Home() {
       }
 
       /* ── Vapor trigger ───────────────────────────────────────────────────── */
-      // Reset the one-shot flag ONLY when clearly scrolling forward into services
-      // from the about direction — never when scrolling back from the portfolio
-      // section. Also never reset when the session already has the completion flag.
-      // Check sessionStorage live (not just the mount-time snapshot) so that if
-      // the vapor completed this very visit and the user scrolls back to Hero,
-      // vaporTriggered is not cleared and the animation won't fire again.
       if (
         raw < VAPOR_RAW - 0.02 &&
         raw < 0.62 &&
@@ -146,13 +122,8 @@ export default function Home() {
         vaporTriggered = false;
       }
 
-      // ── Services-at-100% hold (repeat visits) ──────────────────────────────
-      // On first visit the vapor lock already parks the page at raw=SERVICES_BOUNDARY;
-      // the 2-second hold fires inside handleVaporComplete instead.
-      // On repeat visits (sessionAlreadyDone) vapor never runs, so we add the
-      // hold here when the user first scrolls into the services→portfolio seam.
+      /* ── Services-at-100% hold (repeat visits) ──────────────────────────── */
       if (raw < SERVICES_BOUNDARY - 0.03) {
-        // Reset one-shot so the hold fires again if the user scrolls back up
         servicesHoldTriggeredRef.current = false;
       }
       if (
@@ -174,16 +145,32 @@ export default function Home() {
 
       if (raw >= VAPOR_RAW && !vaporTriggered && !isInitialEval && !vaporActiveRef.current) {
         vaporTriggered = true;
-        // Freeze at the exact services/portfolio boundary (raw = 2/3) so the
-        // page is locked with services at 100% and portfolio not yet visible.
         const currentMax = document.documentElement.scrollHeight - window.innerHeight;
         frozenScrollRef.current = Math.round(currentMax * SERVICES_BOUNDARY);
         vaporActiveRef.current  = true;
         window.dispatchEvent(new CustomEvent("services-section-active", { detail: { active: false } }));
-        // Do NOT wrap in startTransition — vapor must appear immediately (urgent update).
         setVaporRevealed(true);
-        // Small delay then activate vapour words
         setTimeout(() => setVapourActive(true), 120);
+      }
+
+      /* ── Chess Reveal trigger ────────────────────────────────────────────── */
+      // Allow re-trigger if user dismissed (scrolled back) and re-scrolls forward
+      if (raw < CHESS_RAW - 0.05) {
+        chessTriggeredRef.current = false;
+      }
+      if (
+        raw >= CHESS_RAW &&
+        !chessTriggeredRef.current &&
+        !isInitialEval &&
+        !vaporActiveRef.current &&
+        !chessActiveRef.current
+      ) {
+        chessTriggeredRef.current = true;
+        chessActiveRef.current    = true;
+        // Freeze scroll at max (portfolio fully visible)
+        const cMax = document.documentElement.scrollHeight - window.innerHeight;
+        frozenScrollRef.current = Math.round(cMax * 1.0);
+        chessRef.current?.activate();
       }
     };
 
@@ -191,8 +178,7 @@ export default function Home() {
       const max = document.documentElement.scrollHeight - window.innerHeight;
       if (!max) return;
 
-      // Lock scroll while vapour is animating OR during the 2-s services hold
-      if (vaporActiveRef.current || servicesHoldRef.current) {
+      if (vaporActiveRef.current || servicesHoldRef.current || chessActiveRef.current) {
         window.scrollTo(0, frozenScrollRef.current);
         return;
       }
@@ -202,12 +188,20 @@ export default function Home() {
 
     window.addEventListener("scroll", onScroll, { passive: true });
 
-    // Evaluate on load (e.g. browser scroll restore after refresh).
+    // Chess reveal dismissed → user can scroll back
+    const onChessDismissed = () => {
+      chessActiveRef.current    = false;
+      chessTriggeredRef.current = false;
+    };
+    const onChessComplete = () => {
+      chessActiveRef.current = false;
+    };
+    window.addEventListener("chess-reveal-dismissed", onChessDismissed);
+    window.addEventListener("chess-reveal-complete",  onChessComplete);
+
+    // Evaluate on load
     const initMax = document.documentElement.scrollHeight - window.innerHeight;
     const initRaw = initMax > 0 ? window.scrollY / initMax : 0;
-    // Pre-mark triggered if at/past threshold OR session already completed.
-    // Also set vaporDone so Services content is immediately active (no vapor
-    // will play, so we must not leave active={false} on <Services>).
     if (initRaw >= VAPOR_RAW || sessionAlreadyDone) {
       vaporTriggered = true;
       startTransition(() => setVaporDone(true));
@@ -215,10 +209,14 @@ export default function Home() {
     driveFrame(initRaw);
     isInitialEval = false;
 
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("chess-reveal-dismissed", onChessDismissed);
+      window.removeEventListener("chess-reveal-complete",  onChessComplete);
+    };
   }, []);
 
-  /* Block ALL wheel/touch scroll during vapour (both directions) */
+  /* Block ALL wheel/touch scroll during vapour */
   useEffect(() => {
     if (!vaporRevealed || vaporDone) return;
 
@@ -279,9 +277,7 @@ export default function Home() {
     };
   }, [servicesHolding]);
 
-  // On mount: if vapor already played this session, mark it done immediately so
-  // the Services section is shown without waiting for the animation (handles
-  // reload-at-Our-Work and navigate-back-from-Our-Work cases).
+  // On mount: if vapor already played this session, mark done
   useEffect(() => {
     if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(VAPOR_SESSION_KEY)) {
       setVaporDone(true);
@@ -291,7 +287,6 @@ export default function Home() {
 
   /* Vapor cycle complete */
   const handleVaporComplete = () => {
-    // Persist completion so the animation never re-fires for the rest of the session
     if (typeof sessionStorage !== "undefined") {
       sessionStorage.setItem(VAPOR_SESSION_KEY, "1");
     }
@@ -305,9 +300,6 @@ export default function Home() {
       setVaporFading(false);
     }, 650);
 
-    // Hold the page at services 100% for 2 seconds so the user can see the
-    // section before it snaps to Our Work. frozenScrollRef is already set to
-    // the SERVICES_BOUNDARY position by the vapor trigger — reuse it here.
     servicesHoldTriggeredRef.current = true;
     servicesHoldRef.current          = true;
     setServicesHolding(true);
@@ -334,16 +326,16 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ServicesIntro overlay: DotGrid background + VapourWords text.
-          Shown on first visit to the services section each browser tab session.
-          `visible` keeps the overlay mounted (with fade-out transition) while
-          `vapourActive` tells VapourWords to start cycling through the words. */}
+      {/* ServicesIntro overlay */}
       <ServicesIntro
         ref={introRef}
         visible={vaporRevealed}
         vapourActive={vapourActive}
         onVapourComplete={handleVaporComplete}
       />
+
+      {/* Chess Reveal — fixed overlay that appears after Our Work */}
+      <ChessReveal ref={chessRef} />
     </main>
   );
 }
