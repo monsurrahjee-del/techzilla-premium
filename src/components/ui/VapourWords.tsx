@@ -6,10 +6,6 @@ import styles from "./VapourWords.module.css";
 const WORDS = ["The", "services", "We", "Provide"];
 const WORD_MS = 2600; // ms each word holds
 
-// sessionStorage key — survives component unmounts AND hard page reloads
-// (module-level variables reset on F5; sessionStorage persists for the tab session).
-const VAPOUR_KEY = "vapour_played";
-
 interface Props {
   active: boolean;
   onComplete?: () => void;
@@ -30,13 +26,8 @@ export default function VapourWords({ active, onComplete }: Props) {
       return;
     }
 
-    // If this animation already ran this browser session (survives F5 too),
-    // skip straight to the completion callback so the parent transitions immediately.
-    if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(VAPOUR_KEY)) {
-      cbRef.current?.();
-      return;
-    }
-
+    // Session management is handled by the parent (page.tsx).
+    // VapourWords simply plays through all words whenever active=true.
     doneRef.current = false;
     setWordIndex(0);
 
@@ -47,9 +38,7 @@ export default function VapourWords({ active, onComplete }: Props) {
           advance(idx + 1);
         } else if (!doneRef.current) {
           doneRef.current = true;
-          // Persist so reloads and re-mounts both skip the animation
-          if (typeof sessionStorage !== "undefined") sessionStorage.setItem(VAPOUR_KEY, "1");
-          // small extra pause so the last word fully vaporises before transition
+          // Small extra pause so the last word fully vaporises before transition
           timerRef.current = setTimeout(() => cbRef.current?.(), 900);
         }
       }, WORD_MS);

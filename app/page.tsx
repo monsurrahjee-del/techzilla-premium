@@ -1,18 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState, startTransition } from "react";
-import Hero      from "@/components/sections/Hero";
-import About     from "@/components/sections/About/About";
-import Services  from "@/components/sections/Services/Services";
-import Portfolio from "@/components/sections/Portfolio/Portfolio";
-import VaporizeTextCycle, { Tag } from "@/components/ui/VaporizeTextCycle";
-import styles    from "./page.module.css";
+import Hero          from "@/components/sections/Hero";
+import About         from "@/components/sections/About/About";
+import Services      from "@/components/sections/Services/Services";
+import Portfolio     from "@/components/sections/Portfolio/Portfolio";
+import ServicesIntro from "@/components/sections/ServicesIntro/ServicesIntro";
+import type { ServicesIntroHandle } from "@/components/sections/ServicesIntro/ServicesIntro";
+import styles        from "./page.module.css";
 
 export default function Home() {
   const heroRef      = useRef<HTMLDivElement>(null);
   const aboutRef     = useRef<HTMLDivElement>(null);
   const servicesRef  = useRef<HTMLDivElement>(null);
   const portfolioRef = useRef<HTMLDivElement>(null);
+  const introRef     = useRef<ServicesIntroHandle>(null);
 
   const aboutActiveRef      = useRef(false);
   const heroActiveRef       = useRef(true);
@@ -23,6 +25,7 @@ export default function Home() {
   const [vaporRevealed,    setVaporRevealed]    = useState(false);
   const [vaporFading,      setVaporFading]      = useState(false);
   const [vaporDone,        setVaporDone]        = useState(false);
+  const [vapourActive,     setVapourActive]     = useState(false);
 
   const frozenScrollRef          = useRef(0);
   const vaporActiveRef           = useRef(false);
@@ -37,19 +40,6 @@ export default function Home() {
   // Once vapor has played once, it never plays again for the rest of the session.
   const VAPOR_SESSION_KEY = "tz_vapor_done";
 
-  /* Font size for the vapor overlay */
-  const [vaporFontSize, setVaporFontSize] = useState("240px");
-  useEffect(() => {
-    const calc = () => {
-      const byWidth  = Math.floor((window.innerWidth  * 0.8) / (8 * 0.52));
-      const byHeight = Math.floor(window.innerHeight  * 0.38);
-      setVaporFontSize(`${Math.min(byWidth, byHeight, 380)}px`);
-    };
-    calc();
-    window.addEventListener("resize", calc);
-    return () => window.removeEventListener("resize", calc);
-  }, []);
-
   /* Scroll-driven state logic
      Visual transforms are handled by CSS scroll-driven animations on
      Chrome/Edge/Firefox (scroll(root block) — compositor-threaded, true 1:1).
@@ -59,7 +49,10 @@ export default function Home() {
      Scrollable range: 300vh (400vh total − 100vh viewport).
        0%   → 33.33%  =   0 → 100vh  (about slides in from right, hero fades)
       33.33% → 66.66%  = 100 → 200vh  (services scales in)
-      66.66% → 100%    = 200 → 300vh  (portfolio slides in from left)           */
+      66.66% → 100%    = 200 → 300vh  (portfolio slides in from left)
+
+     SERVICES_BOUNDARY = 2/3 (≈ 0.6667): the exact point where services
+     reaches 100% and portfolio has NOT yet started sliding in.           */
   useEffect(() => {
     const hero      = heroRef.current;
     const about     = aboutRef.current;
@@ -79,6 +72,15 @@ export default function Home() {
       typeof CSS !== "undefined" &&
       CSS.supports("animation-timeline", "scroll()");
 
+    // Services is fully visible at raw = 2/3 (CSS range 33.33% → 66.66%).
+    // Trigger vapor at 90% through the services animation — well within the
+    // services section and clearly before the portfolio boundary.
+    // 1/3 + 0.90*(2/3 − 1/3) = 1/3 + 0.30 = 0.633
+    const VAPOR_RAW = 1 / 3 + 0.90 * (2 / 3 - 1 / 3); // ≈ 0.633
+
+    // Services is fully visible (portfolio not yet started) at exactly 2/3.
+    const SERVICES_BOUNDARY = 2 / 3; // ≈ 0.6667
+
     const driveFrame = (raw: number) => {
       /* ── Safari fallback: JS transforms ──────────────────────────────────── */
       if (!supportsScrollDriven) {
@@ -94,7 +96,6 @@ export default function Home() {
       }
 
       /* ── Hero / SplashCursor ──────────────────────────────────────────────── */
-      // Hero was active at raw < 0.35 in old 200vh range → 0.35*200/300 = 0.233
       const heroNowActive = raw < 0.233;
       if (heroNowActive !== heroActiveRef.current) {
         heroActiveRef.current = heroNowActive;
@@ -104,7 +105,6 @@ export default function Home() {
       }
 
       /* ── LiquidEther (About WebGL) ───────────────────────────────────────── */
-      // Was 0.35–0.65 in 200vh → 0.233–0.433 in 300vh
       const aboutNowActive = raw >= 0.233 && raw < 0.433;
       if (aboutNowActive !== aboutActiveRef.current) {
         aboutActiveRef.current = aboutNowActive;
@@ -112,8 +112,10 @@ export default function Home() {
       }
 
       /* ── ServiceThreeHeading (Three.js) ─────────────────────────────────── */
-      // Was >= 0.65 in 200vh → 0.433 in 300vh; and stop at portfolio entry
-      const servicesNowPrimary = raw >= 0.433 && raw < 0.75;
+      // Active from when services starts animating in until the services/portfolio
+      // boundary (2/3). Stop exactly at SERVICES_BOUNDARY so Three.js isn't
+      // running while portfolio is already visible.
+      const servicesNowPrimary = raw >= 0.433 && raw < SERVICES_BOUNDARY;
       if (servicesNowPrimary !== servicesPrimaryRef.current) {
         servicesPrimaryRef.current = servicesNowPrimary;
         window.dispatchEvent(
@@ -129,24 +131,18 @@ export default function Home() {
       }
 
       /* ── Vapor trigger ───────────────────────────────────────────────────── */
-      // Fires at 94% through the services section (raw 0.433→0.75).
-      // 0.433 + 0.94*(0.75−0.433) ≈ 0.731
-      const VAPOR_RAW = 0.433 + 0.94 * (0.75 - 0.433); // ≈ 0.731
-
       // Reset the one-shot flag ONLY when clearly scrolling forward into services
       // from the about direction — never when scrolling back from the portfolio
-      // section (raw >= 0.70 means user came from Our Work, keep it triggered).
-      // Also never reset when the session already has the completion flag.
-      if (raw < VAPOR_RAW - 0.02 && raw < 0.70 && !sessionAlreadyDone) {
+      // section. Also never reset when the session already has the completion flag.
+      if (raw < VAPOR_RAW - 0.02 && raw < 0.62 && !sessionAlreadyDone) {
         vaporTriggered = false;
       }
 
       // ── Services-at-100% hold (repeat visits) ──────────────────────────────
-      // On first visit the vapor lock already parks the page at raw=0.75;
+      // On first visit the vapor lock already parks the page at raw=SERVICES_BOUNDARY;
       // the 2-second hold fires inside handleVaporComplete instead.
       // On repeat visits (sessionAlreadyDone) vapor never runs, so we add the
       // hold here when the user first scrolls into the services→portfolio seam.
-      const SERVICES_BOUNDARY = 0.75;
       if (raw < SERVICES_BOUNDARY - 0.03) {
         // Reset one-shot so the hold fires again if the user scrolls back up
         servicesHoldTriggeredRef.current = false;
@@ -170,17 +166,16 @@ export default function Home() {
 
       if (raw >= VAPOR_RAW && !vaporTriggered && !isInitialEval && !vaporActiveRef.current) {
         vaporTriggered = true;
-        // Freeze at the 100 % boundary of the services scroll range (raw = 0.75)
-        // rather than at the trigger point (94 %). This locks the page at the
-        // clean services→portfolio boundary while the vapor animation plays.
+        // Freeze at the exact services/portfolio boundary (raw = 2/3) so the
+        // page is locked with services at 100% and portfolio not yet visible.
         const currentMax = document.documentElement.scrollHeight - window.innerHeight;
-        frozenScrollRef.current = Math.round(currentMax * 0.75);
+        frozenScrollRef.current = Math.round(currentMax * SERVICES_BOUNDARY);
         vaporActiveRef.current  = true;
         window.dispatchEvent(new CustomEvent("services-section-active", { detail: { active: false } }));
         // Do NOT wrap in startTransition — vapor must appear immediately (urgent update).
-        // startTransition marks it as deferrable, which lets React skip the render while
-        // the user is scrolling and produces a blank overlay until React is idle.
         setVaporRevealed(true);
+        // Small delay then activate vapour words
+        setTimeout(() => setVapourActive(true), 120);
       }
     };
 
@@ -200,16 +195,12 @@ export default function Home() {
     window.addEventListener("scroll", onScroll, { passive: true });
 
     // Evaluate on load (e.g. browser scroll restore after refresh).
-    // isInitialEval stays true during this call so vapor never shows on reload.
-    // Pre-mark triggered if already at/past threshold so a stray post-load
-    // scroll event (browser scroll-restore jitter) cannot fire the overlay.
     const initMax = document.documentElement.scrollHeight - window.innerHeight;
     const initRaw = initMax > 0 ? window.scrollY / initMax : 0;
-    const VAPOR_RAW_INIT = 0.433 + 0.94 * (0.75 - 0.433);
     // Pre-mark triggered if at/past threshold OR session already completed
-    if (initRaw >= VAPOR_RAW_INIT || sessionAlreadyDone) vaporTriggered = true;
+    if (initRaw >= VAPOR_RAW || sessionAlreadyDone) vaporTriggered = true;
     driveFrame(initRaw);
-    isInitialEval = false; // allow vapor to trigger on subsequent user scrolls
+    isInitialEval = false;
 
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -219,7 +210,6 @@ export default function Home() {
     if (!vaporRevealed || vaporDone) return;
 
     const blockUpWheel = (e: WheelEvent) => {
-      // Block every scroll direction — vapor must play to completion
       e.preventDefault();
       e.stopImmediatePropagation();
     };
@@ -293,6 +283,7 @@ export default function Home() {
       sessionStorage.setItem(VAPOR_SESSION_KEY, "1");
     }
     vaporActiveRef.current = false;
+    setVapourActive(false);
     setVaporDone(true);
     window.dispatchEvent(new CustomEvent("services-section-active", { detail: { active: true } }));
     setVaporFading(true);
@@ -303,7 +294,7 @@ export default function Home() {
 
     // Hold the page at services 100% for 2 seconds so the user can see the
     // section before it snaps to Our Work. frozenScrollRef is already set to
-    // the raw=0.75 position by the vapor trigger — reuse it here.
+    // the SERVICES_BOUNDARY position by the vapor trigger — reuse it here.
     servicesHoldTriggeredRef.current = true;
     servicesHoldRef.current          = true;
     setServicesHolding(true);
@@ -330,48 +321,16 @@ export default function Home() {
         </div>
       </div>
 
-      {vaporRevealed && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            // Explicit dimensions are belt-and-suspenders for browsers that
-            // occasionally mis-resolve inset:0 height inside filter contexts.
-            width: "100vw",
-            height: "100vh",
-            zIndex: 200,
-            // No flex layout here — VaporizeTextCycle already centres the text
-            // via alignment="center". flex + align-items:center collapses the
-            // child's height:100% to ~20 px (canvas minHeight), making the
-            // canvas too small and rendering the text invisible.
-            pointerEvents: "none",
-            opacity: vaporFading ? 0 : 1,
-            transition: "opacity 0.6s ease",
-            // Single modest drop-shadow — safe now that VaporizeTextCycle uses
-            // main-thread canvas rendering (CSS filters are incompatible with
-            // OffscreenCanvas compositing; the OffscreenCanvas path is disabled).
-            filter: "drop-shadow(0 0 24px rgba(255,255,255,0.9))",
-          }}
-        >
-          <VaporizeTextCycle
-            texts={["The", "Services", "We", "Provide"]}
-            font={{
-              fontFamily: "Geist, system-ui, sans-serif",
-              fontSize: vaporFontSize,
-              fontWeight: 900,
-            }}
-            color="rgb(255, 255, 255)"
-            spread={4}
-            density={2}
-            animation={{ vaporizeDuration: 1.0, fadeInDuration: 0.5, waitDuration: 0.3 }}
-            direction="left-to-right"
-            alignment="center"
-            tag={Tag.H1}
-            forceActive={true}
-            onComplete={handleVaporComplete}
-          />
-        </div>
-      )}
+      {/* ServicesIntro overlay: DotGrid background + VapourWords text.
+          Shown on first visit to the services section each browser tab session.
+          `visible` keeps the overlay mounted (with fade-out transition) while
+          `vapourActive` tells VapourWords to start cycling through the words. */}
+      <ServicesIntro
+        ref={introRef}
+        visible={vaporRevealed}
+        vapourActive={vapourActive}
+        onVapourComplete={handleVaporComplete}
+      />
     </main>
   );
 }
