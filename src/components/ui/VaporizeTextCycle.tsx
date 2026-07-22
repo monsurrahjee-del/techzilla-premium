@@ -49,10 +49,8 @@ export default function VaporizeTextCycle({
   onComplete,
   forceActive = false,
 }: VaporizeTextCycleProps) {
-  const canvasRef   = useRef<HTMLCanvasElement | null>(null);
-  const wrapperRef  = useRef<HTMLDivElement | null>(null);
-  const workerRef   = useRef<Worker | null>(null);
-  const transferredRef = useRef(false);
+  const canvasRef      = useRef<HTMLCanvasElement | null>(null);
+  const wrapperRef     = useRef<HTMLDivElement | null>(null);
   const onCompleteRef  = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
@@ -85,49 +83,22 @@ export default function VaporizeTextCycle({
     canvas.width  = Math.floor(wrapperSize.width  * globalDpr);
     canvas.height = Math.floor(wrapperSize.height * globalDpr);
 
-    // Try OffscreenCanvas (Chrome, Edge, Firefox) — keeps main thread free
-    const supportsOffscreen = typeof (canvas as any).transferControlToOffscreen === "function";
+    // OffscreenCanvas + worker path intentionally disabled.
+    //
+    // Root cause: when a CSS `filter` (even `drop-shadow`) is applied to an
+    // ancestor element, the browser rasterises the subtree into an offscreen
+    // intermediate buffer before compositing.  OffscreenCanvas content is
+    // composited at the GPU layer, AFTER that intermediate buffer is captured,
+    // so the worker's pixels never make it into the filter output — the canvas
+    // appears completely blank to the user even though the worker is drawing
+    // correctly.  The animation also only plays once per session and lasts ~5 s,
+    // so there is no meaningful performance gain from the worker path anyway.
+    //
+    // The main-thread fallback below is throttled to 30 fps and is fully
+    // adequate.  Do not re-enable the OffscreenCanvas path without first moving
+    // the canvas element outside any ancestor that applies a CSS filter.
 
-    if (supportsOffscreen && !transferredRef.current) {
-      transferredRef.current = true;
-      const offscreen = (canvas as any).transferControlToOffscreen() as OffscreenCanvas;
-
-      const worker = new Worker(new URL("./vaporize.worker.ts", import.meta.url));
-      workerRef.current = worker;
-
-      worker.onmessage = (e: MessageEvent) => {
-        const msg = e.data;
-        if (msg.type === "cycle_complete") {
-          onCompleteRef.current?.();
-        }
-        // "text_changed" is informational — worker handles rendering internally
-      };
-
-      worker.postMessage({
-        type: "init",
-        canvas: offscreen,
-        config: {
-          texts,
-          font,
-          color,
-          spread,
-          density,
-          direction,
-          alignment,
-          durations,
-          dpr: globalDpr,
-        },
-      }, [offscreen]);
-
-      return () => {
-        worker.postMessage({ type: "stop" });
-        worker.terminate();
-        workerRef.current = null;
-        transferredRef.current = false;
-      };
-    }
-
-    // ── Fallback: main-thread rendering (Safari) ─────────────────────────────
+    // ── Main-thread rendering (reliable across all browsers) ─────────────────
     // Throttled to 30 fps so it doesn't dominate input event processing.
     const MIN_FRAME_MS = 1000 / 30;
     let rafId: number;

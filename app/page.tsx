@@ -262,6 +262,10 @@ export default function Home() {
           style={{
             position: "fixed",
             inset: 0,
+            // Explicit dimensions are belt-and-suspenders for browsers that
+            // occasionally mis-resolve inset:0 height inside filter contexts.
+            width: "100vw",
+            height: "100vh",
             zIndex: 200,
             // No flex layout here — VaporizeTextCycle already centres the text
             // via alignment="center". flex + align-items:center collapses the
@@ -270,12 +274,9 @@ export default function Home() {
             pointerEvents: "none",
             opacity: vaporFading ? 0 : 1,
             transition: "opacity 0.6s ease",
-            // Single modest drop-shadow only — the previous three-layer filter
-            // (brightness×2.6 + three drop-shadows at 12/50/100px blur) was forcing
-            // the browser to rasterize the full-screen canvas into an offscreen texture
-            // and run three separable blur passes on it every frame, which hammered the
-            // GPU compositor and made cursor movement feel extremely laggy.
-            // One 24px drop-shadow is imperceptible in quality but ~50× cheaper.
+            // Single modest drop-shadow — safe now that VaporizeTextCycle uses
+            // main-thread canvas rendering (CSS filters are incompatible with
+            // OffscreenCanvas compositing; the OffscreenCanvas path is disabled).
             filter: "drop-shadow(0 0 24px rgba(255,255,255,0.9))",
           }}
         >

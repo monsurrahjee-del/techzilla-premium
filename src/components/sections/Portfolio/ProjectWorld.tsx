@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useMemo, Suspense } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useGLTF, Html } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { projects } from "@/lib/projects";
 
@@ -128,19 +128,23 @@ function CityModel() {
 }
 
 // ── Ground circle ─────────────────────────────────────────────────────────────
+// Html elements from @react-three/drei are intentionally NOT used here.
+// Each Html element forces a DOM style update (CSS transform) on every single
+// R3F frame — 7 stations × 60 fps = 420 synchronous DOM mutations per second.
+// Those mutations run on the main thread between RAF callbacks, which starves
+// the mousemove event queue and makes the cursor feel extremely sluggish.
+// Station names already appear in the project info card (right side panel)
+// when the car is near, so the floating labels are redundant.
 function GroundCircle({
   index,
   accent,
   isNear,
-  isClose,
 }: {
   index:   number;
   accent:  string;
   isNear:  boolean;
-  isClose: boolean;
 }) {
-  const { x, z, icon } = STATIONS[index];
-  const project = projects[index];
+  const { x, z } = STATIONS[index];
   const ringRef = useRef<THREE.Mesh>(null!);
   const tmr     = useRef(Math.random() * Math.PI * 2);
 
@@ -167,29 +171,6 @@ function GroundCircle({
         <ringGeometry args={[3.2, 4.2, 40]} />
         <meshBasicMaterial color={accent} transparent opacity={0.4} depthWrite={false} />
       </mesh>
-
-      {/* Floating name label */}
-      <Html position={[x, ROAD_Y + 8, z]} center distanceFactor={55}
-        style={{ pointerEvents: "none" }} zIndexRange={[0, 10]}>
-        <div style={{
-          background: `${accent}55`,
-          border: `1.5px solid ${accent}`,
-          borderRadius: "8px",
-          padding: "5px 12px",
-          color: "#fff",
-          fontSize: "12px",
-          fontWeight: 700,
-          whiteSpace: "nowrap",
-          fontFamily: "system-ui, -apple-system, sans-serif",
-          textShadow: "0 1px 3px rgba(0,0,0,0.9)",
-          letterSpacing: "0.02em",
-          opacity:    isClose ? 0 : 1,
-          transition: "opacity 0.4s ease",
-          pointerEvents: "none",
-        }}>
-          {icon} {project.title}
-        </div>
-      </Html>
 
       {/* Glow light when near */}
       {isNear && (
@@ -758,8 +739,7 @@ function Scene({
             key={i}
             index={i}
             accent={p.accent}
-            isNear={nearIdx  === i}
-            isClose={closeIdx === i}
+            isNear={nearIdx === i}
           />
         );
       })}
