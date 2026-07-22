@@ -117,7 +117,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
     setAutoTargetIdx(0);
     setAutopilotTarget(null);
     setHintHidden(true);
-    setColorsHidden(true);
+    setColorsHidden(false); // keep colour panel visible until Start Tour is clicked
   };
 
   const selectManual = () => {
@@ -143,6 +143,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
 
   const handleStartTour = () => {
     setRccgUnlocked(false); // re-lock RCCG at every tour start
+    setColorsHidden(true);  // hide colour panel once the tour begins
     setTourId(id => id + 1);
     driveToStation(0);
   };
@@ -326,8 +327,8 @@ export default function Portfolio({ active = false }: PortfolioProps) {
         )}
       </button>
 
-      {/* ── Car colour picker — manual mode only ── */}
-      {isManual && (
+      {/* ── Car colour picker — manual mode, OR auto mode before tour starts ── */}
+      {(isManual || (mode === "auto" && !tourStarted)) && (
         <div className={`${styles.colorPanel} ${isDark ? styles.colorPanelDark : styles.colorPanelLight} ${colorsHidden ? styles.hidden : ""}`}>
           <div className={styles.colorRow}>
             <span className={`${styles.colorLabel} ${isDark ? styles.colorLabelDark : styles.colorLabelLight}`}>Body</span>

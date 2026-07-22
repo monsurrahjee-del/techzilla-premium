@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState, useMemo, Suspense } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { projects } from "@/lib/projects";
@@ -272,28 +272,6 @@ function Car({ carRef, colors, theme }: {
       )}
     </group>
   );
-}
-
-// ── Building-collision detector ───────────────────────────────────────────────
-const _bcRay    = new THREE.Raycaster();
-const _bcDown   = new THREE.Vector3(0, -1, 0);
-const _bcOrigin = new THREE.Vector3();
-const BLDG_Y_MARGIN = 1.5;
-
-function isBuilding(
-  x: number,
-  z: number,
-  scene: THREE.Scene,
-  excludeObj?: THREE.Object3D | null,
-): boolean {
-  _bcOrigin.set(x, ROAD_Y + 40, z);
-  _bcRay.set(_bcOrigin, _bcDown);
-  const targets = excludeObj
-    ? scene.children.filter(c => c !== excludeObj)
-    : scene.children;
-  const hits = _bcRay.intersectObjects(targets, true);
-  if (hits.length === 0) return false;
-  return hits[0].point.y > ROAD_Y + BLDG_Y_MARGIN;
 }
 
 // ── Pre-allocated vectors ─────────────────────────────────────────────────────
@@ -642,21 +620,11 @@ function Scene({
       carOrientRef.current -= (forwardDelta * TURN_RAD * 0.02) * wheelOrRef.current;
       const newX = posRef.current.x + Math.sin(carOrientRef.current) * forwardDelta;
       const newZ = posRef.current.z + Math.cos(carOrientRef.current) * forwardDelta;
-      const cx = clamp(newX, CITY_MIN_X, CITY_MAX_X);
-      const cz = clamp(newZ, CITY_MIN_Z, CITY_MAX_Z);
-      // Only run the (expensive) building raycaster when the car is actually
-      // moving. At rest forwardDelta ≈ 0 so cx ≈ posRef.current.x and
-      // cz ≈ posRef.current.z — the collision check would always pass anyway.
-      // Skipping it when stationary eliminates two full scene-graph traversals
-      // per frame, which was the primary cause of main-thread stalls that made
-      // the cursor feel sluggish everywhere on the page.
-      if (Math.abs(forwardDelta) > 0.001) {
-        if (!isBuilding(cx, posRef.current.z, state.scene, carRef.current)) posRef.current.x = cx;
-        if (!isBuilding(posRef.current.x, cz, state.scene, carRef.current)) posRef.current.z = cz;
-      } else {
-        posRef.current.x = cx;
-        posRef.current.z = cz;
-      }
+      // Clamp to city bounds only — building collision raycasting removed because
+      // it traversed the entire scene mesh every frame and was the primary cause
+      // of main-thread stalls that made the cursor feel sluggish everywhere.
+      posRef.current.x = clamp(newX, CITY_MIN_X, CITY_MAX_X);
+      posRef.current.z = clamp(newZ, CITY_MIN_Z, CITY_MAX_Z);
     }
 
     // ── Sync car mesh ─────────────────────────────────────────────────────────
@@ -753,6 +721,28 @@ function Scene({
   );
 }
 
+// ── 30 fps frame driver ───────────────────────────────────────────────────────
+// The Canvas uses frameloop="demand" so Three.js only renders when invalidate()
+// is called. This driver calls it at a capped 30 fps, giving the browser ~33 ms
+// between renders — more than enough for mousemove events to be processed
+// smoothly. At 60 fps the 16 ms budget is exhausted by WebGL submissions,
+// leaving almost no slack for input event handling.
+function FrameDriver() {
+  const { invalidate } = useThree();
+  useEffect(() => {
+    const TARGET_MS = 1000 / 30;
+    let last = 0;
+    let rafId: number;
+    const drive = (ts: number) => {
+      if (ts - last >= TARGET_MS) { last = ts; invalidate(); }
+      rafId = requestAnimationFrame(drive);
+    };
+    rafId = requestAnimationFrame(drive);
+    return () => cancelAnimationFrame(rafId);
+  }, [invalidate]);
+  return null;
+}
+
 // ── Exported component ────────────────────────────────────────────────────────
 interface ProjectWorldProps {
   onNearProject:     (idx: number | null) => void;
@@ -780,9 +770,11 @@ export default function ProjectWorld({
       }}
       style={{ width: "100%", height: "100%" }}
       gl={{ antialias: false, alpha: false, powerPreference: "high-performance" }}
-      dpr={[0.5, 0.9]}
-      performance={{ min: 0.3 }}
+      dpr={[0.4, 0.8]}
+      performance={{ min: 0.2 }}
+      frameloop="demand"
     >
+      <FrameDriver />
       <color attach="background" args={[bg]} />
       <Scene
         onNearProject={onNearProject}

@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, startTransition } from "react";
-import Hero      from "@/components/sections/Hero";
-import About     from "@/components/sections/About/About";
-import Services  from "@/components/sections/Services/Services";
-import Portfolio from "@/components/sections/Portfolio/Portfolio";
-import VaporizeTextCycle, { Tag } from "@/components/ui/VaporizeTextCycle";
-import styles    from "./page.module.css";
+import Hero        from "@/components/sections/Hero";
+import About       from "@/components/sections/About/About";
+import Services    from "@/components/sections/Services/Services";
+import Portfolio   from "@/components/sections/Portfolio/Portfolio";
+import VapourWords from "@/components/ui/VapourWords";
+import styles      from "./page.module.css";
 
 export default function Home() {
   const heroRef      = useRef<HTMLDivElement>(null);
@@ -31,18 +31,7 @@ export default function Home() {
   // Once vapor has played once, it never plays again for the rest of the session.
   const VAPOR_SESSION_KEY = "tz_vapor_done";
 
-  /* Font size for the vapor overlay */
-  const [vaporFontSize, setVaporFontSize] = useState("240px");
-  useEffect(() => {
-    const calc = () => {
-      const byWidth  = Math.floor((window.innerWidth  * 0.8) / (8 * 0.52));
-      const byHeight = Math.floor(window.innerHeight  * 0.38);
-      setVaporFontSize(`${Math.min(byWidth, byHeight, 380)}px`);
-    };
-    calc();
-    window.addEventListener("resize", calc);
-    return () => window.removeEventListener("resize", calc);
-  }, []);
+  // (font size no longer needed — VapourWords uses CSS clamp())
 
   /* Scroll-driven state logic
      Visual transforms are handled by CSS scroll-driven animations on
@@ -262,39 +251,17 @@ export default function Home() {
           style={{
             position: "fixed",
             inset: 0,
-            // Explicit dimensions are belt-and-suspenders for browsers that
-            // occasionally mis-resolve inset:0 height inside filter contexts.
-            width: "100vw",
-            height: "100vh",
             zIndex: 200,
-            // No flex layout here — VaporizeTextCycle already centres the text
-            // via alignment="center". flex + align-items:center collapses the
-            // child's height:100% to ~20 px (canvas minHeight), making the
-            // canvas too small and rendering the text invisible.
+            // Dark background so white vapour text is always clearly visible
+            background: "#030612",
             pointerEvents: "none",
             opacity: vaporFading ? 0 : 1,
             transition: "opacity 0.6s ease",
-            // Single modest drop-shadow — safe now that VaporizeTextCycle uses
-            // main-thread canvas rendering (CSS filters are incompatible with
-            // OffscreenCanvas compositing; the OffscreenCanvas path is disabled).
-            filter: "drop-shadow(0 0 24px rgba(255,255,255,0.9))",
           }}
         >
-          <VaporizeTextCycle
-            texts={["The", "Services", "We", "Provide"]}
-            font={{
-              fontFamily: "Geist, system-ui, sans-serif",
-              fontSize: vaporFontSize,
-              fontWeight: 900,
-            }}
-            color="rgb(255, 255, 255)"
-            spread={4}
-            density={2}
-            animation={{ vaporizeDuration: 1.0, fadeInDuration: 0.5, waitDuration: 0.3 }}
-            direction="left-to-right"
-            alignment="center"
-            tag={Tag.H1}
-            forceActive={true}
+          <VapourWords
+            words={["The", "Services", "We", "Provide"]}
+            active={vaporRevealed && !vaporFading}
             onComplete={handleVaporComplete}
           />
         </div>
