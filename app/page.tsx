@@ -144,7 +144,10 @@ export default function Home() {
         frozenScrollRef.current = Math.round(currentMax * 0.75);
         vaporActiveRef.current  = true;
         window.dispatchEvent(new CustomEvent("services-section-active", { detail: { active: false } }));
-        startTransition(() => setVaporRevealed(true));
+        // Do NOT wrap in startTransition — vapor must appear immediately (urgent update).
+        // startTransition marks it as deferrable, which lets React skip the render while
+        // the user is scrolling and produces a blank overlay until React is idle.
+        setVaporRevealed(true);
       }
     };
 
@@ -266,7 +269,13 @@ export default function Home() {
             pointerEvents: "none",
             opacity: vaporFading ? 0 : 1,
             transition: "opacity 0.6s ease",
-            filter: "brightness(2.6) drop-shadow(0 0 12px rgba(255,255,255,1)) drop-shadow(0 0 50px rgba(255,255,255,0.85)) drop-shadow(0 0 100px rgba(255,255,255,0.6))",
+            // Single modest drop-shadow only — the previous three-layer filter
+            // (brightness×2.6 + three drop-shadows at 12/50/100px blur) was forcing
+            // the browser to rasterize the full-screen canvas into an offscreen texture
+            // and run three separable blur passes on it every frame, which hammered the
+            // GPU compositor and made cursor movement feel extremely laggy.
+            // One 24px drop-shadow is imperceptible in quality but ~50× cheaper.
+            filter: "drop-shadow(0 0 24px rgba(255,255,255,0.9))",
           }}
         >
           <VaporizeTextCycle

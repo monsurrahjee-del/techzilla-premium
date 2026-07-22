@@ -460,22 +460,25 @@ export default function SplashCursor({
     function updateFrame() {
       if (!isActive) return;
       if (!pausedRef.current) {
-        // Full simulation path
+        // Full simulation path — hero section is active.
         pauseFrameCount = 0;
         const dt = calcDeltaTime();
         if (resizeCanvas()) initFramebuffers();
         updateColors(dt); applyInputs(); step(dt);
         render(null);
-      } else {
-        // Paused: render once every 30 frames (~2×/s at 60 fps) to prevent
-        // the browser discarding the WebGL compositing layer, without burning
-        // meaningful GPU on an invisible canvas.
+      } else if (!hiddenRef.current) {
+        // Paused but still visible (transitioning): keep the WebGL compositing
+        // layer alive with an occasional render so the browser doesn't discard it.
         pauseFrameCount++;
         if (pauseFrameCount >= 30) {
           pauseFrameCount = 0;
           render(null);
         }
       }
+      // If BOTH hidden AND paused (clearly off the hero section): do NO GL work
+      // at all. The RAF callback still fires so we can detect when the section
+      // becomes active again, but zero GPU commands are issued — no texture
+      // samples, no draw calls, nothing that competes with other sections' WebGL.
       animationFrameId.current = requestAnimationFrame(updateFrame);
     }
 

@@ -231,8 +231,13 @@ export default function Portfolio({ active = false }: PortfolioProps) {
     <section className={`${styles.section} ${isDark ? styles.dark : styles.light}`}>
 
       {/* Three.js canvas */}
+      {/* Render ProjectWorld only while Portfolio is active. Once mounted is true
+          the preloader/mode state in Portfolio survives, but the R3F scene itself
+          (and its 60fps RAF render loop) is torn down the moment Portfolio leaves
+          view and restarted when it re-enters. This stops the Three.js GPU work
+          from accumulating and slowing cursor movement on every other section. */}
       <div className={styles.canvasWrap}>
-        {mounted && (
+        {mounted && active && (
           <ProjectWorld
             onNearProject={handleNear}
             onAtBoundary={handleAtBoundary}
