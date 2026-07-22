@@ -412,6 +412,7 @@ function Scene({
   const curCloseRef  = useRef<number | null>(null);
   const atBoundRef   = useRef(false);
   const arrivedRef   = useRef(false);
+  const isReversingRef = useRef(false);   // true while driving backwards (Prev pressed)
 
   // Waypoint index along RECORDED_PATH — persists across station-to-station drives
   const waypointIdx = useRef(0);
@@ -436,26 +437,25 @@ function Scene({
   // so the car continues from its current waypoint index
   useEffect(() => {
     if (autopilotTarget === null) return;
+    isReversingRef.current = false;   // going forward — clear reverse flag
     arrivedRef.current = false;
   }, [autopilotTarget]);
 
-  // When "Prev" is pressed, rewind waypointIdx to just before the target station
-  // so the car drives a short forward approach instead of going all the way around.
+  // When "Prev" is pressed, find the waypoint nearest the car's CURRENT position
+  // and enable reverse mode so the car drives backwards along the recorded path.
   useEffect(() => {
-    if (rewindId === 0 || autopilotTarget === null) return;
-    const target = STATIONS[autopilotTarget];
-    // Find the waypoint in RECORDED_PATH closest to this station
+    if (autopilotRewindId === 0 || autopilotTarget === null) return;
+    // Find the waypoint in RECORDED_PATH closest to where the car is right now
     let bestIdx = 0;
     let bestDist = Infinity;
     for (let i = 0; i < RECORDED_PATH.length; i++) {
-      const dx = RECORDED_PATH[i].x - target.x;
-      const dz = RECORDED_PATH[i].z - target.z;
+      const dx = RECORDED_PATH[i].x - posRef.current.x;
+      const dz = RECORDED_PATH[i].z - posRef.current.z;
       const d = dx * dx + dz * dz;
       if (d < bestDist) { bestDist = d; bestIdx = i; }
     }
-    // Back up ~40 waypoints so the car has a clean run-up
-    waypointIdx.current = Math.max(0, bestIdx - 40);
-    posRef.current = { ...RECORDED_PATH[waypointIdx.current] };
+    waypointIdx.current = bestIdx;
+    isReversingRef.current = true;    // drive backwards from here
     arrivedRef.current = false;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autopilotRewindId]);
@@ -508,7 +508,7 @@ function Scene({
       const AUTO_SPEED = 22;
 
       if (!arrivedRef.current) {
-        // Check if we've reached the target station
+        // Check if we've reached the target station (works for both directions)
         const targetSt = STATIONS[autopilotTarget];
         const sdx = posRef.current.x - targetSt.x;
         const sdz = posRef.current.z - targetSt.z;
@@ -516,13 +516,57 @@ function Scene({
 
         if (stationDist < ARRIVE_DIST) {
           // Stop at this station
+          isReversingRef.current = false;
           arrivedRef.current = true;
           speedRef.current   = 0;
           wheelOrRef.current = 0;
           onAutoArrived();
+        } else if (isReversingRef.current) {
+          // ── Reverse: walk BACKWARDS along RECORDED_PATH ─────────────────
+          let budget = AUTO_SPEED * dt;
+          let steerDx = 0, steerDz = 0;
+
+          while (budget > 0.0001) {
+            // Wrap around to end of path if we reach the beginning
+            if (waypointIdx.current <= 0) {
+              waypointIdx.current = RECORDED_PATH.length - 1;
+            }
+            const prevIdx = waypointIdx.current - 1;
+            const wp  = RECORDED_PATH[Math.max(0, prevIdx)];
+            const dx  = wp.x - posRef.current.x;
+            const dz  = wp.z - posRef.current.z;
+            const seg = Math.sqrt(dx * dx + dz * dz);
+
+            if (seg < 0.0001) {
+              waypointIdx.current--;
+              continue;
+            }
+
+            steerDx = dx; steerDz = dz;
+
+            if (seg <= budget) {
+              posRef.current.x = wp.x;
+              posRef.current.z = wp.z;
+              budget -= seg;
+              waypointIdx.current--;
+            } else {
+              posRef.current.x += (dx / seg) * budget;
+              posRef.current.z += (dz / seg) * budget;
+              budget = 0;
+            }
+          }
+
+          if (Math.abs(steerDx) + Math.abs(steerDz) > 0.01) {
+            const len         = Math.sqrt(steerDx * steerDx + steerDz * steerDz);
+            const targetAngle = Math.atan2(-steerDx / len, -steerDz / len);
+            const angleDiff   = normaliseAngle(targetAngle - carOrientRef.current);
+            carOrientRef.current += angleDiff * Math.min(dt * 5, 1);
+          }
+
+          speedRef.current   = AUTO_SPEED / MOV_SCALE;
+          wheelOrRef.current = THREE.MathUtils.lerp(wheelOrRef.current, 0, Math.min(dt * 4, 1));
         } else {
-          // Continuous path following — consume exactly AUTO_SPEED * dt units
-          // along RECORDED_PATH with no per-waypoint pause frames.
+          // ── Forward: follow RECORDED_PATH in order ───────────────────────
           let budget = AUTO_SPEED * dt;        // world-units left to travel this frame
           let steerDx = 0, steerDz = 0;       // direction of the last segment moved
 
