@@ -259,7 +259,6 @@ function drawPhrases(
   W: number,
   H: number,
   progress: number,
-  opacity = 1,
 ) {
   if (progress <= 0) return;
   const fs = Math.round(clamp(W * 0.018, 12, 22));
@@ -269,7 +268,7 @@ function drawPhrases(
     const a = easeInOut(clamp((progress - i * 0.12) / 0.4, 0, 1));
     if (a <= 0) return;
     const { ax, ay } = PHRASE_POS[i];
-    ctx.globalAlpha = a * 0.80 * opacity;
+    ctx.globalAlpha = a * 0.80;
     ctx.fillStyle   = "#ffffff";
     ctx.textAlign   = "left";
     phrase.split("\n").forEach((line, li) => {
@@ -286,7 +285,6 @@ function drawHeadline(
   text: string,
   progress: number,
   yFrac = 0.50,
-  opacity = 1,
 ) {
   if (progress <= 0) return;
   const fs    = Math.round(clamp(W * 0.066, 32, 102));
@@ -297,7 +295,7 @@ function drawHeadline(
   ctx.textAlign    = "center";
   ctx.textBaseline = "middle";
   ctx.font         = `900 ${fs}px 'Inter','Helvetica Neue',Arial,sans-serif`;
-  ctx.globalAlpha  = easeInOut(progress) * opacity;
+  ctx.globalAlpha  = easeInOut(progress);
   lines.forEach((line, li) => {
     ctx.shadowColor = "rgba(0,80,220,0.65)";
     ctx.shadowBlur  = 36;
@@ -341,16 +339,13 @@ const CIRCULAR_CENTER = (
   </span>
 );
 
-/* ─── Phase boundaries ─────────────────────────────────────────────────────
- * The phases overlap so the outgoing content remains visible while the next
- * content enters. This avoids a hard cut between A, B, and C.
+/* ─── Phase boundaries (strict handoffs) ───────────────────────────────────
+ * A is finished when B begins, and B is finished when C begins. The content
+ * still enters and exits with its own within-phase easing, but never overlaps.
  */
-//  Phase A: 0.62 → 0.80   "TURN YOUR DREAMS TO REALITY"
-//  Phase B: 0.70 → 0.91   Circular component + manifesto phrases
-//  Phase C: 0.84 → 1.00   "YOUR SATISFACTION ALWAYS"
-const PH_A_START = 0.62, PH_A_END = 0.80;
-const PH_B_START = 0.70, PH_B_END = 0.91;
-const PH_C_START = 0.84, PH_C_END = 1.00;
+const PH_A_START = 0.62, PH_A_END = 0.76;
+const PH_B_START = 0.76, PH_B_END = 0.87;
+const PH_C_START = 0.87, PH_C_END = 1.00;
 
 /* ─── Component ─────────────────────────────────────────────────────────── */
 const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
@@ -367,6 +362,43 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     rafId:         0,
   });
   const TOTAL = 5200;
+
+  const setVirtualScroll = (next: number) => {
+    const s = stateRef.current;
+    s.virtualScroll = clamp(next, 0, TOTAL);
+    window.dispatchEvent(
+      new CustomEvent("chess-reveal-progress", {
+        detail: { progress: s.virtualScroll / TOTAL },
+      }),
+    );
+  };
+
+  const applyVirtualDelta = (delta: number) => {
+    const s = stateRef.current;
+    const previous = s.virtualScroll;
+    setVirtualScroll(previous + delta);
+    if (s.virtualScroll <= 0 && delta < 0) {
+      s.active = false;
+      slideOut();
+      window.dispatchEvent(new CustomEvent("chess-reveal-mode", { detail: { active: false } }));
+      window.dispatchEvent(new CustomEvent("chess-reveal-dismissed"));
+    }
+  };
+
+  const seekVirtualScroll = (progress: number) => {
+    const s = stateRef.current;
+    if (!s.active) return;
+    const next = clamp(progress, 0, 1) * TOTAL;
+    if (next <= 0) {
+      s.virtualScroll = 0;
+      s.active = false;
+      slideOut();
+      window.dispatchEvent(new CustomEvent("chess-reveal-mode", { detail: { active: false } }));
+      window.dispatchEvent(new CustomEvent("chess-reveal-dismissed"));
+      return;
+    }
+    setVirtualScroll(next);
+  };
 
   const slideIn = () => {
     const w = wrapRef.current; if (!w) return;
@@ -387,16 +419,19 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       if (s.active) return;
       s.active        = true;
       s.virtualScroll = 0;
+      window.dispatchEvent(new CustomEvent("chess-reveal-mode", { detail: { active: true } }));
+      window.dispatchEvent(new CustomEvent("chess-reveal-progress", { detail: { progress: 0 } }));
       slideIn();
     },
     deactivate() {
       stateRef.current.active = false;
       slideOut(true);
+      window.dispatchEvent(new CustomEvent("chess-reveal-mode", { detail: { active: false } }));
     },
     scrollBy(delta: number) {
       const s = stateRef.current;
       if (!s.active) return;
-      s.virtualScroll = clamp(s.virtualScroll + delta, 0, TOTAL);
+      applyVirtualDelta(delta);
     },
   }));
 
@@ -426,14 +461,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       e.preventDefault();
       e.stopImmediatePropagation();
       const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-      s.virtualScroll = clamp(s.virtualScroll + delta, 0, TOTAL);
-
-      // Dismiss only when user scrolls back at the very start
-      if (s.virtualScroll <= 0 && delta < 0) {
-        s.active = false;
-        slideOut();
-        window.dispatchEvent(new CustomEvent("chess-reveal-dismissed"));
-      }
+      applyVirtualDelta(delta);
       // At the end — stay there; never auto-dismiss.
     };
 
@@ -444,12 +472,17 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       e.preventDefault();
       const dy = touchY - (e.touches[0]?.clientY ?? 0);
       touchY   = e.touches[0]?.clientY ?? 0;
-      s.virtualScroll = clamp(s.virtualScroll + dy * 3, 0, TOTAL);
+      applyVirtualDelta(dy * 3);
     };
 
     window.addEventListener("wheel",      onWheel,      { passive: false, capture: true });
     window.addEventListener("touchstart", onTouchStart, { passive: true  });
     window.addEventListener("touchmove",  onTouchMove,  { passive: false, capture: true });
+    const onRevealSeek = (e: Event) => {
+      const progress = (e as CustomEvent<{ progress?: number }>).detail?.progress;
+      if (typeof progress === "number") seekVirtualScroll(progress);
+    };
+    window.addEventListener("chess-reveal-seek", onRevealSeek);
 
     const tick = (ts: number) => {
       s.rafId = requestAnimationFrame(tick);
@@ -477,17 +510,13 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       const linesP = easeInOut(invlerp(0.40, 0.80, p));
       const pawnSpin = easeOut3(growP) * Math.PI * 6;
 
-      /* ── Overlapping phases and crossfade envelopes ────────────── */
-      const pA = easeInOut(invlerp(PH_A_START, 0.70, p));
-      const pB = easeInOut(invlerp(PH_B_START, 0.78, p));
-      const pC = easeInOut(invlerp(PH_C_START, 0.92, p));
-      const aAlpha =
-        easeInOut(invlerp(PH_A_START, 0.66, p)) *
-        (1 - easeInOut(invlerp(0.72, PH_A_END, p)));
-      const bAlpha =
-        easeInOut(invlerp(PH_B_START, 0.76, p)) *
-        (1 - easeInOut(invlerp(0.84, PH_B_END, p)));
-      const cAlpha = easeInOut(invlerp(PH_C_START, 0.91, p));
+      /* ── Strict handoff progress ───────────────────────────────── */
+      const inPhaseA = p >= PH_A_START && p < PH_A_END;
+      const inPhaseB = p >= PH_B_START && p < PH_B_END;
+      const inPhaseC = p >= PH_C_START;
+      const pA = inPhaseA ? invlerp(PH_A_START, PH_A_END, p) : 0;
+      const pB = inPhaseB ? invlerp(PH_B_START, PH_B_END, p) : 0;
+      const pC = inPhaseC ? invlerp(PH_C_START, PH_C_END, p) : 0;
 
       /* ── 1. Background ────────────────────────────────────────── */
       ctx.fillStyle = "#030508";
@@ -497,7 +526,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       drawGrid(ctx, W, H, introP * (1 - blueP * 0.95));
 
       /* ── 3. Warp lines (background; reduced during Phase B) ───── */
-       const warpIntensity = lerp(linesP, linesP * 0.30, bAlpha);
+      const warpIntensity = inPhaseB ? linesP * 0.30 : linesP;
       drawWarpLines(ctx, cx, cy, W, H, warpIntensity, s.time);
 
       /* ── 4. Blue fill ─────────────────────────────────────────── */
@@ -506,47 +535,52 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       /* ── 5. HUD brackets ──────────────────────────────────────── */
       drawCornerBrackets(ctx, W, H, introP * (1 - blueP * 0.5));
 
-      /* ── 7. Chess piece fades behind the final phase ──────────── */
+      /* ── 7. Chess piece (hidden during Phase C) ────────────────── */
       const maxH   = H * 0.52;
       const minH   = maxH * 0.04;
       const sizeT  = easeOut3(clamp(growP + morphP * 0.30, 0, 1));
       const pieceH = lerp(minH, maxH, sizeT);
       const pieceCY = cy - H * 0.03;
-      const pieceAlpha = introP * (1 - cAlpha);
-      if (morphP < 1 && pawnRef.current) {
-        drawPiece(ctx, pawnRef.current, cx, pieceCY, pieceH, pieceAlpha * (1 - morphP), pawnSpin);
-      }
-      if (morphP > 0 && queenRef.current) {
-        drawPiece(ctx, queenRef.current, cx, pieceCY, pieceH, pieceAlpha * clamp(morphP * 1.6, 0, 1));
+      if (!inPhaseC) {
+        if (morphP < 1 && pawnRef.current) {
+          drawPiece(ctx, pawnRef.current, cx, pieceCY, pieceH, introP * (1 - morphP), pawnSpin);
+        }
+        if (morphP > 0 && queenRef.current) {
+          drawPiece(ctx, queenRef.current, cx, pieceCY, pieceH, introP * clamp(morphP * 1.6, 0, 1));
+        }
       }
 
       // PHASE A — "TURN YOUR DREAMS TO REALITY"
-      drawHeadline(ctx, W, H, "TURN YOUR\nDREAMS TO\nREALITY", pA, 0.50, aAlpha);
+      if (inPhaseA) {
+        drawHeadline(ctx, W, H, "TURN YOUR\nDREAMS TO\nREALITY", easeInOut(pA), 0.50);
+      }
 
-      // PHASE B — Manifesto phrases, crossfading with A and C
-      drawPhrases(ctx, W, H, pB, bAlpha);
+      // PHASE B — Manifesto phrases
+      if (inPhaseB) {
+        drawPhrases(ctx, W, H, pB);
+      }
 
-      // PHASE C — Final screen, entering while B is still fading out
-      if (cAlpha > 0) {
+      // PHASE C — Final screen
+      if (inPhaseC) {
         ctx.save();
-        ctx.globalAlpha = cAlpha * 0.88;
+        ctx.globalAlpha = easeInOut(pC) * 0.88;
         ctx.fillStyle   = "#030508";
         ctx.fillRect(0, 0, W, H);
         ctx.restore();
         // Warp lines on top of dark fill
         drawWarpLines(ctx, cx, cy, W, H, 0.28, s.time * 0.6);
         // Final text — 3 lines
-        drawHeadline(ctx, W, H, "YOUR\nSATISFACTION\nALWAYS", pC, 0.44, cAlpha);
+        drawHeadline(ctx, W, H, "YOUR\nSATISFACTION\nALWAYS", easeInOut(pC), 0.44);
         if (queenRef.current) {
-          drawPiece(ctx, queenRef.current, cx, cy + H * 0.27, H * 0.18, cAlpha * 0.60);
+          drawPiece(ctx, queenRef.current, cx, cy + H * 0.27, H * 0.18, easeInOut(pC) * 0.60);
         }
-        drawCornerBrackets(ctx, W, H, cAlpha * 0.70);
+        drawCornerBrackets(ctx, W, H, easeInOut(pC) * 0.70);
       }
 
-      /* ── Circular overlay — crossfades between A and C ────────── */
+      /* ── Circular overlay — visible only during Phase B ────────── */
       if (circularRef.current) {
-        circularRef.current.style.opacity       = bAlpha.toFixed(3);
-        circularRef.current.style.pointerEvents = bAlpha > 0.01 ? "auto" : "none";
+        circularRef.current.style.opacity       = inPhaseB ? "1" : "0";
+        circularRef.current.style.pointerEvents = inPhaseB ? "auto" : "none";
       }
 
       /* ── Status bar ───────────────────────────────────────────── */
@@ -561,6 +595,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       window.removeEventListener("wheel",      onWheel,      { capture: true } as EventListenerOptions);
       window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("touchmove",  onTouchMove,  { capture: true } as EventListenerOptions);
+      window.removeEventListener("chess-reveal-seek", onRevealSeek);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -35,7 +35,6 @@ const TargetCursor = ({
   const spinnerRef = useRef<HTMLDivElement>(null);
 
   const cornersRef = useRef<NodeListOf<Element> | null>(null);
-  const spinTl = useRef<gsap.core.Timeline | null>(null);
   const dotRef = useRef<HTMLDivElement>(null);
 
   // Viewport coords of the cursor — used by tickerFn, scrollHandler, enterHandler.
@@ -87,7 +86,6 @@ const TargetCursor = ({
 
     let activeTarget: Element | null = null;
     let currentLeaveHandler: (() => void) | null = null;
-    let resumeTimeout: ReturnType<typeof setTimeout> | null = null;
 
     const cleanupTarget = (target: Element) => {
       if (currentLeaveHandler) {
@@ -101,18 +99,6 @@ const TargetCursor = ({
     const initY = window.innerHeight / 2;
     cursorPosRef.current = { x: initX, y: initY };
     cursor.style.transform = `translate3d(${initX}px, ${initY}px, 0)`;
-
-    // ── Spin animation — ONLY on the spinner child, never on cursor wrapper ─
-    const createSpinTimeline = () => {
-      if (spinTl.current) {
-        spinTl.current.kill();
-      }
-      spinTl.current = gsap
-        .timeline({ repeat: -1 })
-        .to(spinner, { rotation: '+=360', duration: spinDuration, ease: 'none' });
-    };
-
-    createSpinTimeline();
 
     // Keep target corners on the same direct path as the cursor. The previous
     // GSAP ticker created four new tweens on every frame while hovering a
@@ -137,15 +123,18 @@ const TargetCursor = ({
       moveCursor(sample.clientX, sample.clientY);
       updateTargetCorners();
     };
-    // Prefer raw hardware samples when available. Pointermove is the
-    // compatibility path and still consumes coalesced samples when exposed.
-    const moveEvent =
-      'onpointerrawupdate' in window
-        ? 'pointerrawupdate'
-        : 'PointerEvent' in window
-          ? 'pointermove'
-          : 'mousemove';
-    window.addEventListener(moveEvent, moveHandler as EventListener, { passive: true });
+    // Listen to both pointer paths. Some browsers expose raw updates but do
+    // not emit them for every device; the standard path guarantees coverage,
+    // while coalesced samples keep the latest hardware position 1:1.
+    const pointerEvents = ['pointerrawupdate', 'pointermove'];
+    const usePointerEvents = 'PointerEvent' in window;
+    if (usePointerEvents) {
+      pointerEvents.forEach((eventName) => {
+        window.addEventListener(eventName, moveHandler as EventListener, { passive: true });
+      });
+    } else {
+      window.addEventListener('mousemove', moveHandler as EventListener, { passive: true });
+    }
 
     const scrollHandler = () => {
       if (!activeTarget || !cursorRef.current) return;
@@ -200,17 +189,10 @@ const TargetCursor = ({
       if (activeTarget) {
         cleanupTarget(activeTarget);
       }
-      if (resumeTimeout) {
-        clearTimeout(resumeTimeout);
-        resumeTimeout = null;
-      }
-
       activeTarget = target;
       corners.forEach(corner => gsap.killTweensOf(corner, 'x,y'));
 
-      gsap.killTweensOf(spinner, 'rotation');
-      spinTl.current?.pause();
-      gsap.set(spinner, { rotation: 0 });
+      spinner.style.animationPlayState = 'paused';
 
       if (cursorColorOnTarget) {
         gsap.to(corners, {
@@ -279,25 +261,7 @@ const TargetCursor = ({
           });
         }
 
-        resumeTimeout = setTimeout(() => {
-          if (!activeTarget && spinnerRef.current && spinTl.current) {
-            const currentRotation = gsap.getProperty(spinner, 'rotation') as number;
-            const normalizedRotation = currentRotation % 360;
-            spinTl.current.kill();
-            spinTl.current = gsap
-              .timeline({ repeat: -1 })
-              .to(spinner, { rotation: '+=360', duration: spinDuration, ease: 'none' });
-            gsap.to(spinner, {
-              rotation: normalizedRotation + 360,
-              duration: spinDuration * (1 - normalizedRotation / 360),
-              ease: 'none',
-              onComplete: () => {
-                spinTl.current?.restart();
-              }
-            });
-          }
-          resumeTimeout = null;
-        }, 50);
+        spinner.style.animationPlayState = 'running';
 
         cleanupTarget(target);
       };
@@ -310,7 +274,13 @@ const TargetCursor = ({
 
     // ── Cleanup ────────────────────────────────────────────────────────────
     return () => {
-      window.removeEventListener(moveEvent, moveHandler as EventListener);
+      if (usePointerEvents) {
+        pointerEvents.forEach((eventName) => {
+          window.removeEventListener(eventName, moveHandler as EventListener);
+        });
+      } else {
+        window.removeEventListener('mousemove', moveHandler as EventListener);
+      }
       window.removeEventListener('mouseover', enterHandler as EventListener);
       window.removeEventListener('scroll', scrollHandler);
       window.removeEventListener('mousedown', mouseDownHandler);
@@ -320,7 +290,6 @@ const TargetCursor = ({
         cleanupTarget(activeTarget);
       }
 
-      spinTl.current?.kill();
       document.body.style.cursor = originalCursor;
 
       isActiveRef.current = false;
@@ -338,13 +307,8 @@ const TargetCursor = ({
   ]);
 
   useEffect(() => {
-    if (isMobile || !spinnerRef.current || !spinTl.current) return;
-    if (spinTl.current.isActive()) {
-      spinTl.current.kill();
-      spinTl.current = gsap
-        .timeline({ repeat: -1 })
-        .to(spinnerRef.current, { rotation: '+=360', duration: spinDuration, ease: 'none' });
-    }
+    if (isMobile || !spinnerRef.current) return;
+    spinnerRef.current.style.animationDuration = `${spinDuration}s`;
   }, [spinDuration, isMobile]);
 
   if (isMobile) {

@@ -21,7 +21,7 @@
   /* NO transform here — JS writes translate3d(x, y, 0) via style.transform in mousemove */
 }
 
-/* GSAP animates rotation on this element only */
+/* Rotation is isolated from pointer positioning and handled by CSS, not GSAP. */
 .target-cursor-spinner {
   position: absolute;
   top: 0;
@@ -29,6 +29,12 @@
   width: 0;
   height: 0;
   will-change: transform;
+  animation: target-cursor-spin 2s linear infinite;
+  animation-play-state: running;
+}
+
+@keyframes target-cursor-spin {
+  to { transform: rotate(360deg); }
 }
 
 .target-cursor-dot {
