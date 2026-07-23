@@ -48,19 +48,26 @@ export default function ScrollBar() {
       };
     };
 
+    const getThumbMetrics = () => {
+      const { scrollHeight, clientHeight } = getScrollInfo();
+      return {
+        trackH: track.clientHeight,
+        thumbH: Math.max(40, (clientHeight / scrollHeight) * track.clientHeight),
+      };
+    };
+
     const updateThumb = () => {
-      if (revealActive.current) {
-        const trackH = track.clientHeight;
-        const thumbH = Math.max(40, trackH * 0.12);
-        thumb.style.height = `${thumbH}px`;
-        thumb.style.transform = `translateY(${revealProgress.current * (trackH - thumbH)}px)`;
-        return;
-      }
       const { scrollTop, scrollHeight, clientHeight } = getScrollInfo();
       const docHeight = scrollHeight - clientHeight;
-      const progress  = docHeight > 0 ? scrollTop / docHeight : 0;
-      const trackH    = track.clientHeight;
-      const thumbH    = Math.max(40, (clientHeight / scrollHeight) * trackH);
+      // Keep the exact same thumb geometry across the whole website. The
+      // New page only swaps the progress source because its content uses
+      // virtual scroll; it does not create a differently sized scrollbar.
+      const progress = revealActive.current
+        ? revealProgress.current
+        : docHeight > 0
+          ? scrollTop / docHeight
+          : 0;
+      const { trackH, thumbH } = getThumbMetrics();
       thumb.style.height    = `${thumbH}px`;
       thumb.style.transform = `translateY(${progress * (trackH - thumbH)}px)`;
     };
@@ -125,8 +132,7 @@ export default function ScrollBar() {
     const onDocMouseMove = (e: MouseEvent) => {
       if (!dragging.current) return;
       if (revealActive.current) {
-        const trackH = track.clientHeight;
-        const thumbH = Math.max(40, trackH * 0.12);
+        const { trackH, thumbH } = getThumbMetrics();
         const progress = (e.clientY - track.getBoundingClientRect().top - thumbH / 2) /
           (trackH - thumbH);
         seekReveal(progress);
@@ -134,8 +140,7 @@ export default function ScrollBar() {
       }
       const { scrollHeight, clientHeight } = getScrollInfo();
       const docHeight = scrollHeight - clientHeight;
-      const trackH    = track.clientHeight;
-      const thumbH    = Math.max(40, (clientHeight / scrollHeight) * trackH);
+      const { trackH, thumbH } = getThumbMetrics();
       const dy        = e.clientY - dragStartY.current;
       const scrollDelta = (dy / (trackH - thumbH)) * docHeight;
       const newScroll   = Math.max(0, Math.min(docHeight, dragStartScroll.current + scrollDelta));
@@ -162,8 +167,7 @@ export default function ScrollBar() {
       if (e.target === thumb) return;
       if (revealActive.current) {
         const trackRect = track.getBoundingClientRect();
-        const trackH = track.clientHeight;
-        const thumbH = Math.max(40, trackH * 0.12);
+        const { trackH, thumbH } = getThumbMetrics();
         seekReveal((e.clientY - trackRect.top - thumbH / 2) / (trackH - thumbH));
         return;
       }
@@ -171,8 +175,7 @@ export default function ScrollBar() {
       const docHeight  = scrollHeight - clientHeight;
       const trackRect  = track.getBoundingClientRect();
       const clickY     = e.clientY - trackRect.top;
-      const trackH     = track.clientHeight;
-      const thumbH     = Math.max(40, (clientHeight / scrollHeight) * trackH);
+      const { trackH, thumbH } = getThumbMetrics();
       const progress   = Math.max(0, Math.min(1, (clickY - thumbH / 2) / (trackH - thumbH)));
       const newScroll  = progress * docHeight;
 
