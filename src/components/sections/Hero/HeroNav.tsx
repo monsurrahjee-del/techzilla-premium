@@ -6,13 +6,14 @@ import styles from "./Hero.module.css";
 import HeroClock from "./HeroClock";
 import { useLoaded } from "@/hooks/useLoaded";
 
-const NAV_ITEMS = ["Home", "Work", "Contact"] as const;
+const DEFAULT_NAV_ITEMS = ["Home", "Work", "Contact"] as const;
 
 interface HeroNavProps {
   theme: "dark" | "light";
   sound: boolean;
   onThemeToggle: () => void;
   onSoundToggle: () => void;
+  navItems?: string[];
 }
 
 export default function HeroNav({
@@ -20,6 +21,7 @@ export default function HeroNav({
   sound,
   onThemeToggle,
   onSoundToggle,
+  navItems = [...DEFAULT_NAV_ITEMS],
 }: HeroNavProps) {
   const loaded = useLoaded();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -43,8 +45,9 @@ export default function HeroNav({
         </div>
 
         <div className={styles.navCenter}>
-          <a href="#projects" className="cursor-target">Work</a>
-          <a href="#contact" className="cursor-target">Contact</a>
+          {navItems.filter(i => i !== "Home").map((item) => (
+            <a key={item} href={`#${item.toLowerCase()}`} className="cursor-target">{item}</a>
+          ))}
         </div>
 
         <div className={styles.navRight}>
@@ -101,7 +104,7 @@ export default function HeroNav({
 
             <div className={styles.mobileMenuBody}>
               <nav className={styles.mobileMenuLinks}>
-                {NAV_ITEMS.map((item, i) => (
+                {navItems.map((item, i) => (
                   <motion.div
                     key={item}
                     className={styles.mobileMenuLinkRow}

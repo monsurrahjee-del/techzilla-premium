@@ -124,6 +124,7 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
           sound={sound}
           onThemeToggle={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
           onSoundToggle={() => setSound((s) => !s)}
+          navItems={["Home", "Work", "About"]}
         />
 
         {/* ── Hero sticker cloud ── */}

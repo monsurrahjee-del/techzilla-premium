@@ -2,26 +2,29 @@
 
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Image from "next/image";
 import styles from "./Craft.module.css";
 import PlayingCard from "./PlayingCard";
 
+// Joker is always index 0 (the default starting card).
+// The 10 selectable characters follow at index 1-10.
 const CHARACTERS = [
-  { name: "Developer",     file: "/characters/developer.png",    label: "Software Dev" },
-  { name: "Doctor",        file: "/characters/doctor.png",       label: "Healthcare" },
-  { name: "Designer",      file: "/characters/designer.png",     label: "UI/UX Design" },
-  { name: "Chef",          file: "/characters/chef.png",         label: "Food & Beverage" },
-  { name: "Teacher",       file: "/characters/teacher.png",      label: "Education" },
-  { name: "Musician",      file: "/characters/musician.png",     label: "Music & Arts" },
-  { name: "Astronaut",     file: "/characters/astronaut.png",    label: "Exploration" },
-  { name: "Scientist",     file: "/characters/scientist.png",    label: "Research" },
-  { name: "Entrepreneur",  file: "/characters/entrepreneur.png", label: "Business" },
-  { name: "Artist",        file: "/characters/artist.png",       label: "Creative Arts" },
+  { name: "Joker",        file: "/characters/joker.png",        label: "Techzilla Joker" },
+  { name: "Developer",    file: "/characters/developer.png",    label: "Software Dev" },
+  { name: "Doctor",       file: "/characters/doctor.png",       label: "Healthcare" },
+  { name: "Designer",     file: "/characters/designer.png",     label: "UI/UX Design" },
+  { name: "Chef",         file: "/characters/chef.png",         label: "Food & Beverage" },
+  { name: "Teacher",      file: "/characters/teacher.png",      label: "Education" },
+  { name: "Musician",     file: "/characters/musician.png",     label: "Music & Arts" },
+  { name: "Astronaut",    file: "/characters/astronaut.png",    label: "Exploration" },
+  { name: "Scientist",    file: "/characters/scientist.png",    label: "Research" },
+  { name: "Entrepreneur", file: "/characters/entrepreneur.png", label: "Business" },
+  { name: "Artist",       file: "/characters/artist.png",       label: "Creative Arts" },
 ];
 
 function generateDiscountCode() {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  const seg = (n: number) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  const seg = (n: number) =>
+    Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
   return `TZ-${seg(4)}-${seg(4)}`;
 }
 
@@ -33,73 +36,112 @@ interface GiftCardDisplayProps {
   onClose: () => void;
 }
 
-function GiftCardDisplay({ businessName, discountCode, charIndex, onCharChange, onClose }: GiftCardDisplayProps) {
+function GiftCardDisplay({
+  businessName,
+  discountCode,
+  charIndex,
+  onCharChange,
+  onClose,
+}: GiftCardDisplayProps) {
   const [clicked, setClicked] = useState(false);
   const [downloadMsg, setDownloadMsg] = useState<string | null>(null);
 
   const char = CHARACTERS[charIndex];
 
   const handleCardClick = () => setClicked((p) => !p);
-  const handlePrev = () => onCharChange((charIndex - 1 + CHARACTERS.length) % CHARACTERS.length);
-  const handleNext = () => onCharChange((charIndex + 1) % CHARACTERS.length);
+  const handlePrev = () =>
+    onCharChange((charIndex - 1 + CHARACTERS.length) % CHARACTERS.length);
+  const handleNext = () =>
+    onCharChange((charIndex + 1) % CHARACTERS.length);
 
+  // Download: renders everything (including the character image) onto a 2× canvas
   const handleDownload = useCallback(() => {
-    const canvas = document.createElement("canvas");
-    const W = 320, H = Math.round(W * 16 / 9);
-    canvas.width = W * 2; canvas.height = H * 2;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.scale(2, 2);
+    const W = 400;
+    const H = Math.round(W * (16 / 9));
+    const color = clicked ? "#f12b30" : "#3662f4";
 
-    ctx.fillStyle = "#000";
-    ctx.roundRect(0, 0, W, H, 18);
-    ctx.fill();
+    const drawCard = (charImg: HTMLImageElement | null) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = W * 2;
+      canvas.height = H * 2;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.scale(2, 2);
 
-    // Brand text (Techzilla corner inscription)
-    ctx.fillStyle = clicked ? "#f12b30" : "#3662f4";
-    ctx.font = "bold 14px monospace";
-    ctx.fillText("T", 16, 34);
-    ctx.fillText("Z", 16, 54);
+      // Black card background
+      ctx.fillStyle = "#000";
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(0, 0, W, H, 22);
+      } else {
+        ctx.rect(0, 0, W, H);
+      }
+      ctx.fill();
 
-    // Mirrored at bottom-right
-    ctx.save();
-    ctx.translate(W - 16, H - 20);
-    ctx.scale(-1, -1);
-    ctx.fillText("T", 0, 20);
-    ctx.fillText("Z", 0, 40);
-    ctx.restore();
+      // Character image centered (drawn first so text overlays it)
+      if (charImg) {
+        const imgSize = W * 0.62;
+        const imgX = (W - imgSize) / 2;
+        const imgY = (H - imgSize) / 2;
+        ctx.drawImage(charImg, imgX, imgY, imgSize, imgSize);
+      }
 
-    // Company name
-    ctx.fillStyle = "rgba(255,255,255,0.6)";
-    ctx.font = "bold 8px monospace";
-    ctx.textAlign = "center";
-    ctx.fillText("TECHZILLA INC.", W / 2, H / 2 - 40);
+      // T / Z corner inscriptions — top-left
+      ctx.fillStyle = color;
+      ctx.font = "bold 20px monospace";
+      ctx.textAlign = "left";
+      ctx.fillText("T", 20, 42);
+      ctx.fillText("Z", 20, 66);
 
-    // Business name
-    ctx.fillStyle = "rgba(255,255,255,0.45)";
-    ctx.font = "7px monospace";
-    ctx.fillText(businessName.toUpperCase().slice(0, 22), W / 2, H / 2 - 28);
+      // Mirrored at bottom-right
+      ctx.save();
+      ctx.translate(W - 20, H - 26);
+      ctx.scale(-1, -1);
+      ctx.fillText("T", 0, 24);
+      ctx.fillText("Z", 0, 48);
+      ctx.restore();
 
-    // Discount
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 32px sans-serif";
-    ctx.fillText("5% OFF", W / 2, H / 2 + 12);
+      // --- Overlay text (centred) ---
+      ctx.textAlign = "center";
 
-    // Code
-    ctx.fillStyle = "rgba(255,255,255,0.4)";
-    ctx.font = "7px monospace";
-    ctx.fillText(discountCode, W / 2, H / 2 + 32);
+      // TECHZILLA INC.
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.font = "bold 12px monospace";
+      ctx.fillText("TECHZILLA INC.", W / 2, H / 2 - 60);
 
-    ctx.textAlign = "left";
+      // Business name
+      ctx.fillStyle = "rgba(255,255,255,0.50)";
+      ctx.font = "10px monospace";
+      ctx.fillText(businessName.toUpperCase().slice(0, 22), W / 2, H / 2 - 42);
 
-    const link = document.createElement("a");
-    link.download = `techzilla-gift-${businessName.replace(/\s+/g, "-").toLowerCase()}.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
+      // 5% OFF
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 44px sans-serif";
+      ctx.fillText("5% OFF", W / 2, H / 2 + 20);
 
-    setDownloadMsg("Card downloaded!");
-    setTimeout(() => setDownloadMsg(null), 2500);
-  }, [businessName, discountCode, clicked]);
+      // Discount code
+      ctx.fillStyle = "rgba(255,255,255,0.42)";
+      ctx.font = "10px monospace";
+      ctx.fillText(discountCode, W / 2, H / 2 + 48);
+
+      ctx.textAlign = "left";
+
+      const link = document.createElement("a");
+      link.download = `techzilla-gift-${businessName.replace(/\s+/g, "-").toLowerCase()}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+
+      setDownloadMsg("Card downloaded!");
+      setTimeout(() => setDownloadMsg(null), 2500);
+    };
+
+    // Load the character image first, then draw
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => drawCard(img);
+    img.onerror = () => drawCard(null); // graceful fallback if image missing
+    img.src = char.file;
+  }, [businessName, discountCode, clicked, char]);
 
   return (
     <div className={styles.giftCardWrap}>
@@ -114,7 +156,6 @@ function GiftCardDisplay({ businessName, discountCode, charIndex, onCharChange, 
           &#8592;
         </button>
 
-        {/* PlayingCard — 100% as provided */}
         <div style={{ position: "relative", maxWidth: 240, width: "100%" }}>
           <PlayingCard
             componentId={`gift-card-${charIndex}`}
@@ -128,9 +169,10 @@ function GiftCardDisplay({ businessName, discountCode, charIndex, onCharChange, 
             horizontalPadding="14px"
             onCardClicked={handleCardClick}
             revealCanvas={true}
-            revealCanvasColors={clicked
-              ? [[241, 43, 48], [255, 100, 80]]
-              : [[54, 98, 244], [80, 140, 255]]
+            revealCanvasColors={
+              clicked
+                ? [[241, 43, 48], [255, 100, 80]]
+                : [[54, 98, 244], [80, 140, 255]]
             }
             inscriptionColor={clicked ? "#f12b30" : "#3662f4"}
             inscriptionColorHovered={clicked ? "#ff4444" : "#5580ff"}
@@ -141,13 +183,13 @@ function GiftCardDisplay({ businessName, discountCode, charIndex, onCharChange, 
             manualLetterSpacing={4}
           />
 
-          {/* Info overlay: TECHZILLA brand + business name + discount + code */}
+          {/* Info overlay centred on the card */}
           <div
             style={{
               position: "absolute",
               top: "50%",
               left: "50%",
-              transform: "translate(-50%, -50%)",
+              transform: "translate(-50%, -40%)",
               zIndex: 10,
               textAlign: "center",
               pointerEvents: "none",
@@ -155,7 +197,6 @@ function GiftCardDisplay({ businessName, discountCode, charIndex, onCharChange, 
               flexDirection: "column",
               alignItems: "center",
               gap: 2,
-              marginTop: 40,
             }}
           >
             <div style={{
@@ -218,6 +259,7 @@ function GiftCardDisplay({ businessName, discountCode, charIndex, onCharChange, 
           Download Card
         </button>
       </div>
+
       {downloadMsg && (
         <p style={{ fontSize: "0.65rem", color: "rgba(80,200,120,0.8)", letterSpacing: "0.08em", textAlign: "center" }}>
           {downloadMsg}
@@ -244,6 +286,8 @@ function GiftCardDisplay({ businessName, discountCode, charIndex, onCharChange, 
   );
 }
 
+/* ── GiftFlow shell (business-name input → card reveal) ─── */
+
 interface GiftFlowProps {
   onClose: () => void;
 }
@@ -252,6 +296,7 @@ export default function GiftFlow({ onClose }: GiftFlowProps) {
   const [step, setStep] = useState<"input" | "card">("input");
   const [businessName, setBusinessName] = useState("");
   const [discountCode] = useState(generateDiscountCode);
+  // Always start at index 0 — the Joker card
   const [charIndex, setCharIndex] = useState(0);
 
   const handleUnlock = (e: React.FormEvent) => {
@@ -267,7 +312,9 @@ export default function GiftFlow({ onClose }: GiftFlowProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
       >
         <motion.div
           className={styles.giftModal}
@@ -276,7 +323,9 @@ export default function GiftFlow({ onClose }: GiftFlowProps) {
           exit={{ opacity: 0, y: 20, scale: 0.97 }}
           transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
         >
-          <button className={styles.modalClose} onClick={onClose} aria-label="Close">✕</button>
+          <button className={styles.modalClose} onClick={onClose} aria-label="Close">
+            ✕
+          </button>
 
           <AnimatePresence mode="wait">
             {step === "input" && (
@@ -291,11 +340,22 @@ export default function GiftFlow({ onClose }: GiftFlowProps) {
                 <div className={styles.giftIcon}>🎁</div>
                 <div className={styles.giftTitle}>Claim Your Free Gift</div>
                 <div className={styles.giftSubtitle}>
-                  You&apos;ve unlocked a <span className={styles.giftHighlight}>5% discount</span> on your next project with Techzilla.
-                  Enter your business name to generate your personalised gift card.
+                  You&apos;ve unlocked a{" "}
+                  <span className={styles.giftHighlight}>5% discount</span> on your
+                  next project with Techzilla. Enter your business name to generate
+                  your personalised gift card.
                 </div>
 
-                <form onSubmit={handleUnlock} style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+                <form
+                  onSubmit={handleUnlock}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 16,
+                  }}
+                >
                   <input
                     className={styles.giftInput}
                     type="text"
@@ -312,7 +372,14 @@ export default function GiftFlow({ onClose }: GiftFlowProps) {
                   </button>
                 </form>
 
-                <p style={{ fontSize: "0.62rem", color: "rgba(255,255,255,0.25)", letterSpacing: "0.05em", margin: 0 }}>
+                <p
+                  style={{
+                    fontSize: "0.62rem",
+                    color: "rgba(255,255,255,0.25)",
+                    letterSpacing: "0.05em",
+                    margin: 0,
+                  }}
+                >
                   No credit card required. Gift applies to your first project quote.
                 </p>
               </motion.div>
