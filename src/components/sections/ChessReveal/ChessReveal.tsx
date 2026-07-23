@@ -254,7 +254,13 @@ const PHRASE_POS = [
   { ax: 0.065, ay: 0.36 },
   { ax: 0.065, ay: 0.62 },
 ];
-function drawPhrases(ctx: CanvasRenderingContext2D, W: number, H: number, progress: number) {
+function drawPhrases(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  progress: number,
+  opacity = 1,
+) {
   if (progress <= 0) return;
   const fs = Math.round(clamp(W * 0.018, 12, 22));
   ctx.save();
@@ -263,7 +269,7 @@ function drawPhrases(ctx: CanvasRenderingContext2D, W: number, H: number, progre
     const a = easeInOut(clamp((progress - i * 0.12) / 0.4, 0, 1));
     if (a <= 0) return;
     const { ax, ay } = PHRASE_POS[i];
-    ctx.globalAlpha = a * 0.80;
+    ctx.globalAlpha = a * 0.80 * opacity;
     ctx.fillStyle   = "#ffffff";
     ctx.textAlign   = "left";
     phrase.split("\n").forEach((line, li) => {
@@ -280,6 +286,7 @@ function drawHeadline(
   text: string,
   progress: number,
   yFrac = 0.50,
+  opacity = 1,
 ) {
   if (progress <= 0) return;
   const fs    = Math.round(clamp(W * 0.066, 32, 102));
@@ -290,7 +297,7 @@ function drawHeadline(
   ctx.textAlign    = "center";
   ctx.textBaseline = "middle";
   ctx.font         = `900 ${fs}px 'Inter','Helvetica Neue',Arial,sans-serif`;
-  ctx.globalAlpha  = easeInOut(progress);
+  ctx.globalAlpha  = easeInOut(progress) * opacity;
   lines.forEach((line, li) => {
     ctx.shadowColor = "rgba(0,80,220,0.65)";
     ctx.shadowBlur  = 36;
@@ -334,13 +341,16 @@ const CIRCULAR_CENTER = (
   </span>
 );
 
-/* ─── Phase boundaries (STRICTLY EXCLUSIVE — no overlap) ────────────────── */
-//  Phase A: 0.62 → 0.76   "TURN YOUR DREAMS TO REALITY"
-//  Phase B: 0.76 → 0.87   Circular component + manifesto phrases
-//  Phase C: 0.87 → 1.00   "YOUR SATISFACTION ALWAYS"
-const PH_A_START = 0.62, PH_A_END = 0.76;
-const PH_B_START = 0.76, PH_B_END = 0.87;
-const PH_C_START = 0.87, PH_C_END = 1.00;
+/* ─── Phase boundaries ─────────────────────────────────────────────────────
+ * The phases overlap so the outgoing content remains visible while the next
+ * content enters. This avoids a hard cut between A, B, and C.
+ */
+//  Phase A: 0.62 → 0.80   "TURN YOUR DREAMS TO REALITY"
+//  Phase B: 0.70 → 0.91   Circular component + manifesto phrases
+//  Phase C: 0.84 → 1.00   "YOUR SATISFACTION ALWAYS"
+const PH_A_START = 0.62, PH_A_END = 0.80;
+const PH_B_START = 0.70, PH_B_END = 0.91;
+const PH_C_START = 0.84, PH_C_END = 1.00;
 
 /* ─── Component ─────────────────────────────────────────────────────────── */
 const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
@@ -467,15 +477,17 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       const linesP = easeInOut(invlerp(0.40, 0.80, p));
       const pawnSpin = easeOut3(growP) * Math.PI * 6;
 
-      /* ── Strictly exclusive phases ────────────────────────────── */
-      const inPhaseA = p >= PH_A_START && p < PH_A_END;
-      const inPhaseB = p >= PH_B_START && p < PH_B_END;
-      const inPhaseC = p >= PH_C_START;
-
-      // Within-phase 0→1 progress (0 outside that phase)
-      const pA = inPhaseA ? invlerp(PH_A_START, PH_A_END, p) : 0;
-      const pB = inPhaseB ? invlerp(PH_B_START, PH_B_END, p) : 0;
-      const pC = inPhaseC ? invlerp(PH_C_START, PH_C_END, p) : 0;
+      /* ── Overlapping phases and crossfade envelopes ────────────── */
+      const pA = easeInOut(invlerp(PH_A_START, 0.70, p));
+      const pB = easeInOut(invlerp(PH_B_START, 0.78, p));
+      const pC = easeInOut(invlerp(PH_C_START, 0.92, p));
+      const aAlpha =
+        easeInOut(invlerp(PH_A_START, 0.66, p)) *
+        (1 - easeInOut(invlerp(0.72, PH_A_END, p)));
+      const bAlpha =
+        easeInOut(invlerp(PH_B_START, 0.76, p)) *
+        (1 - easeInOut(invlerp(0.84, PH_B_END, p)));
+      const cAlpha = easeInOut(invlerp(PH_C_START, 0.91, p));
 
       /* ── 1. Background ────────────────────────────────────────── */
       ctx.fillStyle = "#030508";
@@ -485,7 +497,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       drawGrid(ctx, W, H, introP * (1 - blueP * 0.95));
 
       /* ── 3. Warp lines (background; reduced during Phase B) ───── */
-      const warpIntensity = inPhaseB ? linesP * 0.30 : linesP;
+       const warpIntensity = lerp(linesP, linesP * 0.30, bAlpha);
       drawWarpLines(ctx, cx, cy, W, H, warpIntensity, s.time);
 
       /* ── 4. Blue fill ─────────────────────────────────────────── */
@@ -494,62 +506,47 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       /* ── 5. HUD brackets ──────────────────────────────────────── */
       drawCornerBrackets(ctx, W, H, introP * (1 - blueP * 0.5));
 
-      /* ── 7. Chess piece (hidden during Phase C — only small queen below text shown there) ── */
+      /* ── 7. Chess piece fades behind the final phase ──────────── */
       const maxH   = H * 0.52;
       const minH   = maxH * 0.04;
       const sizeT  = easeOut3(clamp(growP + morphP * 0.30, 0, 1));
       const pieceH = lerp(minH, maxH, sizeT);
       const pieceCY = cy - H * 0.03;
-      if (!inPhaseC) {
-        if (morphP < 1 && pawnRef.current) {
-          drawPiece(ctx, pawnRef.current, cx, pieceCY, pieceH, introP * (1 - morphP), pawnSpin);
-        }
-        if (morphP > 0 && queenRef.current) {
-          drawPiece(ctx, queenRef.current, cx, pieceCY, pieceH, introP * clamp(morphP * 1.6, 0, 1));
-        }
+      const pieceAlpha = introP * (1 - cAlpha);
+      if (morphP < 1 && pawnRef.current) {
+        drawPiece(ctx, pawnRef.current, cx, pieceCY, pieceH, pieceAlpha * (1 - morphP), pawnSpin);
       }
-
-      /* ────────────────────────────────────────────────────────────
-         STRICTLY EXCLUSIVE: A, B, C
-         Each block draws NOTHING from the other phases.
-         ──────────────────────────────────────────────────────────── */
+      if (morphP > 0 && queenRef.current) {
+        drawPiece(ctx, queenRef.current, cx, pieceCY, pieceH, pieceAlpha * clamp(morphP * 1.6, 0, 1));
+      }
 
       // PHASE A — "TURN YOUR DREAMS TO REALITY"
-      if (inPhaseA) {
-        drawHeadline(ctx, W, H, "TURN YOUR\nDREAMS TO\nREALITY", easeInOut(pA), 0.50);
-      }
+      drawHeadline(ctx, W, H, "TURN YOUR\nDREAMS TO\nREALITY", pA, 0.50, aAlpha);
 
-      // PHASE B — Manifesto phrases (canvas text, same as before)
-      if (inPhaseB) {
-        drawPhrases(ctx, W, H, pB);
-      }
+      // PHASE B — Manifesto phrases, crossfading with A and C
+      drawPhrases(ctx, W, H, pB, bAlpha);
 
-      // PHASE C — Final screen
-      if (inPhaseC) {
-        // Dark overlay wipes B content
+      // PHASE C — Final screen, entering while B is still fading out
+      if (cAlpha > 0) {
         ctx.save();
-        ctx.globalAlpha = easeInOut(pC) * 0.88;
+        ctx.globalAlpha = cAlpha * 0.88;
         ctx.fillStyle   = "#030508";
         ctx.fillRect(0, 0, W, H);
         ctx.restore();
         // Warp lines on top of dark fill
         drawWarpLines(ctx, cx, cy, W, H, 0.28, s.time * 0.6);
         // Final text — 3 lines
-        drawHeadline(ctx, W, H, "YOUR\nSATISFACTION\nALWAYS", easeInOut(pC), 0.44);
+        drawHeadline(ctx, W, H, "YOUR\nSATISFACTION\nALWAYS", pC, 0.44, cAlpha);
         if (queenRef.current) {
-          drawPiece(ctx, queenRef.current, cx, cy + H * 0.27, H * 0.18, easeInOut(pC) * 0.60);
+          drawPiece(ctx, queenRef.current, cx, cy + H * 0.27, H * 0.18, cAlpha * 0.60);
         }
-        drawCornerBrackets(ctx, W, H, easeInOut(pC) * 0.70);
+        drawCornerBrackets(ctx, W, H, cAlpha * 0.70);
       }
 
-      /* ── Circular overlay — shown ONLY during Phase B ─────────── */
+      /* ── Circular overlay — crossfades between A and C ────────── */
       if (circularRef.current) {
-        // Hard switch: visible only in Phase B, invisible otherwise
-        const showCircular = inPhaseB;
-        circularRef.current.style.opacity       = showCircular ? "1" : "0";
-        circularRef.current.style.pointerEvents = showCircular ? "auto" : "none";
-        // No CSS transition — the opacity change must be instant
-        circularRef.current.style.transition    = "none";
+        circularRef.current.style.opacity       = bAlpha.toFixed(3);
+        circularRef.current.style.pointerEvents = bAlpha > 0.01 ? "auto" : "none";
       }
 
       /* ── Status bar ───────────────────────────────────────────── */
@@ -576,7 +573,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     >
       <canvas ref={canvasRef} className={styles.canvas} />
 
-      {/* Circular component — Phase B only, hard switch via RAF loop */}
+      {/* Circular component — opacity follows the Phase B crossfade */}
       <div
         ref={circularRef}
         style={{
@@ -588,7 +585,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
           opacity: 0,
           pointerEvents: "none",
           zIndex: 10,
-          /* NO transition here — opacity toggled instantly by RAF */
+          /* The RAF loop writes the continuous opacity value directly. */
         }}
       >
         <CircularRevealHeading

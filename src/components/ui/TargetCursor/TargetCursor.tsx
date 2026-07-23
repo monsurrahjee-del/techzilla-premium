@@ -83,6 +83,7 @@ const TargetCursor = ({
     const cursor  = cursorRef.current;
     const spinner = spinnerRef.current;
     cornersRef.current = spinner.querySelectorAll('.target-cursor-corner');
+    const corners = Array.from(cornersRef.current) as HTMLElement[];
 
     let activeTarget: Element | null = null;
     let currentLeaveHandler: (() => void) | null = null;
@@ -120,7 +121,6 @@ const TargetCursor = ({
     const updateTargetCorners = () => {
       if (!targetCornerPositionsRef.current || !cornersRef.current) return;
       const { x: cursorX, y: cursorY } = cursorPosRef.current;
-      const corners = Array.from(cornersRef.current) as HTMLElement[];
       corners.forEach((corner, i) => {
         const point = targetCornerPositionsRef.current![i];
         corner.style.transform = `translate3d(${point.x - cursorX}px, ${point.y - cursorY}px, 0)`;
@@ -128,11 +128,24 @@ const TargetCursor = ({
     };
 
     // ── Event handlers ─────────────────────────────────────────────────────
-    const moveHandler = (e: MouseEvent) => {
-      moveCursor(e.clientX, e.clientY);
+    const moveHandler = (e: MouseEvent | PointerEvent) => {
+      const pointerEvent = e as PointerEvent & {
+        getCoalescedEvents?: () => PointerEvent[];
+      };
+      const samples = pointerEvent.getCoalescedEvents?.();
+      const sample = samples?.[samples.length - 1] ?? e;
+      moveCursor(sample.clientX, sample.clientY);
       updateTargetCorners();
     };
-    window.addEventListener('mousemove', moveHandler);
+    // Prefer raw hardware samples when available. Pointermove is the
+    // compatibility path and still consumes coalesced samples when exposed.
+    const moveEvent =
+      'onpointerrawupdate' in window
+        ? 'pointerrawupdate'
+        : 'PointerEvent' in window
+          ? 'pointermove'
+          : 'mousemove';
+    window.addEventListener(moveEvent, moveHandler as EventListener, { passive: true });
 
     const scrollHandler = () => {
       if (!activeTarget || !cursorRef.current) return;
@@ -193,7 +206,6 @@ const TargetCursor = ({
       }
 
       activeTarget = target;
-      const corners = Array.from(cornersRef.current) as HTMLElement[];
       corners.forEach(corner => gsap.killTweensOf(corner, 'x,y'));
 
       gsap.killTweensOf(spinner, 'rotation');
@@ -298,7 +310,7 @@ const TargetCursor = ({
 
     // ── Cleanup ────────────────────────────────────────────────────────────
     return () => {
-      window.removeEventListener('mousemove', moveHandler);
+      window.removeEventListener(moveEvent, moveHandler as EventListener);
       window.removeEventListener('mouseover', enterHandler as EventListener);
       window.removeEventListener('scroll', scrollHandler);
       window.removeEventListener('mousedown', mouseDownHandler);

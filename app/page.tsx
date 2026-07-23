@@ -296,8 +296,11 @@ export default function Home() {
   /* ── Block wheel/touch during portfolio 2-s hold ───────────────────────── */
   useEffect(() => {
     if (!portfolioHolding) return;
+    let gateReleased = false;
+
     const releaseFromGate = (delta: number) => {
       const max = document.documentElement.scrollHeight - window.innerHeight;
+      gateReleased = true;
       portfolioHoldRef.current = false;
       setPortfolioHolding(false);
 
@@ -313,9 +316,16 @@ export default function Home() {
       // Upward input should be honored immediately after the gate, rather than
       // being swallowed by the capture listener that opened the gate.
       window.scrollTo(0, Math.max(0, Math.min(max, frozenScrollRef.current + delta)));
-      portfolioHoldTriggeredRef.current = false;
+      // Keep the gate marked as handled until the scroll position is clearly
+      // away from Our Work. Resetting this here lets the scroll event caused
+      // by this same gesture immediately re-arm the gate at the threshold,
+      // which traps the user when trying to continue toward Services.
     };
     const blockWheel = (e: WheelEvent) => {
+      // React state cleanup happens after this event turn. Once released,
+      // immediately let subsequent wheel input reach the document instead of
+      // trapping it in the still-mounted capture listener.
+      if (gateReleased) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       if (portfolioGateReadyRef.current) {
@@ -326,6 +336,7 @@ export default function Home() {
     let ty = 0;
     const onTS = (e: TouchEvent) => { ty = e.touches[0]?.clientY ?? 0; };
     const blockTouch = (e: TouchEvent) => {
+      if (gateReleased) return;
       e.preventDefault();
       const currentY = e.touches[0]?.clientY ?? ty;
       const delta = (ty - currentY) * 3;
