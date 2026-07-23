@@ -16,7 +16,7 @@ const easeInOut = (t: number) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 const easeOut3 = (t: number) => 1 - Math.pow(1 - t, 3);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-/* ─── Warp line seeds (stable across frames) ────────────────────────────── */
+/* ─── Warp line seeds ───────────────────────────────────────────────────── */
 const WARP_COUNT = 280;
 type WarpSeed = { angle: number; speed: number; phase: number; width: number; colorIdx: number };
 const WARP_SEEDS: WarpSeed[] = Array.from({ length: WARP_COUNT }, (_, i) => ({
@@ -26,17 +26,11 @@ const WARP_SEEDS: WarpSeed[] = Array.from({ length: WARP_COUNT }, (_, i) => ({
   width:    1.0  + (i % 5) * 0.5,
   colorIdx: i % 6,
 }));
-
 const WARP_COLORS = [
-  [0, 229, 255],
-  [26, 128, 229],
-  [159, 85, 255],
-  [255, 68, 204],
-  [0, 200, 170],
-  [180, 200, 255],
+  [0, 229, 255], [26, 128, 229], [159, 85, 255],
+  [255, 68, 204], [0, 200, 170], [180, 200, 255],
 ];
 
-/* ─── Draw perspective warp lines ───────────────────────────────────────── */
 function drawWarpLines(
   ctx: CanvasRenderingContext2D,
   cx: number, cy: number,
@@ -48,27 +42,21 @@ function drawWarpLines(
   const maxDist = Math.hypot(W, H) * 0.62;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
-
   for (const seed of WARP_SEEDS) {
     const t = (seed.phase + time * seed.speed * 0.055) % 1;
-
     const bandLen  = maxDist * (0.06 + seed.speed * 0.09) * progress;
     const startFrac = t * progress;
     const startDist = startFrac * maxDist;
     const endDist   = Math.min(startDist + bandLen, maxDist * 1.02);
     if (endDist <= startDist) continue;
-
     const [r, g, b] = WARP_COLORS[seed.colorIdx];
     const baseAlpha = progress * (0.25 + 0.55 * easeInOut(t));
-
     const cos  = Math.cos(seed.angle);
     const sin  = Math.sin(seed.angle);
     const pCos = Math.cos(seed.angle + Math.PI / 2);
     const pSin = Math.sin(seed.angle + Math.PI / 2);
-
     const wStart = (startDist / maxDist) * seed.width * (1.5 + progress * 2.5);
     const wEnd   = (endDist   / maxDist) * seed.width * (1.5 + progress * 2.5);
-
     const x0 = cx + cos * startDist + pCos * wStart;
     const y0 = cy + sin * startDist + pSin * wStart;
     const x1 = cx + cos * endDist   + pCos * wEnd;
@@ -77,7 +65,6 @@ function drawWarpLines(
     const y2 = cy + sin * endDist   - pSin * wEnd;
     const x3 = cx + cos * startDist - pCos * wStart;
     const y3 = cy + sin * startDist - pSin * wStart;
-
     const grad = ctx.createLinearGradient(
       cx + cos * startDist, cy + sin * startDist,
       cx + cos * endDist,   cy + sin * endDist,
@@ -85,7 +72,6 @@ function drawWarpLines(
     grad.addColorStop(0,    `rgba(${r},${g},${b},0)`);
     grad.addColorStop(0.25, `rgba(${r},${g},${b},${(baseAlpha * 0.5).toFixed(3)})`);
     grad.addColorStop(1,    `rgba(${r},${g},${b},${baseAlpha.toFixed(3)})`);
-
     ctx.beginPath();
     ctx.moveTo(x0, y0); ctx.lineTo(x1, y1);
     ctx.lineTo(x2, y2); ctx.lineTo(x3, y3);
@@ -96,16 +82,10 @@ function drawWarpLines(
   ctx.restore();
 }
 
-/* ─── Crosshair grid ────────────────────────────────────────────────────── */
-function drawGrid(
-  ctx: CanvasRenderingContext2D,
-  W: number, H: number,
-  alpha: number,
-) {
+function drawGrid(ctx: CanvasRenderingContext2D, W: number, H: number, alpha: number) {
   if (alpha <= 0) return;
   ctx.save();
   const cell = Math.min(W, H) / 14;
-
   ctx.strokeStyle = "rgba(40,70,110,1)";
   ctx.lineWidth   = 0.4;
   ctx.globalAlpha = alpha * 0.35;
@@ -115,7 +95,6 @@ function drawGrid(
   for (let y = 0; y <= H; y += cell) {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
   }
-
   ctx.strokeStyle = "rgba(80,140,180,1)";
   ctx.lineWidth   = 1;
   ctx.globalAlpha = alpha * 0.55;
@@ -130,23 +109,16 @@ function drawGrid(
   ctx.restore();
 }
 
-/* ─── Corner HUD brackets ───────────────────────────────────────────────── */
-function drawCornerBrackets(
-  ctx: CanvasRenderingContext2D,
-  W: number, H: number,
-  alpha: number,
-) {
+function drawCornerBrackets(ctx: CanvasRenderingContext2D, W: number, H: number, alpha: number) {
   if (alpha <= 0) return;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.strokeStyle = "rgba(0,229,255,0.9)";
   ctx.lineWidth   = 1.5;
   ctx.lineCap     = "square";
-
   const mx = W * 0.06, my = H * 0.08;
   const rx = mx, ry = my, rw = W - mx * 2, rh = H - my * 2;
   const arm = Math.min(W, H) * 0.04;
-
   const corners = [
     { x: rx,      y: ry,      dx:  1, dy:  1 },
     { x: rx + rw, y: ry,      dx: -1, dy:  1 },
@@ -156,11 +128,10 @@ function drawCornerBrackets(
   for (const c of corners) {
     ctx.beginPath();
     ctx.moveTo(c.x + c.dx * arm, c.y);
-    ctx.lineTo(c.x,               c.y);
-    ctx.lineTo(c.x,               c.y + c.dy * arm);
+    ctx.lineTo(c.x, c.y);
+    ctx.lineTo(c.x, c.y + c.dy * arm);
     ctx.stroke();
   }
-
   ctx.lineWidth   = 1;
   ctx.strokeStyle = "rgba(0,229,255,0.35)";
   const carm = 12;
@@ -168,17 +139,10 @@ function drawCornerBrackets(
   ctx.beginPath(); ctx.moveTo(W / 2, H / 2 - carm); ctx.lineTo(W / 2, H / 2 + carm); ctx.stroke();
   ctx.beginPath(); ctx.arc(W / 2, H / 2, 2, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(0,229,255,0.5)"; ctx.fill();
-
   ctx.restore();
 }
 
-/* ─── Status / HUD bar at bottom ────────────────────────────────────────── */
-function drawStatusBar(
-  ctx: CanvasRenderingContext2D,
-  W: number, H: number,
-  alpha: number,
-  time: number,
-) {
+function drawStatusBar(ctx: CanvasRenderingContext2D, W: number, H: number, alpha: number, time: number) {
   if (alpha <= 0) return;
   ctx.save();
   ctx.globalAlpha = alpha * 0.75;
@@ -186,29 +150,23 @@ function drawStatusBar(
   ctx.font      = `400 ${fs}px 'Courier New','Courier',monospace`;
   ctx.fillStyle = "rgba(0,229,255,0.85)";
   ctx.textBaseline = "middle";
-
   const py = H * 0.935;
-
   const coordX = (W * 0.5 + Math.sin(time * 0.3) * 40).toFixed(0).padStart(4, "0");
   const coordY = (H * 0.5 + Math.cos(time * 0.22) * 30).toFixed(0).padStart(4, "0");
   ctx.textAlign = "left";
   ctx.fillText(`TECHZILLA.STUDIO`, W * 0.065, py);
   ctx.fillText(`${coordX} X  ${coordY} Y`, W * 0.38, py);
-
   ctx.textAlign = "right";
   ctx.fillText(`SYS·ONLINE`, W * 0.935, py);
-
   ctx.strokeStyle = "rgba(0,229,255,0.18)";
   ctx.lineWidth   = 0.5;
   ctx.beginPath();
   ctx.moveTo(W * 0.065, H * 0.92);
   ctx.lineTo(W * 0.935, H * 0.92);
   ctx.stroke();
-
   ctx.restore();
 }
 
-/* ─── Orbit rings ────────────────────────────────────────────────────────── */
 function drawRings(
   ctx: CanvasRenderingContext2D,
   cx: number, cy: number,
@@ -220,10 +178,10 @@ function drawRings(
   ctx.save();
   const base = W * 0.32;
   const rings = [
-    { rx: 1.05, ry: 0.22, spd:  0.20, color: [212, 255, 0],   lw: 1.8 },
-    { rx: 0.80, ry: 0.16, spd: -0.14, color: [0, 234, 255],   lw: 1.4 },
-    { rx: 0.60, ry: 0.12, spd:  0.10, color: [128, 64, 255],  lw: 1.2 },
-    { rx: 1.28, ry: 0.28, spd: -0.08, color: [255, 68, 170],  lw: 1.0 },
+    { rx: 1.05, ry: 0.22, spd:  0.20, color: [212, 255, 0],  lw: 1.8 },
+    { rx: 0.80, ry: 0.16, spd: -0.14, color: [0, 234, 255],  lw: 1.4 },
+    { rx: 0.60, ry: 0.12, spd:  0.10, color: [128, 64, 255], lw: 1.2 },
+    { rx: 1.28, ry: 0.28, spd: -0.08, color: [255, 68, 170], lw: 1.0 },
   ];
   rings.forEach((r, i) => {
     const rot = time * r.spd + i * 0.72;
@@ -244,7 +202,6 @@ function drawRings(
   ctx.restore();
 }
 
-/* ─── Radial blue fill from centre ──────────────────────────────────────── */
 function drawBlueFill(
   ctx: CanvasRenderingContext2D,
   cx: number, cy: number,
@@ -264,7 +221,6 @@ function drawBlueFill(
   ctx.restore();
 }
 
-/* ─── Chess piece image ──────────────────────────────────────────────────── */
 function drawPiece(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
@@ -281,6 +237,38 @@ function drawPiece(
   ctx.translate(cx, cy);
   ctx.rotate(rotation);
   ctx.drawImage(img, -w * 0.5, -h * 0.5, w, h);
+  ctx.restore();
+}
+
+/* ─── Manifesto phrases — still drawn on canvas during Phase B ──────────── */
+const PHRASES = [
+  "Building tomorrow's\ndigital products.",
+  "Independent by\ndesign & engineering.",
+  "Clarity first.\nDelight second.",
+  "Ship in small loops.\nAim for long arcs.",
+];
+const PHRASE_POS = [
+  { ax: 0.72, ay: 0.30 },
+  { ax: 0.70, ay: 0.60 },
+  { ax: 0.065, ay: 0.36 },
+  { ax: 0.065, ay: 0.62 },
+];
+function drawPhrases(ctx: CanvasRenderingContext2D, W: number, H: number, progress: number) {
+  if (progress <= 0) return;
+  const fs = Math.round(clamp(W * 0.018, 12, 22));
+  ctx.save();
+  ctx.font = `300 ${fs}px 'Inter','Helvetica Neue',sans-serif`;
+  PHRASES.forEach((phrase, i) => {
+    const a = easeInOut(clamp((progress - i * 0.12) / 0.4, 0, 1));
+    if (a <= 0) return;
+    const { ax, ay } = PHRASE_POS[i];
+    ctx.globalAlpha = a * 0.80;
+    ctx.fillStyle   = "#ffffff";
+    ctx.textAlign   = "left";
+    phrase.split("\n").forEach((line, li) => {
+      ctx.fillText(line, W * ax, H * ay + li * fs * 1.4);
+    });
+  });
   ctx.restore();
 }
 
@@ -311,23 +299,24 @@ function drawHeadline(
   ctx.restore();
 }
 
-/* ─── Circular items (replacing manifesto phrases) ──────────────────────── */
+/* ─── Circular items — center text TECHZILLA, Design item = design image ── */
 const CIRCULAR_ITEMS = [
   {
-    text: "Clarity First",
-    image: "https://images.unsplash.com/photo-1558655146-9f40138edfeb?w=400&h=400&fit=crop&auto=format",
+    text: "Web",
+    image: "https://images.unsplash.com/photo-1547658719-da2b51169166?w=400&h=400&fit=crop&auto=format",
+  },
+  {
+    text: "Mobile",
+    image: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400&h=400&fit=crop&auto=format",
   },
   {
     text: "Design",
+    // Design-related image: Figma/UI design tools — NOT a person photo
     image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=400&fit=crop&auto=format",
   },
   {
-    text: "Build Tomorrow",
-    image: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=400&fit=crop&auto=format",
-  },
-  {
-    text: "Ship In Loops",
-    image: "https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=400&h=400&fit=crop&auto=format",
+    text: "Cloud",
+    image: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=400&fit=crop&auto=format",
   },
 ];
 
@@ -345,14 +334,22 @@ const CIRCULAR_CENTER = (
   </span>
 );
 
+/* ─── Phase boundaries (STRICTLY EXCLUSIVE — no overlap) ────────────────── */
+//  Phase A: 0.62 → 0.76   "TURN YOUR DREAMS TO REALITY"
+//  Phase B: 0.76 → 0.87   Circular component + manifesto phrases
+//  Phase C: 0.87 → 1.00   "YOUR SATISFACTION ALWAYS"
+const PH_A_START = 0.62, PH_A_END = 0.76;
+const PH_B_START = 0.76, PH_B_END = 0.87;
+const PH_C_START = 0.87, PH_C_END = 1.00;
+
 /* ─── Component ─────────────────────────────────────────────────────────── */
 const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
-  const canvasRef       = useRef<HTMLCanvasElement>(null);
-  const wrapRef         = useRef<HTMLDivElement>(null);
-  const circularRef     = useRef<HTMLDivElement>(null);
-  const pawnRef         = useRef<HTMLImageElement | null>(null);
-  const queenRef        = useRef<HTMLImageElement | null>(null);
-  const stateRef        = useRef({
+  const canvasRef   = useRef<HTMLCanvasElement>(null);
+  const wrapRef     = useRef<HTMLDivElement>(null);
+  const circularRef = useRef<HTMLDivElement>(null);
+  const pawnRef     = useRef<HTMLImageElement | null>(null);
+  const queenRef    = useRef<HTMLImageElement | null>(null);
+  const stateRef    = useRef({
     active:        false,
     virtualScroll: 0,
     time:          0,
@@ -361,7 +358,6 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
   });
   const TOTAL = 5200;
 
-  /* Slide helpers ─────────────────────────────────────────────────────── */
   const slideIn = () => {
     const w = wrapRef.current; if (!w) return;
     w.style.transition    = "transform 0.70s cubic-bezier(0.22,1,0.36,1)";
@@ -394,13 +390,11 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     if (!canvas) return;
     const s = stateRef.current;
 
-    /* Pre-load chess images ─────────────────────────────────────────── */
     const pawn  = new Image(); pawn.src  = "/chess/pawn.png";
     const queen = new Image(); queen.src = "/chess/queen.png";
     pawnRef.current  = pawn;
     queenRef.current = queen;
 
-    /* Resize ────────────────────────────────────────────────────────── */
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
       const W = window.innerWidth, H = window.innerHeight;
@@ -412,7 +406,6 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     resize();
     window.addEventListener("resize", resize);
 
-    /* Scroll accumulation ───────────────────────────────────────────── */
     const onWheel = (e: WheelEvent) => {
       if (!s.active) return;
       e.preventDefault();
@@ -420,14 +413,13 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
       s.virtualScroll = clamp(s.virtualScroll + delta, 0, TOTAL);
 
-      // Dismiss (go back to Our Work) only when user actively scrolls back at the start
+      // Dismiss only when user scrolls back at the very start
       if (s.virtualScroll <= 0 && delta < 0) {
         s.active = false;
         slideOut();
         window.dispatchEvent(new CustomEvent("chess-reveal-dismissed"));
       }
-      // At the end — stay here; do NOT auto-dismiss.
-      // User must scroll back themselves to return to Our Work.
+      // At the end — stay there; never auto-dismiss.
     };
 
     let touchY = 0;
@@ -444,7 +436,6 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     window.addEventListener("touchstart", onTouchStart, { passive: true  });
     window.addEventListener("touchmove",  onTouchMove,  { passive: false, capture: true });
 
-    /* Render loop ───────────────────────────────────────────────────── */
     const tick = (ts: number) => {
       s.rafId = requestAnimationFrame(tick);
       if (!s.active && s.virtualScroll <= 0) { s.lastTs = ts; return; }
@@ -463,33 +454,23 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
 
       const p = s.virtualScroll / TOTAL;
 
-      /*
-        Phase map:
-        0.00–0.07  dark intro, grid + piece appears
-        0.07–0.46  piece grows, warp lines build
-        0.46–0.62  pawn → queen cross-fade; blue fill expands
-        0.62–0.76  full blue screen, headline "TURN YOUR DREAMS TO REALITY"
-        0.76–0.88  circular component + orbit rings (headline fades OUT)
-        0.88–1.00  final screen: "YOUR\nSATISFACTION\nALWAYS" (circular fades OUT)
-      */
-      const introP    = easeInOut(invlerp(0.00, 0.07, p));
-      const growP     = easeInOut(invlerp(0.07, 0.46, p));
-      const morphP    = easeInOut(invlerp(0.40, 0.56, p));
-      const blueP     = easeInOut(invlerp(0.50, 0.72, p));
-      const linesP    = easeInOut(invlerp(0.40, 0.80, p));
-      const headlineP = easeInOut(invlerp(0.62, 0.76, p));
-      const ringsP    = easeInOut(invlerp(0.74, 0.87, p));
-      const phrasesP  = easeInOut(invlerp(0.76, 1.00, p));
-      const finalP    = easeInOut(invlerp(0.87, 0.97, p));
+      /* ── Background / shared elements (always present) ────────── */
+      const introP = easeInOut(invlerp(0.00, 0.07, p));
+      const growP  = easeInOut(invlerp(0.07, 0.46, p));
+      const morphP = easeInOut(invlerp(0.40, 0.56, p));
+      const blueP  = easeInOut(invlerp(0.50, 0.72, p));
+      const linesP = easeInOut(invlerp(0.40, 0.80, p));
+      const pawnSpin = easeOut3(growP) * Math.PI * 6;
 
-      // Headline fades out as circular component fades in
-      const headlineAlpha = headlineP * (1 - phrasesP);
-      // Circular component fades out as final screen fades in
-      const circularAlpha = phrasesP * (1 - finalP);
-      // Warp lines dim behind circular component so it reads clearly
-      const effectiveLinesP = linesP * (1 - phrasesP * 0.7);
+      /* ── Strictly exclusive phases ────────────────────────────── */
+      const inPhaseA = p >= PH_A_START && p < PH_A_END;
+      const inPhaseB = p >= PH_B_START && p < PH_B_END;
+      const inPhaseC = p >= PH_C_START;
 
-      const pawnSpin  = easeOut3(growP) * Math.PI * 6;
+      // Within-phase 0→1 progress (0 outside that phase)
+      const pA = inPhaseA ? invlerp(PH_A_START, PH_A_END, p) : 0;
+      const pB = inPhaseB ? invlerp(PH_B_START, PH_B_END, p) : 0;
+      const pC = inPhaseC ? invlerp(PH_C_START, PH_C_END, p) : 0;
 
       /* ── 1. Background ────────────────────────────────────────── */
       ctx.fillStyle = "#030508";
@@ -498,17 +479,21 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       /* ── 2. Crosshair grid ────────────────────────────────────── */
       drawGrid(ctx, W, H, introP * (1 - blueP * 0.95));
 
-      /* ── 3. Perspective warp lines ────────────────────────────── */
-      drawWarpLines(ctx, cx, cy, W, H, effectiveLinesP, s.time);
+      /* ── 3. Warp lines (background; reduced during Phase B) ───── */
+      const warpIntensity = inPhaseB ? linesP * 0.30 : linesP;
+      drawWarpLines(ctx, cx, cy, W, H, warpIntensity, s.time);
 
-      /* ── 4. Radial blue fill ──────────────────────────────────── */
+      /* ── 4. Blue fill ─────────────────────────────────────────── */
       drawBlueFill(ctx, cx, cy, W, H, blueP);
 
-      /* ── 5. HUD corner brackets ───────────────────────────────── */
+      /* ── 5. HUD brackets ──────────────────────────────────────── */
       drawCornerBrackets(ctx, W, H, introP * (1 - blueP * 0.5));
 
-      /* ── 6. Orbit rings (visible during circular phase) ──────── */
-      drawRings(ctx, cx, cy, W, H, ringsP, s.time);
+      /* ── 6. Orbit rings (only during Phase C) ─────────────────── */
+      // Replaced by CircularRevealHeading in Phase B
+      if (inPhaseC) {
+        drawRings(ctx, cx, cy, W, H, easeInOut(pC), s.time);
+      }
 
       /* ── 7. Chess piece ───────────────────────────────────────── */
       const maxH   = H * 0.52;
@@ -516,7 +501,6 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       const sizeT  = easeOut3(clamp(growP + morphP * 0.30, 0, 1));
       const pieceH = lerp(minH, maxH, sizeT);
       const pieceCY = cy - H * 0.03;
-
       if (morphP < 1 && pawnRef.current) {
         drawPiece(ctx, pawnRef.current, cx, pieceCY, pieceH, introP * (1 - morphP), pawnSpin);
       }
@@ -524,44 +508,52 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
         drawPiece(ctx, queenRef.current, cx, pieceCY, pieceH, introP * clamp(morphP * 1.6, 0, 1));
       }
 
-      /* ── 8. Main headline (fades out when circular appears) ───── */
-      if (headlineAlpha > 0) {
-        drawHeadline(ctx, W, H, "TURN YOUR\nDREAMS TO\nREALITY", headlineAlpha, 0.50);
+      /* ────────────────────────────────────────────────────────────
+         STRICTLY EXCLUSIVE: A, B, C
+         Each block draws NOTHING from the other phases.
+         ──────────────────────────────────────────────────────────── */
+
+      // PHASE A — "TURN YOUR DREAMS TO REALITY"
+      if (inPhaseA) {
+        drawHeadline(ctx, W, H, "TURN YOUR\nDREAMS TO\nREALITY", easeInOut(pA), 0.50);
       }
 
-      /* ── 9. Circular overlay opacity (controlled via DOM ref) ──── */
-      if (circularRef.current) {
-        circularRef.current.style.opacity = circularAlpha.toFixed(4);
-        circularRef.current.style.pointerEvents = circularAlpha > 0.05 ? "auto" : "none";
+      // PHASE B — Manifesto phrases (canvas text, same as before)
+      if (inPhaseB) {
+        drawPhrases(ctx, W, H, pB);
       }
 
-      /* ── 10. Final screen ─────────────────────────────────────── */
-      if (finalP > 0) {
-        // Dim previous elements
+      // PHASE C — Final screen
+      if (inPhaseC) {
+        // Dark overlay wipes B content
         ctx.save();
-        ctx.globalAlpha = finalP * 0.80;
+        ctx.globalAlpha = easeInOut(pC) * 0.88;
         ctx.fillStyle   = "#030508";
         ctx.fillRect(0, 0, W, H);
         ctx.restore();
-
-        // Keep warp lines + rings at low intensity
+        // Re-draw rings + warp at low level on top of dark fill
         drawWarpLines(ctx, cx, cy, W, H, 0.28, s.time * 0.6);
-        drawRings(ctx, cx, cy, W, H, finalP, s.time);
-
-        // Final headline — three separate lines
-        drawHeadline(ctx, W, H, "YOUR\nSATISFACTION\nALWAYS", finalP, 0.44);
-
-        // Small queen icon below text
+        drawRings(ctx, cx, cy, W, H, easeInOut(pC), s.time);
+        // Final text — 3 lines
+        drawHeadline(ctx, W, H, "YOUR\nSATISFACTION\nALWAYS", easeInOut(pC), 0.44);
         if (queenRef.current) {
-          drawPiece(ctx, queenRef.current, cx, cy + H * 0.27, H * 0.18, finalP * 0.60);
+          drawPiece(ctx, queenRef.current, cx, cy + H * 0.27, H * 0.18, easeInOut(pC) * 0.60);
         }
-
-        // Corner brackets remain
-        drawCornerBrackets(ctx, W, H, finalP * 0.70);
+        drawCornerBrackets(ctx, W, H, easeInOut(pC) * 0.70);
       }
 
-      /* ── 11. Status bar ───────────────────────────────────────── */
-      drawStatusBar(ctx, W, H, introP * (finalP > 0 ? finalP : 1), s.time);
+      /* ── Circular overlay — shown ONLY during Phase B ─────────── */
+      if (circularRef.current) {
+        // Hard switch: visible only in Phase B, invisible otherwise
+        const showCircular = inPhaseB;
+        circularRef.current.style.opacity       = showCircular ? "1" : "0";
+        circularRef.current.style.pointerEvents = showCircular ? "auto" : "none";
+        // No CSS transition — the opacity change must be instant
+        circularRef.current.style.transition    = "none";
+      }
+
+      /* ── Status bar ───────────────────────────────────────────── */
+      drawStatusBar(ctx, W, H, introP, s.time);
     };
 
     s.rafId = requestAnimationFrame(tick);
@@ -584,7 +576,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     >
       <canvas ref={canvasRef} className={styles.canvas} />
 
-      {/* Circular reveal overlay — replaces manifesto phrases */}
+      {/* Circular component — Phase B only, hard switch via RAF loop */}
       <div
         ref={circularRef}
         style={{
@@ -596,7 +588,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
           opacity: 0,
           pointerEvents: "none",
           zIndex: 10,
-          transition: "opacity 0.1s linear",
+          /* NO transition here — opacity toggled instantly by RAF */
         }}
       >
         <CircularRevealHeading
