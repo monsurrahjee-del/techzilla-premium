@@ -175,23 +175,17 @@ export default function Home() {
         frozenScrollRef.current = Math.round(pMax); // hold at very bottom
         setPortfolioHolding(true);
 
-        // After 2 s hold: slide portfolio UP (like scrolling away) then chess rises
+        // After 2 s hold: activate chess FIRST (no gap), then release hold
         setTimeout(() => {
+          // Mark chess active before releasing hold → onScroll never runs unguarded
+          chessActiveRef.current = true;
+          chessRef.current?.activate();          // slides up from below
+
+          // Release hold after chess is already capturing scroll
           portfolioHoldRef.current = false;
           setPortfolioHolding(false);
-
-          // Stop the CSS scroll-driven animation so we can drive transform with JS
-          if (portfolio) {
-            portfolio.style.animationName  = "none";
-            portfolio.style.transition     = "transform 0.60s cubic-bezier(0.32,0,0.12,1)";
-            portfolio.style.transform      = "translateY(-110%)";
-          }
-
-          // Small delay so portfolio exit starts just before chess enters
-          setTimeout(() => {
-            chessActiveRef.current = true;
-            chessRef.current?.activate();
-          }, 120);
+          // Portfolio layer is left untouched — CSS scroll-driven animation keeps
+          // it at translateX(0%) (fully visible), chess z-index 100 slides over it.
         }, 2000);
       }
     };
@@ -219,20 +213,9 @@ export default function Home() {
     const onChessDismissed = () => {
       chessActiveRef.current            = false;
       portfolioHoldTriggeredRef.current = false;
-
-      // Slide portfolio back into view from above
-      if (portfolio) {
-        portfolio.style.transition = "transform 0.55s cubic-bezier(0.32,0,0.12,1)";
-        portfolio.style.transform  = "translateY(0%)";
-        // After transition: clear inline overrides so CSS animation re-owns the transform
-        setTimeout(() => {
-          if (portfolio) {
-            portfolio.style.animationName = "";
-            portfolio.style.transition    = "";
-            portfolio.style.transform     = "";
-          }
-        }, 600);
-      }
+      // Portfolio CSS animation was never touched — it's still at translateX(0%)
+      // (scroll frozen at pMax), so Our Work is already visible the moment chess
+      // slides back down. No DOM manipulation needed.
     };
     const onChessComplete = () => {
       chessActiveRef.current = false;
