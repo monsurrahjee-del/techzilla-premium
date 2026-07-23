@@ -373,18 +373,36 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     );
   };
 
-  const craftActivatedRef = useRef(false);
+  const craftActivatedRef  = useRef(false);
+  // True when ChessReveal was re-entered by scrolling up from Craft.
+  // In that case any upward scroll should immediately dismiss back to portfolio.
+  const fromCraftRef = useRef(false);
+
+  const dismissChess = () => {
+    const s = stateRef.current;
+    s.active = false;
+    s.virtualScroll = 0;
+    craftActivatedRef.current = false;
+    fromCraftRef.current = false;
+    slideOut();
+    window.dispatchEvent(new CustomEvent("chess-reveal-mode", { detail: { active: false } }));
+    window.dispatchEvent(new CustomEvent("chess-reveal-dismissed"));
+  };
 
   const applyVirtualDelta = (delta: number) => {
     const s = stateRef.current;
     const previous = s.virtualScroll;
+
+    // When returning from Craft, the first upward scroll dismisses immediately.
+    if (fromCraftRef.current && delta < 0) {
+      dismissChess();
+      return;
+    }
+
     setVirtualScroll(previous + delta);
     if (s.virtualScroll <= 0 && delta < 0) {
-      s.active = false;
-      craftActivatedRef.current = false;
-      slideOut();
-      window.dispatchEvent(new CustomEvent("chess-reveal-mode", { detail: { active: false } }));
-      window.dispatchEvent(new CustomEvent("chess-reveal-dismissed"));
+      dismissChess();
+      return;
     }
     // Forward scroll past the end → activate craft section
     if (previous >= TOTAL && delta > 0 && !craftActivatedRef.current) {
@@ -520,6 +538,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     // ── When craft section is dismissed (scroll-up), re-activate ChessReveal at end ─
     const onCraftDismiss = () => {
       craftActivatedRef.current = false;
+      fromCraftRef.current      = true;   // next upward scroll exits immediately
       const s = stateRef.current;
       s.active        = true;
       s.virtualScroll = TOTAL;
