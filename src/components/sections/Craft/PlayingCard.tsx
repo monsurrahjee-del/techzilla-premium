@@ -289,7 +289,7 @@ const Shader: React.FC<ShaderProps> = ({ source, uniforms, maxFps = 60 }) => {
 // --- useDynamicTextLayout Hook ---
 
 function useDynamicTextLayout(
-  containerRef: React.RefObject<HTMLDivElement>,
+  containerRef: React.RefObject<HTMLDivElement | null>,
   textArray: string[],
   minWidth: number,
   maxWidth: number,
