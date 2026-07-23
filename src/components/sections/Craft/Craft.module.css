@@ -8,9 +8,18 @@
   transition: transform 0.70s cubic-bezier(0.22, 1, 0.36, 1);
   overflow: hidden;
 
-  /* Dark fallback while liquid canvas loads */
-  background: #0d0d0d;
-  color: #111;
+  /* Exact Hero background — royal blue radial gradient */
+  background:
+    radial-gradient(
+      160% 110% at 50% -8%,
+      #3a5cff 0%,
+      #2348e8 10%,
+      #1430a8 38%,
+      #080f58 72%,
+      #040a3a 100%
+    ),
+    #040a3a;
+  color: #ffffff;
 }
 
 /* Hero vignette pseudo-element overlay */
