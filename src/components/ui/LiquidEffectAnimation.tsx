@@ -18,25 +18,16 @@ export function LiquidEffectAnimation() {
 
       const app = LiquidBackground(canvas);
 
-      // --- transparent background: show hero bg through the canvas ---
-      if (app.renderer) {
-        app.renderer.setClearColor(0x000000, 0);
-        app.renderer.setClearAlpha(0);
-      }
-      if (app.scene) {
-        app.scene.background = null;
-      }
-
-      // --- material tweaks ---
-      app.liquidPlane.material.metalness = 0.85;
-      app.liquidPlane.material.roughness = 0.15;
-      app.liquidPlane.uniforms.displacementScale.value = 3;
+      // Material — metallic sheen, full opacity, NO transparent hack
+      app.liquidPlane.material.metalness = 0.8;
+      app.liquidPlane.material.roughness = 0.2;
+      app.liquidPlane.uniforms.displacementScale.value = 4;
       app.setRain(false);
 
-      // --- make animation extremely slow (3% of real speed) ---
+      // Faster animation — clock runs at 2× real speed
       if (app.clock) {
         const startReal = performance.now();
-        const SPEED = 0.03; // 3 % — change this to taste
+        const SPEED = 2.0;
         app.clock.getElapsedTime = () =>
           ((performance.now() - startReal) / 1000) * SPEED;
         app.clock.getDelta = () => (1 / 60) * SPEED;
@@ -63,7 +54,6 @@ export function LiquidEffectAnimation() {
         ref={canvasRef}
         id="liquid-canvas"
         className="absolute inset-0 w-full h-full"
-        style={{ background: "transparent" }}
       />
     </div>
   )

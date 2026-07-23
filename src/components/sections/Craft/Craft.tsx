@@ -9,12 +9,7 @@ import {
 } from "react";
 import { AnimatePresence } from "framer-motion";
 import styles from "./Craft.module.css";
-import heroStyles from "../Hero/Hero.module.css";
-
-/* ── Hero sub-components (exact same ones used in Hero.tsx) ─────────────── */
-import MeshGradient     from "../Hero/MeshGradient";
-import HeroLight        from "../Hero/HeroLight";
-import WaterRipple      from "../Hero/WaterRipple";
+/* ── Hero sub-components used in Craft ──────────────────────────────────── */
 import StickerCloud     from "../Hero/StickerCloud";
 import FloatingElements from "../Hero/FloatingElements";
 import HeroNav          from "../Hero/HeroNav";
@@ -109,23 +104,19 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
         style={{ transform: "translateY(100%)", pointerEvents: "none", transition: "none" }}
         aria-hidden={!active}
       >
-        {/* ── Liquid background effect ── */}
+        {/* ── Liquid background — sole background layer ── */}
         <LiquidEffectAnimation />
 
-        {/* ── Exact Hero backgrounds ── */}
-        <MeshGradient />
-        <div className={heroStyles.grid} />
-        <HeroLight />
-        <WaterRipple />
-
-        {/* ── Top Nav — exactly as in the Hero section ── */}
-        <HeroNav
-          theme={theme}
-          sound={sound}
-          onThemeToggle={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-          onSoundToggle={() => setSound((s) => !s)}
-          navItems={["Home", "Work", "About"]}
-        />
+        {/* ── Top Nav wrapped for dark-on-liquid colour override ── */}
+        <div className={styles.craftNavWrap}>
+          <HeroNav
+            theme={theme}
+            sound={sound}
+            onThemeToggle={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+            onSoundToggle={() => setSound((s) => !s)}
+            navItems={["Home", "Work", "About"]}
+          />
+        </div>
 
         {/* ── Hero sticker cloud ── */}
         <StickerCloud />
