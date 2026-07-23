@@ -387,8 +387,9 @@ export default function Home() {
         releaseFromGate(-1);
         // Convert virtual fraction back to real document pixels (clamped to max).
         if (max > 0) window.scrollTo(0, Math.max(0, Math.min(max, fraction * tv)));
-      } else if (fraction > frozenFrac + 0.01 && portfolioGateReadyRef.current) {
-        // Forward beyond Our Work and gate is ready — open chess.
+      } else if (fraction > frozenFrac + 0.01) {
+        // Forward beyond Our Work — scrollbar drags are always intentional,
+        // so bypass the 2-s gate timer and open chess immediately.
         releaseFromGate(1);
       }
     };

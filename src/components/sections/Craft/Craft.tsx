@@ -70,6 +70,19 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
     return () => window.removeEventListener("craft-section-activate", onActivate);
   }, []);
 
+  /* Listen for external dismiss (e.g. scrollbar dragging backward from Craft) */
+  useEffect(() => {
+    const onExternalDismiss = () => {
+      if (!activeRef.current) return; // already dismissed (e.g. from onWheel)
+      activeRef.current = false;
+      setActive(false);
+      slideOut();
+      // craft-section-dismiss was already dispatched by the caller — don't re-fire
+    };
+    window.addEventListener("craft-section-dismiss", onExternalDismiss);
+    return () => window.removeEventListener("craft-section-dismiss", onExternalDismiss);
+  }, []);
+
   /* Scroll-up dismisses back to ChessReveal */
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {

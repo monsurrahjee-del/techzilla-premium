@@ -159,6 +159,11 @@ export default function ScrollBar() {
         window.dispatchEvent(
           new CustomEvent("chess-reveal-seek", { detail: { progress: 0 } }),
         );
+      } else if (rawTrackFraction > csf + cf) {
+        // User dragged past the chess zone into the craft zone → open Craft.
+        chessRawProgress.current = 1;
+        window.dispatchEvent(new CustomEvent("craft-section-activate"));
+        // onCraftActivate will update chessActive/craftActive and call updateThumb.
       } else {
         // Map the raw fraction into chess-internal 0-1 progress.
         const chessProgress = cf > 0
@@ -256,6 +261,16 @@ export default function ScrollBar() {
     const onDocMouseMove = (e: MouseEvent) => {
       if (!dragging.current) return;
 
+      // Craft active: backward drag dismisses craft and hands back to ChessReveal.
+      if (craftActive.current) {
+        const targetFraction = fractionFromClientY(e.clientY);
+        if (targetFraction < 0.98) {
+          // Dispatch both so Craft slides out AND ChessReveal re-activates.
+          window.dispatchEvent(new CustomEvent("craft-section-dismiss"));
+        }
+        return;
+      }
+
       // Chess reveal mode: seek via chess events.
       if (chessActive.current) {
         seekReveal(fractionFromClientY(e.clientY));
@@ -263,6 +278,7 @@ export default function ScrollBar() {
       }
 
       // Frozen (portfolio gate): dispatch navigate intent.
+      // Scrollbar drags are always intentional — bypass the 2-s gate timer.
       if (scrollFrozen.current) {
         const targetFraction = fractionFromClientY(e.clientY);
         const { scrollTop, scrollHeight, clientHeight } = getScrollInfo();
@@ -273,7 +289,7 @@ export default function ScrollBar() {
         const frozenFrac = tv > 0 ? scrollTop / tv : 1;
 
         const goingBack    = targetFraction < frozenFrac - 0.01;
-        const goingForward = targetFraction > frozenFrac + 0.01 && scrollGateReady.current;
+        const goingForward = targetFraction > frozenFrac + 0.01;
 
         if (goingBack || goingForward) {
           updateThumb(targetFraction);

@@ -407,6 +407,8 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     // Forward scroll past the end → activate craft section
     if (previous >= TOTAL && delta > 0 && !craftActivatedRef.current) {
       craftActivatedRef.current = true;
+      // Deactivate chess wheel capture so Craft's own wheel listener can fire.
+      s.active = false;
       window.dispatchEvent(new CustomEvent("craft-section-activate"));
     }
   };
