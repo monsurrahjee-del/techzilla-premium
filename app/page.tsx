@@ -72,7 +72,7 @@ export default function Home() {
 
     const VAPOR_RAW         = 1 / 3 + 0.90 * (2 / 3 - 1 / 3);
     const SERVICES_BOUNDARY = 2 / 3;
-    const PORTFOLIO_FULL    = 0.97; // portfolio fully slid into view
+    const PORTFOLIO_FULL    = 0.999; // portfolio fully slid into view (p3≈1 at raw≈1)
 
     const beginPortfolioGate = () => {
       portfolioHoldTriggeredRef.current = true;

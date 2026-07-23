@@ -374,16 +374,11 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
   };
 
   const craftActivatedRef  = useRef(false);
-  // True when ChessReveal was re-entered by scrolling up from Craft.
-  // In that case any upward scroll should immediately dismiss back to portfolio.
-  const fromCraftRef = useRef(false);
-
   const dismissChess = () => {
     const s = stateRef.current;
     s.active = false;
     s.virtualScroll = 0;
     craftActivatedRef.current = false;
-    fromCraftRef.current = false;
     slideOut();
     window.dispatchEvent(new CustomEvent("chess-reveal-mode", { detail: { active: false } }));
     window.dispatchEvent(new CustomEvent("chess-reveal-dismissed"));
@@ -392,12 +387,6 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
   const applyVirtualDelta = (delta: number) => {
     const s = stateRef.current;
     const previous = s.virtualScroll;
-
-    // When returning from Craft, the first upward scroll dismisses immediately.
-    if (fromCraftRef.current && delta < 0) {
-      dismissChess();
-      return;
-    }
 
     setVirtualScroll(previous + delta);
     if (s.virtualScroll <= 0 && delta < 0) {
@@ -540,12 +529,13 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     // ── When craft section is dismissed (scroll-up), re-activate ChessReveal at end ─
     const onCraftDismiss = () => {
       craftActivatedRef.current = false;
-      fromCraftRef.current      = true;   // next upward scroll exits immediately
       const s = stateRef.current;
       s.active        = true;
-      s.virtualScroll = TOTAL;
+      // Land at the start of Phase C ("Your Satisfaction Always") so the user
+      // can scroll backward through chess content normally before exiting.
+      s.virtualScroll = Math.floor(PH_C_START * TOTAL);
       window.dispatchEvent(new CustomEvent("chess-reveal-mode", { detail: { active: true } }));
-      window.dispatchEvent(new CustomEvent("chess-reveal-progress", { detail: { progress: 1 } }));
+      window.dispatchEvent(new CustomEvent("chess-reveal-progress", { detail: { progress: PH_C_START } }));
       slideIn();
     };
     window.addEventListener("craft-section-dismiss", onCraftDismiss);
