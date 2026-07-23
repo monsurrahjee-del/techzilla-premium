@@ -302,21 +302,20 @@ function drawHeadline(
 /* ─── Circular items — center text TECHZILLA, Design item = design image ── */
 const CIRCULAR_ITEMS = [
   {
-    text: "Web",
-    image: "https://images.unsplash.com/photo-1547658719-da2b51169166?w=400&h=400&fit=crop&auto=format",
+    text: "STRATEGY",
+    image: "https://kxptt4m9j4.ufs.sh/f/9YHhEDeslzkceCYjHtyWSduj04chzxgP3pt1Dvo8KfCsHnwk",
   },
   {
-    text: "Mobile",
-    image: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400&h=400&fit=crop&auto=format",
+    text: "DESIGN",
+    image: "https://kxptt4m9j4.ufs.sh/f/9YHhEDeslzkcZY3vRlCe5wpMsRmKntGfIu4E6OSxhgzL3kU1",
   },
   {
-    text: "Design",
-    // Design-related image: Figma/UI design tools — NOT a person photo
-    image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=400&fit=crop&auto=format",
+    text: "GROWTH",
+    image: "https://kxptt4m9j4.ufs.sh/f/9YHhEDeslzkcz9VsoNLlt5AKuj9HqWQm3NeDUywcLSxB6Yo1",
   },
   {
-    text: "Cloud",
-    image: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=400&fit=crop&auto=format",
+    text: "INNOVATION",
+    image: "https://kxptt4m9j4.ufs.sh/f/9YHhEDeslzkcypc1wWQBS4VNPtfqkpIhO7M6XUva5TzWomdZ",
   },
 ];
 
@@ -489,23 +488,19 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       /* ── 5. HUD brackets ──────────────────────────────────────── */
       drawCornerBrackets(ctx, W, H, introP * (1 - blueP * 0.5));
 
-      /* ── 6. Orbit rings (only during Phase C) ─────────────────── */
-      // Replaced by CircularRevealHeading in Phase B
-      if (inPhaseC) {
-        drawRings(ctx, cx, cy, W, H, easeInOut(pC), s.time);
-      }
-
-      /* ── 7. Chess piece ───────────────────────────────────────── */
+      /* ── 7. Chess piece (hidden during Phase C — only small queen below text shown there) ── */
       const maxH   = H * 0.52;
       const minH   = maxH * 0.04;
       const sizeT  = easeOut3(clamp(growP + morphP * 0.30, 0, 1));
       const pieceH = lerp(minH, maxH, sizeT);
       const pieceCY = cy - H * 0.03;
-      if (morphP < 1 && pawnRef.current) {
-        drawPiece(ctx, pawnRef.current, cx, pieceCY, pieceH, introP * (1 - morphP), pawnSpin);
-      }
-      if (morphP > 0 && queenRef.current) {
-        drawPiece(ctx, queenRef.current, cx, pieceCY, pieceH, introP * clamp(morphP * 1.6, 0, 1));
+      if (!inPhaseC) {
+        if (morphP < 1 && pawnRef.current) {
+          drawPiece(ctx, pawnRef.current, cx, pieceCY, pieceH, introP * (1 - morphP), pawnSpin);
+        }
+        if (morphP > 0 && queenRef.current) {
+          drawPiece(ctx, queenRef.current, cx, pieceCY, pieceH, introP * clamp(morphP * 1.6, 0, 1));
+        }
       }
 
       /* ────────────────────────────────────────────────────────────
@@ -531,9 +526,6 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
         ctx.fillStyle   = "#030508";
         ctx.fillRect(0, 0, W, H);
         ctx.restore();
-        // Re-draw rings + warp at low level on top of dark fill
-        drawWarpLines(ctx, cx, cy, W, H, 0.28, s.time * 0.6);
-        drawRings(ctx, cx, cy, W, H, easeInOut(pC), s.time);
         // Final text — 3 lines
         drawHeadline(ctx, W, H, "YOUR\nSATISFACTION\nALWAYS", easeInOut(pC), 0.44);
         if (queenRef.current) {
