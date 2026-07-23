@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
+import { CircularRevealHeading } from "@/components/ui/CircularRevealHeading";
 import styles from "./ChessReveal.module.css";
 
 export interface ChessRevealHandle {
@@ -22,26 +23,20 @@ const WARP_SEEDS: WarpSeed[] = Array.from({ length: WARP_COUNT }, (_, i) => ({
   angle:    (i / WARP_COUNT) * Math.PI * 2 + (i % 11) * 0.017,
   speed:    0.18 + (i % 7) * 0.085,
   phase:    (i * 0.6180339887) % 1,
-  width:    1.0  + (i % 5) * 0.5,       // base width multiplier
+  width:    1.0  + (i % 5) * 0.5,
   colorIdx: i % 6,
 }));
 
-// haoqi-style palette: cyan, blue, purple, magenta, teal, faint white
 const WARP_COLORS = [
-  [0, 229, 255],    // #00e5ff  cyan
-  [26, 128, 229],   // #1a80e5  blue
-  [159, 85, 255],   // #9f55ff  purple
-  [255, 68, 204],   // #ff44cc  magenta
-  [0, 200, 170],    // #00c8aa  teal
-  [180, 200, 255],  // #b4c8ff  pale blue-white
+  [0, 229, 255],
+  [26, 128, 229],
+  [159, 85, 255],
+  [255, 68, 204],
+  [0, 200, 170],
+  [180, 200, 255],
 ];
 
 /* ─── Draw perspective warp lines ───────────────────────────────────────── */
-/*
-   Each line is a wedge (trapezoid) that starts narrow at the vanishing
-   point (centre) and widens as it radiates outward — exactly the depth
-   perspective seen on haoqi.design.
-*/
 function drawWarpLines(
   ctx: CanvasRenderingContext2D,
   cx: number, cy: number,
@@ -57,7 +52,6 @@ function drawWarpLines(
   for (const seed of WARP_SEEDS) {
     const t = (seed.phase + time * seed.speed * 0.055) % 1;
 
-    // Each line occupies a band along its radial direction
     const bandLen  = maxDist * (0.06 + seed.speed * 0.09) * progress;
     const startFrac = t * progress;
     const startDist = startFrac * maxDist;
@@ -67,17 +61,14 @@ function drawWarpLines(
     const [r, g, b] = WARP_COLORS[seed.colorIdx];
     const baseAlpha = progress * (0.25 + 0.55 * easeInOut(t));
 
-    // Perpendicular direction for the wedge width
     const cos  = Math.cos(seed.angle);
     const sin  = Math.sin(seed.angle);
     const pCos = Math.cos(seed.angle + Math.PI / 2);
     const pSin = Math.sin(seed.angle + Math.PI / 2);
 
-    // Width scales from ~0 at centre to proportional at edge (perspective)
     const wStart = (startDist / maxDist) * seed.width * (1.5 + progress * 2.5);
     const wEnd   = (endDist   / maxDist) * seed.width * (1.5 + progress * 2.5);
 
-    // Corner points of the trapezoid
     const x0 = cx + cos * startDist + pCos * wStart;
     const y0 = cy + sin * startDist + pSin * wStart;
     const x1 = cx + cos * endDist   + pCos * wEnd;
@@ -87,7 +78,6 @@ function drawWarpLines(
     const x3 = cx + cos * startDist - pCos * wStart;
     const y3 = cy + sin * startDist - pSin * wStart;
 
-    // Gradient along the radial axis: transparent → solid
     const grad = ctx.createLinearGradient(
       cx + cos * startDist, cy + sin * startDist,
       cx + cos * endDist,   cy + sin * endDist,
@@ -106,7 +96,7 @@ function drawWarpLines(
   ctx.restore();
 }
 
-/* ─── Crosshair grid (haoqi.design style) ──────────────────────────────── */
+/* ─── Crosshair grid ────────────────────────────────────────────────────── */
 function drawGrid(
   ctx: CanvasRenderingContext2D,
   W: number, H: number,
@@ -116,7 +106,6 @@ function drawGrid(
   ctx.save();
   const cell = Math.min(W, H) / 14;
 
-  // Thin grid lines
   ctx.strokeStyle = "rgba(40,70,110,1)";
   ctx.lineWidth   = 0.4;
   ctx.globalAlpha = alpha * 0.35;
@@ -127,7 +116,6 @@ function drawGrid(
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
   }
 
-  // Crosshair + marks at every intersection
   ctx.strokeStyle = "rgba(80,140,180,1)";
   ctx.lineWidth   = 1;
   ctx.globalAlpha = alpha * 0.55;
@@ -155,12 +143,10 @@ function drawCornerBrackets(
   ctx.lineWidth   = 1.5;
   ctx.lineCap     = "square";
 
-  // Rectangle sits 6% in from edges
   const mx = W * 0.06, my = H * 0.08;
   const rx = mx, ry = my, rw = W - mx * 2, rh = H - my * 2;
   const arm = Math.min(W, H) * 0.04;
 
-  // Four corners: top-left, top-right, bottom-right, bottom-left
   const corners = [
     { x: rx,      y: ry,      dx:  1, dy:  1 },
     { x: rx + rw, y: ry,      dx: -1, dy:  1 },
@@ -175,13 +161,11 @@ function drawCornerBrackets(
     ctx.stroke();
   }
 
-  // Small centre crosshair
   ctx.lineWidth   = 1;
   ctx.strokeStyle = "rgba(0,229,255,0.35)";
   const carm = 12;
   ctx.beginPath(); ctx.moveTo(W / 2 - carm, H / 2); ctx.lineTo(W / 2 + carm, H / 2); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(W / 2, H / 2 - carm); ctx.lineTo(W / 2, H / 2 + carm); ctx.stroke();
-  // dot at centre
   ctx.beginPath(); ctx.arc(W / 2, H / 2, 2, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(0,229,255,0.5)"; ctx.fill();
 
@@ -205,18 +189,15 @@ function drawStatusBar(
 
   const py = H * 0.935;
 
-  // Left: site name + live coordinates that drift slightly
   const coordX = (W * 0.5 + Math.sin(time * 0.3) * 40).toFixed(0).padStart(4, "0");
   const coordY = (H * 0.5 + Math.cos(time * 0.22) * 30).toFixed(0).padStart(4, "0");
   ctx.textAlign = "left";
   ctx.fillText(`TECHZILLA.STUDIO`, W * 0.065, py);
   ctx.fillText(`${coordX} X  ${coordY} Y`, W * 0.38, py);
 
-  // Right: "system" label
   ctx.textAlign = "right";
   ctx.fillText(`SYS·ONLINE`, W * 0.935, py);
 
-  // Horizontal rule above status
   ctx.strokeStyle = "rgba(0,229,255,0.18)";
   ctx.lineWidth   = 0.5;
   ctx.beginPath();
@@ -283,13 +264,13 @@ function drawBlueFill(
   ctx.restore();
 }
 
-/* ─── Chess piece image (screen-blend removes black bg) ─────────────────── */
+/* ─── Chess piece image ──────────────────────────────────────────────────── */
 function drawPiece(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
   cx: number, cy: number,
   size: number, alpha: number,
-  rotation = 0,   // radians – piece spins around its own centre
+  rotation = 0,
 ) {
   if (alpha <= 0 || size <= 0 || !img.complete || img.naturalWidth === 0) return;
   const aspect = img.naturalWidth / img.naturalHeight;
@@ -297,42 +278,9 @@ function drawPiece(
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.globalCompositeOperation = "screen";
-  // Rotate around the piece centre
   ctx.translate(cx, cy);
   ctx.rotate(rotation);
   ctx.drawImage(img, -w * 0.5, -h * 0.5, w, h);
-  ctx.restore();
-}
-
-/* ─── Manifesto phrases ──────────────────────────────────────────────────── */
-const PHRASES = [
-  "Building tomorrow's\ndigital products.",
-  "Independent by\ndesign & engineering.",
-  "Clarity first.\nDelight second.",
-  "Ship in small loops.\nAim for long arcs.",
-];
-const PHRASE_POS = [
-  { ax: 0.72, ay: 0.30 },
-  { ax: 0.70, ay: 0.60 },
-  { ax: 0.065, ay: 0.36 },
-  { ax: 0.065, ay: 0.62 },
-];
-function drawPhrases(ctx: CanvasRenderingContext2D, W: number, H: number, progress: number) {
-  if (progress <= 0) return;
-  const fs = Math.round(clamp(W * 0.018, 12, 22));
-  ctx.save();
-  ctx.font = `300 ${fs}px 'Inter','Helvetica Neue',sans-serif`;
-  PHRASES.forEach((phrase, i) => {
-    const a = easeInOut(clamp((progress - i * 0.12) / 0.4, 0, 1));
-    if (a <= 0) return;
-    const { ax, ay } = PHRASE_POS[i];
-    ctx.globalAlpha = a * 0.80;
-    ctx.fillStyle   = "#ffffff";
-    ctx.textAlign   = "left";
-    phrase.split("\n").forEach((line, li) => {
-      ctx.fillText(line, W * ax, H * ay + li * fs * 1.4);
-    });
-  });
   ctx.restore();
 }
 
@@ -363,15 +311,50 @@ function drawHeadline(
   ctx.restore();
 }
 
+/* ─── Circular items (replacing manifesto phrases) ──────────────────────── */
+const CIRCULAR_ITEMS = [
+  {
+    text: "Clarity First",
+    image: "https://images.unsplash.com/photo-1558655146-9f40138edfeb?w=400&h=400&fit=crop&auto=format",
+  },
+  {
+    text: "Design",
+    image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=400&fit=crop&auto=format",
+  },
+  {
+    text: "Build Tomorrow",
+    image: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=400&fit=crop&auto=format",
+  },
+  {
+    text: "Ship In Loops",
+    image: "https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=400&h=400&fit=crop&auto=format",
+  },
+];
+
+const CIRCULAR_CENTER = (
+  <span
+    style={{
+      fontFamily: "var(--font-display, sans-serif)",
+      fontWeight: 900,
+      fontSize: "clamp(0.9rem, 2vw, 1.2rem)",
+      letterSpacing: "-0.02em",
+      color: "#222",
+    }}
+  >
+    TECHZILLA
+  </span>
+);
+
 /* ─── Component ─────────────────────────────────────────────────────────── */
 const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
-  const canvasRef  = useRef<HTMLCanvasElement>(null);
-  const wrapRef    = useRef<HTMLDivElement>(null);
-  const pawnRef    = useRef<HTMLImageElement | null>(null);
-  const queenRef   = useRef<HTMLImageElement | null>(null);
-  const stateRef   = useRef({
+  const canvasRef       = useRef<HTMLCanvasElement>(null);
+  const wrapRef         = useRef<HTMLDivElement>(null);
+  const circularRef     = useRef<HTMLDivElement>(null);
+  const pawnRef         = useRef<HTMLImageElement | null>(null);
+  const queenRef        = useRef<HTMLImageElement | null>(null);
+  const stateRef        = useRef({
     active:        false,
-    virtualScroll: 0,   // 0 → TOTAL
+    virtualScroll: 0,
     time:          0,
     lastTs:        0,
     rafId:         0,
@@ -381,7 +364,6 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
   /* Slide helpers ─────────────────────────────────────────────────────── */
   const slideIn = () => {
     const w = wrapRef.current; if (!w) return;
-    // Brief pause lets the portfolio exit animation play first
     w.style.transition    = "transform 0.70s cubic-bezier(0.22,1,0.36,1)";
     w.style.transform     = "translateY(0%)";
     w.style.pointerEvents = "all";
@@ -438,18 +420,14 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
       s.virtualScroll = clamp(s.virtualScroll + delta, 0, TOTAL);
 
+      // Dismiss (go back to Our Work) only when user actively scrolls back at the start
       if (s.virtualScroll <= 0 && delta < 0) {
         s.active = false;
         slideOut();
         window.dispatchEvent(new CustomEvent("chess-reveal-dismissed"));
       }
-      if (s.virtualScroll >= TOTAL) {
-        setTimeout(() => {
-          s.active = false;
-          slideOut();
-          window.dispatchEvent(new CustomEvent("chess-reveal-complete"));
-        }, 500);
-      }
+      // At the end — stay here; do NOT auto-dismiss.
+      // User must scroll back themselves to return to Our Work.
     };
 
     let touchY = 0;
@@ -483,21 +461,19 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
 
       ctx.clearRect(0, 0, W, H);
 
-      /* overall progress 0→1 */
       const p = s.virtualScroll / TOTAL;
 
       /*
-        Phase map (designed to match haoqi.design video timing):
+        Phase map:
         0.00–0.07  dark intro, grid + piece appears
-        0.07–0.46  piece grows, warp lines build in intensity
+        0.07–0.46  piece grows, warp lines build
         0.46–0.62  pawn → queen cross-fade; blue fill expands
-        0.62–0.76  full blue screen, warp lines peak, headline reveals
-        0.76–0.88  orbit rings + manifesto phrases
-        0.88–1.00  final screen: "YOUR SATISFACTION ALWAYS"
+        0.62–0.76  full blue screen, headline "TURN YOUR DREAMS TO REALITY"
+        0.76–0.88  circular component + orbit rings (headline fades OUT)
+        0.88–1.00  final screen: "YOUR\nSATISFACTION\nALWAYS" (circular fades OUT)
       */
       const introP    = easeInOut(invlerp(0.00, 0.07, p));
       const growP     = easeInOut(invlerp(0.07, 0.46, p));
-      // Morph starts as growP nears its end (pawn almost full-size) → queen
       const morphP    = easeInOut(invlerp(0.40, 0.56, p));
       const blueP     = easeInOut(invlerp(0.50, 0.72, p));
       const linesP    = easeInOut(invlerp(0.40, 0.80, p));
@@ -506,19 +482,24 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       const phrasesP  = easeInOut(invlerp(0.76, 1.00, p));
       const finalP    = easeInOut(invlerp(0.87, 0.97, p));
 
-      // Pawn rotation: 3 full clockwise spins while growing, decelerates
-      // as it approaches full size (easeOut³ → fast early, slow at end).
-      const pawnSpin  = easeOut3(growP) * Math.PI * 6;   // 3 × 360°
+      // Headline fades out as circular component fades in
+      const headlineAlpha = headlineP * (1 - phrasesP);
+      // Circular component fades out as final screen fades in
+      const circularAlpha = phrasesP * (1 - finalP);
+      // Warp lines dim behind circular component so it reads clearly
+      const effectiveLinesP = linesP * (1 - phrasesP * 0.7);
+
+      const pawnSpin  = easeOut3(growP) * Math.PI * 6;
 
       /* ── 1. Background ────────────────────────────────────────── */
       ctx.fillStyle = "#030508";
       ctx.fillRect(0, 0, W, H);
 
-      /* ── 2. Crosshair grid (fades out as blue fills) ──────────── */
+      /* ── 2. Crosshair grid ────────────────────────────────────── */
       drawGrid(ctx, W, H, introP * (1 - blueP * 0.95));
 
       /* ── 3. Perspective warp lines ────────────────────────────── */
-      drawWarpLines(ctx, cx, cy, W, H, linesP, s.time);
+      drawWarpLines(ctx, cx, cy, W, H, effectiveLinesP, s.time);
 
       /* ── 4. Radial blue fill ──────────────────────────────────── */
       drawBlueFill(ctx, cx, cy, W, H, blueP);
@@ -526,35 +507,33 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       /* ── 5. HUD corner brackets ───────────────────────────────── */
       drawCornerBrackets(ctx, W, H, introP * (1 - blueP * 0.5));
 
-      /* ── 6. Orbit rings ───────────────────────────────────────── */
+      /* ── 6. Orbit rings (visible during circular phase) ──────── */
       drawRings(ctx, cx, cy, W, H, ringsP, s.time);
 
       /* ── 7. Chess piece ───────────────────────────────────────── */
-      // Size: 4% → 52% of screen height
       const maxH   = H * 0.52;
       const minH   = maxH * 0.04;
       const sizeT  = easeOut3(clamp(growP + morphP * 0.30, 0, 1));
       const pieceH = lerp(minH, maxH, sizeT);
-
-      // Centre vertically slightly above mid to leave headline room
       const pieceCY = cy - H * 0.03;
 
-      // Pawn spins while growing; when spin decelerates to a stop it morphs into queen
       if (morphP < 1 && pawnRef.current) {
         drawPiece(ctx, pawnRef.current, cx, pieceCY, pieceH, introP * (1 - morphP), pawnSpin);
       }
       if (morphP > 0 && queenRef.current) {
-        // Queen fades in already upright (rotation = 0)
         drawPiece(ctx, queenRef.current, cx, pieceCY, pieceH, introP * clamp(morphP * 1.6, 0, 1));
       }
 
-      /* ── 8. Main headline ─────────────────────────────────────── */
-      if (headlineP > 0) {
-        drawHeadline(ctx, W, H, "TURN YOUR\nDREAMS TO\nREALITY", headlineP, 0.50);
+      /* ── 8. Main headline (fades out when circular appears) ───── */
+      if (headlineAlpha > 0) {
+        drawHeadline(ctx, W, H, "TURN YOUR\nDREAMS TO\nREALITY", headlineAlpha, 0.50);
       }
 
-      /* ── 9. Manifesto phrases ─────────────────────────────────── */
-      if (phrasesP > 0) drawPhrases(ctx, W, H, phrasesP);
+      /* ── 9. Circular overlay opacity (controlled via DOM ref) ──── */
+      if (circularRef.current) {
+        circularRef.current.style.opacity = circularAlpha.toFixed(4);
+        circularRef.current.style.pointerEvents = circularAlpha > 0.05 ? "auto" : "none";
+      }
 
       /* ── 10. Final screen ─────────────────────────────────────── */
       if (finalP > 0) {
@@ -569,8 +548,8 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
         drawWarpLines(ctx, cx, cy, W, H, 0.28, s.time * 0.6);
         drawRings(ctx, cx, cy, W, H, finalP, s.time);
 
-        // Final headline
-        drawHeadline(ctx, W, H, "YOUR SATISFACTION\nALWAYS", finalP, 0.44);
+        // Final headline — three separate lines
+        drawHeadline(ctx, W, H, "YOUR\nSATISFACTION\nALWAYS", finalP, 0.44);
 
         // Small queen icon below text
         if (queenRef.current) {
@@ -581,7 +560,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
         drawCornerBrackets(ctx, W, H, finalP * 0.70);
       }
 
-      /* ── 11. Status bar (always on when visible) ──────────────── */
+      /* ── 11. Status bar ───────────────────────────────────────── */
       drawStatusBar(ctx, W, H, introP * (finalP > 0 ? finalP : 1), s.time);
     };
 
@@ -604,6 +583,28 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       style={{ transform: "translateY(100%)", pointerEvents: "none", transition: "none" }}
     >
       <canvas ref={canvasRef} className={styles.canvas} />
+
+      {/* Circular reveal overlay — replaces manifesto phrases */}
+      <div
+        ref={circularRef}
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: 0,
+          pointerEvents: "none",
+          zIndex: 10,
+          transition: "opacity 0.1s linear",
+        }}
+      >
+        <CircularRevealHeading
+          items={CIRCULAR_ITEMS}
+          centerText={CIRCULAR_CENTER}
+          size="md"
+        />
+      </div>
     </div>
   );
 });
