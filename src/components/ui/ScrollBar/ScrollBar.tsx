@@ -14,6 +14,10 @@ export default function ScrollBar() {
   const dragging   = useRef(false);
   const dragStartY = useRef(0);
   const dragStartScroll = useRef(0);
+  // Chess reveal mode: while active the thumb tracks chess progress (0–1) so
+  // the scrollbar looks identical to normal mode — same size, same position logic.
+  const revealActive   = useRef(false);
+  const revealProgress = useRef(0);
 
   useEffect(() => {
     const track = trackRef.current;
@@ -57,10 +61,47 @@ export default function ScrollBar() {
     const updateThumb = () => {
       const { scrollTop, scrollHeight, clientHeight } = getScrollInfo();
       const docHeight = scrollHeight - clientHeight;
-      const progress = docHeight > 0 ? scrollTop / docHeight : 0;
+      // During chess reveal, use the chess progress (0–1) so the thumb travels
+      // from top to bottom of the track — exactly like normal scroll progress —
+      // without changing size or appearance.
+      const progress = revealActive.current
+        ? revealProgress.current
+        : docHeight > 0
+          ? scrollTop / docHeight
+          : 0;
       const { trackH, thumbH } = getThumbMetrics();
       thumb.style.height    = `${thumbH}px`;
       thumb.style.transform = `translateY(${progress * (trackH - thumbH)}px)`;
+    };
+
+    // ── chess reveal helpers ──────────────────────────────────────────────────
+    const seekReveal = (progress: number) => {
+      revealProgress.current = Math.max(0, Math.min(1, progress));
+      window.dispatchEvent(new CustomEvent("chess-reveal-seek", {
+        detail: { progress: revealProgress.current },
+      }));
+      updateThumb();
+      show();
+      scheduleHide();
+    };
+
+    const onRevealMode = (e: Event) => {
+      revealActive.current = Boolean(
+        (e as CustomEvent<{ active?: boolean }>).detail?.active,
+      );
+      revealProgress.current = 0;
+      updateThumb();
+      if (revealActive.current) show();
+    };
+
+    const onRevealProgress = (e: Event) => {
+      if (!revealActive.current) return;
+      const progress = (e as CustomEvent<{ progress?: number }>).detail?.progress;
+      if (typeof progress !== "number") return;
+      revealProgress.current = Math.max(0, Math.min(1, progress));
+      updateThumb();
+      show();
+      scheduleHide();
     };
 
     // ── scroll tracking ───────────────────────────────────────────────────────
@@ -93,6 +134,13 @@ export default function ScrollBar() {
     // ── drag: global mousemove ────────────────────────────────────────────────
     const onDocMouseMove = (e: MouseEvent) => {
       if (!dragging.current) return;
+      if (revealActive.current) {
+        const { trackH, thumbH } = getThumbMetrics();
+        const progress = (e.clientY - track.getBoundingClientRect().top - thumbH / 2) /
+          (trackH - thumbH);
+        seekReveal(progress);
+        return;
+      }
       const { scrollHeight, clientHeight } = getScrollInfo();
       const docHeight = scrollHeight - clientHeight;
       const { trackH, thumbH } = getThumbMetrics();
@@ -120,6 +168,12 @@ export default function ScrollBar() {
     // ── click on track (not thumb) to jump ───────────────────────────────────
     const onTrackClick = (e: MouseEvent) => {
       if (e.target === thumb) return;
+      if (revealActive.current) {
+        const trackRect = track.getBoundingClientRect();
+        const { trackH, thumbH } = getThumbMetrics();
+        seekReveal((e.clientY - trackRect.top - thumbH / 2) / (trackH - thumbH));
+        return;
+      }
       const { scrollHeight, clientHeight } = getScrollInfo();
       const docHeight  = scrollHeight - clientHeight;
       const trackRect  = track.getBoundingClientRect();
@@ -140,10 +194,11 @@ export default function ScrollBar() {
     const onTrackLeave = () => { if (!dragging.current) scheduleHide(); };
 
     // ── attach ────────────────────────────────────────────────────────────────
-    // Listen on the custom scroller AND window for coverage
     const scroller = getScroller();
     const scrollTarget = scroller ?? window;
     scrollTarget.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("chess-reveal-mode",     onRevealMode);
+    window.addEventListener("chess-reveal-progress", onRevealProgress);
 
     window.addEventListener("mousemove", onWindowMouseMove, { passive: true });
     document.addEventListener("mousemove", onDocMouseMove,  { passive: true });
@@ -157,6 +212,8 @@ export default function ScrollBar() {
 
     return () => {
       scrollTarget.removeEventListener("scroll", onScroll);
+      window.removeEventListener("chess-reveal-mode",     onRevealMode);
+      window.removeEventListener("chess-reveal-progress", onRevealProgress);
       window.removeEventListener("mousemove", onWindowMouseMove);
       document.removeEventListener("mousemove", onDocMouseMove);
       document.removeEventListener("mouseup",   onDocMouseUp);

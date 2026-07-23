@@ -456,14 +456,55 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     resize();
     window.addEventListener("resize", resize);
 
-    // Wheel and touch scroll are now handled via real document scroll in page.tsx.
-    // The chess animation is driven by chess-reveal-seek events dispatched from
-    // the page scroll handler, so native scroll and the browser scrollbar both
-    // cover the full journey from hero to the final screen.
+    // ── Wheel: captures scroll input while chess panel is active ─────────────
+    const onWheel = (e: WheelEvent) => {
+      if (!s.active) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+      applyVirtualDelta(delta);
+      // At the end — stay there; never auto-dismiss.
+    };
+
+    // ── Touch ─────────────────────────────────────────────────────────────────
+    let touchY = 0;
+    const onTouchStart = (e: TouchEvent) => { if (s.active) touchY = e.touches[0]?.clientY ?? 0; };
+    const onTouchMove  = (e: TouchEvent) => {
+      if (!s.active) return;
+      e.preventDefault();
+      const dy = touchY - (e.touches[0]?.clientY ?? 0);
+      touchY   = e.touches[0]?.clientY ?? 0;
+      applyVirtualDelta(dy * 3);
+    };
+
+    // ── Keyboard: arrow keys, Page Up/Down, Space, Home/End ──────────────────
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!s.active) return;
+      let delta = 0;
+      switch (e.key) {
+        case "ArrowDown":  delta =  80;   break;
+        case "ArrowUp":    delta = -80;   break;
+        case "PageDown":   delta =  600;  break;
+        case "PageUp":     delta = -600;  break;
+        case " ":          delta = e.shiftKey ? -600 : 600; break;
+        case "End":        setVirtualScroll(TOTAL); return;
+        case "Home":       applyVirtualDelta(-TOTAL); return;
+        default: return;
+      }
+      e.preventDefault();
+      applyVirtualDelta(delta);
+    };
+
+    // ── Scrollbar seek (drag/click on the custom scrollbar) ──────────────────
     const onRevealSeek = (e: Event) => {
       const progress = (e as CustomEvent<{ progress?: number }>).detail?.progress;
       if (typeof progress === "number") seekVirtualScroll(progress);
     };
+
+    window.addEventListener("wheel",            onWheel,       { passive: false, capture: true });
+    window.addEventListener("touchstart",       onTouchStart,  { passive: true  });
+    window.addEventListener("touchmove",        onTouchMove,   { passive: false, capture: true });
+    window.addEventListener("keydown",          onKeyDown,     { capture: true  });
     window.addEventListener("chess-reveal-seek", onRevealSeek);
 
     const tick = (ts: number) => {
@@ -574,6 +615,10 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     return () => {
       cancelAnimationFrame(s.rafId);
       window.removeEventListener("resize", resize);
+      window.removeEventListener("wheel",             onWheel,      { capture: true } as EventListenerOptions);
+      window.removeEventListener("touchstart",        onTouchStart);
+      window.removeEventListener("touchmove",         onTouchMove,  { capture: true } as EventListenerOptions);
+      window.removeEventListener("keydown",           onKeyDown,    { capture: true } as EventListenerOptions);
       window.removeEventListener("chess-reveal-seek", onRevealSeek);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

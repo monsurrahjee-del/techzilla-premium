@@ -47,9 +47,6 @@ export default function Home() {
 
   // Chess reveal
   const chessActiveRef = useRef(false);
-  const CHESS_TOTAL = 5200;                    // must match ChessReveal TOTAL
-  const chessBaseScrollRef = useRef(0);        // real scrollY at the moment chess activates
-  const [chessActive, setChessActive] = useState(false);
 
   const VAPOR_SESSION_KEY = "tz_vapor_done";
 
@@ -200,39 +197,11 @@ export default function Home() {
       const max = document.documentElement.scrollHeight - window.innerHeight;
       if (!max) return;
 
-      // Chess reveal is driven by real document scroll (no virtual scroll).
-      if (chessActiveRef.current) {
-        const chessScroll = window.scrollY - chessBaseScrollRef.current;
-        if (chessScroll < -5) {
-          // User scrolled back past the chess start — slide panel out and
-          // re-arm the portfolio gate exactly as if chess was dismissed.
-          chessActiveRef.current = false;
-          setChessActive(false);
-          chessRef.current?.deactivate();
-          frozenScrollRef.current = chessBaseScrollRef.current;
-          window.scrollTo(0, chessBaseScrollRef.current);
-          portfolioHoldRef.current          = true;
-          portfolioHoldTriggeredRef.current = true;
-          portfolioGateReadyRef.current     = false;
-          setPortfolioHolding(true);
-          if (portfolioGateTimerRef.current) clearTimeout(portfolioGateTimerRef.current);
-          portfolioGateTimerRef.current = setTimeout(() => {
-            portfolioGateReadyRef.current = true;
-            portfolioGateTimerRef.current = null;
-          }, 2000);
-          return;
-        }
-        const chessProgress = Math.max(0, Math.min(1, chessScroll / CHESS_TOTAL));
-        window.dispatchEvent(
-          new CustomEvent("chess-reveal-seek", { detail: { progress: chessProgress } })
-        );
-        return;
-      }
-
       if (
         vaporActiveRef.current    ||
         servicesHoldRef.current   ||
-        portfolioHoldRef.current
+        portfolioHoldRef.current  ||
+        chessActiveRef.current
       ) {
         window.scrollTo(0, frozenScrollRef.current);
         return;
@@ -242,6 +211,21 @@ export default function Home() {
     };
 
     window.addEventListener("scroll", onScroll, { passive: true });
+
+    /* Chess events ──────────────────────────────────────────────────────── */
+    const onChessDismissed = () => {
+      chessActiveRef.current = false;
+      // Portfolio CSS animation was never touched — it's still at translateX(0%)
+      // (scroll frozen at pMax), so Our Work is already visible the moment chess
+      // slides back down. Start the same deliberate gate on the way back too:
+      // wait two seconds, then wait for a new user scroll before releasing.
+      beginPortfolioGate();
+    };
+    const onChessComplete = () => {
+      chessActiveRef.current = false;
+    };
+    window.addEventListener("chess-reveal-dismissed", onChessDismissed);
+    window.addEventListener("chess-reveal-complete",  onChessComplete);
 
     /* Initial evaluation ────────────────────────────────────────────────── */
     const initMax = document.documentElement.scrollHeight - window.innerHeight;
@@ -259,6 +243,8 @@ export default function Home() {
         portfolioGateTimerRef.current = null;
       }
       window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("chess-reveal-dismissed", onChessDismissed);
+      window.removeEventListener("chess-reveal-complete",  onChessComplete);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -319,14 +305,11 @@ export default function Home() {
       setPortfolioHolding(false);
 
       if (delta > 0) {
-        // Downward input opens the chess page. We extend the real document with
-        // a scroll spacer so the browser scrollbar covers the full journey.
-        chessBaseScrollRef.current = frozenScrollRef.current;
+        // Downward input moves into the chess page. Activate it before releasing
+        // the hold so the page scroll handler cannot run in the gap.
         chessActiveRef.current = true;
         chessRef.current?.activate();
-        setChessActive(true);
-        // Nudge the document forward so the scroll event fires and chess progress begins.
-        window.scrollTo({ top: frozenScrollRef.current + Math.min(Math.max(delta, 1), 120), behavior: "instant" });
+        chessRef.current?.scrollBy(delta);
         return;
       }
 
@@ -418,14 +401,6 @@ export default function Home() {
           <Portfolio active={portfolioActive} />
         </div>
       </div>
-
-      {/* Real-scroll spacer for chess reveal — extends the document so the
-          browser's native scrollbar tracks the full journey from hero to the
-          final "YOUR SATISFACTION ALWAYS" screen. Only present while chess is
-          active; CHESS_TOTAL matches the value in ChessReveal.tsx. */}
-      {chessActive && (
-        <div style={{ height: CHESS_TOTAL }} aria-hidden="true" />
-      )}
 
       {/* ServicesIntro overlay */}
       <ServicesIntro
