@@ -289,6 +289,7 @@ function drawPiece(
   img: HTMLImageElement,
   cx: number, cy: number,
   size: number, alpha: number,
+  rotation = 0,   // radians – piece spins around its own centre
 ) {
   if (alpha <= 0 || size <= 0 || !img.complete || img.naturalWidth === 0) return;
   const aspect = img.naturalWidth / img.naturalHeight;
@@ -296,7 +297,10 @@ function drawPiece(
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.globalCompositeOperation = "screen";
-  ctx.drawImage(img, cx - w * 0.5, cy - h * 0.5, w, h);
+  // Rotate around the piece centre
+  ctx.translate(cx, cy);
+  ctx.rotate(rotation);
+  ctx.drawImage(img, -w * 0.5, -h * 0.5, w, h);
   ctx.restore();
 }
 
@@ -493,13 +497,18 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       */
       const introP    = easeInOut(invlerp(0.00, 0.07, p));
       const growP     = easeInOut(invlerp(0.07, 0.46, p));
-      const morphP    = easeInOut(invlerp(0.46, 0.62, p));
+      // Morph starts as growP nears its end (pawn almost full-size) → queen
+      const morphP    = easeInOut(invlerp(0.40, 0.56, p));
       const blueP     = easeInOut(invlerp(0.50, 0.72, p));
       const linesP    = easeInOut(invlerp(0.40, 0.80, p));
       const headlineP = easeInOut(invlerp(0.62, 0.76, p));
       const ringsP    = easeInOut(invlerp(0.74, 0.87, p));
       const phrasesP  = easeInOut(invlerp(0.76, 1.00, p));
       const finalP    = easeInOut(invlerp(0.87, 0.97, p));
+
+      // Pawn rotation: 3 full clockwise spins while growing, decelerates
+      // as it approaches full size (easeOut³ → fast early, slow at end).
+      const pawnSpin  = easeOut3(growP) * Math.PI * 6;   // 3 × 360°
 
       /* ── 1. Background ────────────────────────────────────────── */
       ctx.fillStyle = "#030508";
@@ -530,10 +539,12 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       // Centre vertically slightly above mid to leave headline room
       const pieceCY = cy - H * 0.03;
 
+      // Pawn spins while growing; when spin decelerates to a stop it morphs into queen
       if (morphP < 1 && pawnRef.current) {
-        drawPiece(ctx, pawnRef.current, cx, pieceCY, pieceH, introP * (1 - morphP));
+        drawPiece(ctx, pawnRef.current, cx, pieceCY, pieceH, introP * (1 - morphP), pawnSpin);
       }
       if (morphP > 0 && queenRef.current) {
+        // Queen fades in already upright (rotation = 0)
         drawPiece(ctx, queenRef.current, cx, pieceCY, pieceH, introP * clamp(morphP * 1.6, 0, 1));
       }
 
