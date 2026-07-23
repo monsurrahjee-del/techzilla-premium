@@ -7,6 +7,35 @@ import styles from "./ScrollBar.module.css";
 const getScroller = () =>
   (document.getElementById("main-scroller") as HTMLElement | null) ?? null;
 
+/**
+ * Virtual-scroll budget for the sections that live beyond the document scroll.
+ * We treat each as a fraction of clientHeight so the thumb allocation scales
+ * correctly across different viewport sizes.
+ *
+ * Chess  → 1.2 × clientHeight   (~20 % of the bar on a typical layout)
+ * Craft  → 0.5 × clientHeight   (~8 % of the bar)
+ *
+ * Adjust these constants if the relative weight of each section needs tuning.
+ */
+const CHESS_VH_SCALE = 1.2;
+const CRAFT_VH_SCALE = 0.5;
+
+/** Total virtual height used for thumb-fraction arithmetic. */
+const totalVirtH = (docMax: number, clientH: number) =>
+  docMax + clientH * CHESS_VH_SCALE + clientH * CRAFT_VH_SCALE;
+
+/** Fraction of the track where chess begins (= end of document scroll). */
+const chessStartFrac = (docMax: number, clientH: number) => {
+  const tv = totalVirtH(docMax, clientH);
+  return tv > 0 ? docMax / tv : 1;
+};
+
+/** Fraction of the track that the chess section occupies. */
+const chessFrac = (clientH: number, docMax: number) => {
+  const tv = totalVirtH(docMax, clientH);
+  return tv > 0 ? (clientH * CHESS_VH_SCALE) / tv : 0;
+};
+
 export default function ScrollBar() {
   const trackRef   = useRef<HTMLDivElement>(null);
   const thumbRef   = useRef<HTMLDivElement>(null);
@@ -15,15 +44,14 @@ export default function ScrollBar() {
   const dragStartY = useRef(0);
   const dragStartScroll = useRef(0);
 
-  // ── Chess reveal state ──────────────────────────────────────────────────
-  const revealActive       = useRef(false);
-  const revealProgress     = useRef(0);
-  const chessStartProgress = useRef(1); // scroll fraction when chess begins
+  // ── Chess / craft state ─────────────────────────────────────────────────
+  const chessActive      = useRef(false);
+  const craftActive      = useRef(false);
+  /** Chess internal progress 0-1, updated from chess-reveal-progress events. */
+  const chessRawProgress = useRef(0);
 
   // ── Portfolio gate / scroll-freeze state ────────────────────────────────
-  // True while page.tsx has the scroll position locked.
-  const scrollFrozen  = useRef(false);
-  // True once the 2-second gate timer fires (page is ready to release).
+  const scrollFrozen    = useRef(false);
   const scrollGateReady = useRef(false);
 
   useEffect(() => {
@@ -51,7 +79,7 @@ export default function ScrollBar() {
         return { scrollTop: el.scrollTop, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight };
       }
       return {
-        scrollTop: window.scrollY,
+        scrollTop:    window.scrollY,
         scrollHeight: document.documentElement.scrollHeight,
         clientHeight: window.innerHeight,
       };
@@ -61,63 +89,82 @@ export default function ScrollBar() {
       const { scrollHeight, clientHeight } = getScrollInfo();
       return {
         trackH: track.clientHeight,
+        // Thumb height is proportional to the doc-only range so it stays a
+        // reasonable size (we don't let the total-virtual range shrink it).
         thumbH: Math.max(12, Math.min(40, (clientHeight / scrollHeight) * track.clientHeight)),
       };
     };
 
     // ── Thumb position ────────────────────────────────────────────────────
+    /**
+     * Map the current state (doc scroll / chess progress / craft) to a 0-1
+     * fraction for the thumb position.
+     *
+     * overrideFraction: pass a ready-made fraction (e.g. during drag feedback)
+     *   to skip all state-based calculations.
+     */
     const updateThumb = (overrideFraction?: number) => {
       const { scrollTop, scrollHeight, clientHeight } = getScrollInfo();
-      const docHeight = scrollHeight - clientHeight;
+      const docMax = scrollHeight - clientHeight;
 
       let progress: number;
+
       if (overrideFraction !== undefined) {
         progress = overrideFraction;
-      } else if (revealActive.current) {
-        progress = revealProgress.current;
+      } else if (craftActive.current) {
+        // Craft is the last section — thumb sits at 100 %.
+        progress = 1;
+      } else if (chessActive.current) {
+        // Chess occupies the slice immediately after the doc scroll.
+        const csf = chessStartFrac(docMax, clientHeight);
+        const cf  = chessFrac(clientHeight, docMax);
+        progress  = csf + chessRawProgress.current * cf;
       } else {
-        progress = docHeight > 0 ? scrollTop / docHeight : 0;
+        // Normal document scroll: map scrollTop into the doc portion of the bar.
+        const tv = totalVirtH(docMax, clientHeight);
+        progress = tv > 0 ? scrollTop / tv : 0;
       }
 
       const { trackH, thumbH } = getThumbMetrics();
       thumb.style.height    = `${thumbH}px`;
-      thumb.style.transform = `translateY(${Math.max(0, Math.min(trackH - thumbH, progress * (trackH - thumbH)))}px)`;
+      thumb.style.transform =
+        `translateY(${Math.max(0, Math.min(trackH - thumbH, progress * (trackH - thumbH)))}px)`;
     };
 
-    // ── Compute the track fraction for an absolute mouse Y position ───────
+    // ── Compute track fraction from pointer Y ─────────────────────────────
     const fractionFromClientY = (clientY: number) => {
       const { trackH, thumbH } = getThumbMetrics();
       const trackRect = track.getBoundingClientRect();
-      const posY = clientY - trackRect.top - thumbH / 2;
+      const posY      = clientY - trackRect.top - thumbH / 2;
       return Math.max(0, Math.min(1, posY / (trackH - thumbH)));
     };
 
-    // ── Chess reveal helpers ──────────────────────────────────────────────
-
+    // ── Scrollbar seek during chess reveal ────────────────────────────────
     /**
-     * Called from scrollbar drag/click while chess reveal is active.
-     * rawProgress: 0-1 track fraction from the user's pointer.
-     *   - If above chessStartProgress → maps into chess space, seeks forward.
-     *   - If below chessStartProgress → seeks chess to 0 (dismisses it).
+     * rawTrackFraction: the 0-1 position along the track from the user's pointer.
+     *
+     * • Dragging into the chess zone (≥ chessStartFrac) → seek chess forward.
+     * • Dragging below the chess zone (< chessStartFrac) → dismiss chess.
      */
-    const seekReveal = (rawProgress: number) => {
-      const start = chessStartProgress.current;
+    const seekReveal = (rawTrackFraction: number) => {
+      const { scrollHeight, clientHeight } = getScrollInfo();
+      const docMax = scrollHeight - clientHeight;
+      const csf    = chessStartFrac(docMax, clientHeight);
+      const cf     = chessFrac(clientHeight, docMax);
 
-      if (rawProgress < start) {
-        // User dragging backward past where chess started → dismiss chess.
-        // Show the thumb moving back so the user gets visual feedback.
-        revealProgress.current = rawProgress;
-        updateThumb();
+      if (rawTrackFraction < csf) {
+        // User dragged backward past where chess started → dismiss.
+        chessRawProgress.current = 0;
+        updateThumb(rawTrackFraction);
         window.dispatchEvent(
           new CustomEvent("chess-reveal-seek", { detail: { progress: 0 } }),
         );
       } else {
-        // Map rawProgress (start..1) → chessProgress (0..1).
-        const remaining    = 1 - start;
-        const chessProgress = remaining > 0
-          ? Math.max(0, Math.min(1, (rawProgress - start) / remaining))
+        // Map the raw fraction into chess-internal 0-1 progress.
+        const chessProgress = cf > 0
+          ? Math.max(0, Math.min(1, (rawTrackFraction - csf) / cf))
           : 1;
-        revealProgress.current = Math.min(1, rawProgress);
+        chessRawProgress.current = chessProgress;
         updateThumb();
         window.dispatchEvent(
           new CustomEvent("chess-reveal-seek", { detail: { progress: chessProgress } }),
@@ -131,49 +178,52 @@ export default function ScrollBar() {
     // ── Chess reveal mode event ───────────────────────────────────────────
     const onRevealMode = (e: Event) => {
       const active = Boolean((e as CustomEvent<{ active?: boolean }>).detail?.active);
-      revealActive.current = active;
+      chessActive.current = active;
 
       if (active) {
-        // Capture the scroll fraction exactly so thumb never resets.
-        const { scrollTop, scrollHeight, clientHeight } = getScrollInfo();
-        const docHeight = scrollHeight - clientHeight;
-        chessStartProgress.current = docHeight > 0 ? Math.min(1, scrollTop / docHeight) : 1;
-        revealProgress.current     = chessStartProgress.current;
+        // If craft was showing and chess re-activates (user scrolled back from
+        // craft), keep chessRawProgress at 1 — it will be updated immediately
+        // by the chess-reveal-progress event that follows.
+        craftActive.current = false;
       } else {
-        // Chess deactivated — return to normal scroll tracking.
-        chessStartProgress.current = 1;
-        revealProgress.current     = 0;
+        chessRawProgress.current = 0;
       }
+
       updateThumb();
       if (active) show();
     };
 
-    // ── Chess progress event (from ChessReveal RAF) ───────────────────────
+    // ── Chess progress event (from ChessReveal RAF loop) ──────────────────
     const onRevealProgress = (e: Event) => {
-      if (!revealActive.current) return;
+      if (!chessActive.current) return;
       const chessProgress = (e as CustomEvent<{ progress?: number }>).detail?.progress;
       if (typeof chessProgress !== "number") return;
-
-      const start   = chessStartProgress.current;
-      const clamped = Math.max(0, Math.min(1, chessProgress));
-      revealProgress.current = start + (1 - start) * clamped;
+      chessRawProgress.current = Math.max(0, Math.min(1, chessProgress));
       updateThumb();
       show();
       scheduleHide();
     };
 
+    // ── Craft section events ──────────────────────────────────────────────
+    const onCraftActivate = () => {
+      craftActive.current     = true;
+      chessActive.current     = false; // chess stays rendered but bar shows craft
+      chessRawProgress.current = 1;
+      updateThumb();
+      show();
+      scheduleHide();
+    };
+    const onCraftDismiss = () => {
+      // Chess re-activates (chess-reveal-mode fires right after this) —
+      // just reset craft flag; chess events will take over.
+      craftActive.current = false;
+      updateThumb();
+    };
+
     // ── Freeze / gate events from page.tsx ────────────────────────────────
-    const onScrollFrozen = () => {
-      scrollFrozen.current    = true;
-      scrollGateReady.current = false;
-    };
-    const onScrollGateReady = () => {
-      scrollGateReady.current = true;
-    };
-    const onScrollReleased = () => {
-      scrollFrozen.current    = false;
-      scrollGateReady.current = false;
-    };
+    const onScrollFrozen    = () => { scrollFrozen.current    = true;  scrollGateReady.current = false; };
+    const onScrollGateReady = () => { scrollGateReady.current = true; };
+    const onScrollReleased  = () => { scrollFrozen.current    = false; scrollGateReady.current = false; };
 
     // ── Normal scroll tracking ────────────────────────────────────────────
     const onScroll = () => {
@@ -183,7 +233,7 @@ export default function ScrollBar() {
       scheduleHide();
     };
 
-    // ── Hover zone: right 72px of viewport ───────────────────────────────
+    // ── Hover zone: right 72 px of viewport ──────────────────────────────
     const onWindowMouseMove = (e: MouseEvent) => {
       if (e.clientX >= window.innerWidth - 72) {
         show();
@@ -206,25 +256,24 @@ export default function ScrollBar() {
     const onDocMouseMove = (e: MouseEvent) => {
       if (!dragging.current) return;
 
-      // ── Chess reveal mode: seek via chess events ──────────────────────
-      if (revealActive.current) {
+      // Chess reveal mode: seek via chess events.
+      if (chessActive.current) {
         seekReveal(fractionFromClientY(e.clientY));
         return;
       }
 
-      // ── Frozen (portfolio gate): dispatch navigate intent ─────────────
+      // Frozen (portfolio gate): dispatch navigate intent.
       if (scrollFrozen.current) {
         const targetFraction = fractionFromClientY(e.clientY);
         const { scrollHeight, clientHeight } = getScrollInfo();
-        const docHeight  = scrollHeight - clientHeight;
-        const frozenFrac = docHeight > 0 ? getScrollInfo().scrollTop / docHeight : 1;
+        const docMax     = scrollHeight - clientHeight;
+        const frozenFrac = docMax > 0 ? getScrollInfo().scrollTop / docMax : 1;
 
-        // Always allow backward; allow forward only once gate is ready.
         const goingBack    = targetFraction < frozenFrac - 0.01;
         const goingForward = targetFraction > frozenFrac + 0.01 && scrollGateReady.current;
 
         if (goingBack || goingForward) {
-          updateThumb(targetFraction); // move thumb visually
+          updateThumb(targetFraction);
           window.dispatchEvent(
             new CustomEvent("tz-scrollbar-navigate", { detail: { fraction: targetFraction } }),
           );
@@ -232,13 +281,15 @@ export default function ScrollBar() {
         return;
       }
 
-      // ── Normal scroll ─────────────────────────────────────────────────
+      // Normal scroll.
       const { scrollHeight, clientHeight } = getScrollInfo();
-      const docHeight   = scrollHeight - clientHeight;
+      const docMax          = scrollHeight - clientHeight;
       const { trackH, thumbH } = getThumbMetrics();
-      const dy          = e.clientY - dragStartY.current;
-      const scrollDelta = (dy / (trackH - thumbH)) * docHeight;
-      const newScroll   = Math.max(0, Math.min(docHeight, dragStartScroll.current + scrollDelta));
+      const dy              = e.clientY - dragStartY.current;
+      // During drag, map thumb movement to the *document* scroll range
+      // (same feel as before — the virtual extension doesn't change drag speed).
+      const scrollDelta = (dy / (trackH - thumbH)) * docMax;
+      const newScroll   = Math.max(0, Math.min(docMax, dragStartScroll.current + scrollDelta));
 
       const scroller = getScroller();
       if (scroller) {
@@ -261,7 +312,7 @@ export default function ScrollBar() {
     const onTrackClick = (e: MouseEvent) => {
       if (e.target === thumb) return;
 
-      if (revealActive.current) {
+      if (chessActive.current) {
         seekReveal(fractionFromClientY(e.clientY));
         return;
       }
@@ -275,9 +326,10 @@ export default function ScrollBar() {
       }
 
       const { scrollHeight, clientHeight } = getScrollInfo();
-      const docHeight  = scrollHeight - clientHeight;
-      const progress   = fractionFromClientY(e.clientY);
-      const newScroll  = progress * docHeight;
+      const docMax   = scrollHeight - clientHeight;
+      const progress = fractionFromClientY(e.clientY);
+      // Map click fraction → document scroll position (only the doc range is clickable here).
+      const newScroll = progress * docMax;
 
       const scroller = getScroller();
       if (scroller) {
@@ -293,14 +345,16 @@ export default function ScrollBar() {
     // ── Attach ────────────────────────────────────────────────────────────
     const scroller     = getScroller();
     const scrollTarget = scroller ?? window;
-    scrollTarget.addEventListener("scroll",              onScroll,           { passive: true });
+    scrollTarget.addEventListener("scroll",              onScroll,          { passive: true });
     window.addEventListener("chess-reveal-mode",         onRevealMode);
     window.addEventListener("chess-reveal-progress",     onRevealProgress);
+    window.addEventListener("craft-section-activate",    onCraftActivate);
+    window.addEventListener("craft-section-dismiss",     onCraftDismiss);
     window.addEventListener("tz-scroll-frozen",          onScrollFrozen);
     window.addEventListener("tz-scroll-gate-ready",      onScrollGateReady);
     window.addEventListener("tz-scroll-released",        onScrollReleased);
-    window.addEventListener("mousemove",                 onWindowMouseMove,  { passive: true });
-    document.addEventListener("mousemove",               onDocMouseMove,     { passive: true });
+    window.addEventListener("mousemove",                 onWindowMouseMove, { passive: true });
+    document.addEventListener("mousemove",               onDocMouseMove,    { passive: true });
     document.addEventListener("mouseup",                 onDocMouseUp);
     thumb.addEventListener("mousedown",                  onThumbDown);
     track.addEventListener("mouseenter",                 onTrackEnter);
@@ -310,19 +364,21 @@ export default function ScrollBar() {
     updateThumb();
 
     return () => {
-      scrollTarget.removeEventListener("scroll", onScroll);
-      window.removeEventListener("chess-reveal-mode",     onRevealMode);
-      window.removeEventListener("chess-reveal-progress", onRevealProgress);
-      window.removeEventListener("tz-scroll-frozen",      onScrollFrozen);
-      window.removeEventListener("tz-scroll-gate-ready",  onScrollGateReady);
-      window.removeEventListener("tz-scroll-released",    onScrollReleased);
-      window.removeEventListener("mousemove",             onWindowMouseMove);
-      document.removeEventListener("mousemove",           onDocMouseMove);
-      document.removeEventListener("mouseup",             onDocMouseUp);
-      thumb.removeEventListener("mousedown",              onThumbDown);
-      track.removeEventListener("mouseenter",             onTrackEnter);
-      track.removeEventListener("mouseleave",             onTrackLeave);
-      track.removeEventListener("click",                  onTrackClick);
+      scrollTarget.removeEventListener("scroll",            onScroll);
+      window.removeEventListener("chess-reveal-mode",       onRevealMode);
+      window.removeEventListener("chess-reveal-progress",   onRevealProgress);
+      window.removeEventListener("craft-section-activate",  onCraftActivate);
+      window.removeEventListener("craft-section-dismiss",   onCraftDismiss);
+      window.removeEventListener("tz-scroll-frozen",        onScrollFrozen);
+      window.removeEventListener("tz-scroll-gate-ready",    onScrollGateReady);
+      window.removeEventListener("tz-scroll-released",      onScrollReleased);
+      window.removeEventListener("mousemove",               onWindowMouseMove);
+      document.removeEventListener("mousemove",             onDocMouseMove);
+      document.removeEventListener("mouseup",               onDocMouseUp);
+      thumb.removeEventListener("mousedown",                onThumbDown);
+      track.removeEventListener("mouseenter",               onTrackEnter);
+      track.removeEventListener("mouseleave",               onTrackLeave);
+      track.removeEventListener("click",                    onTrackClick);
       if (hideTimer.current) clearTimeout(hideTimer.current);
     };
   }, []);
