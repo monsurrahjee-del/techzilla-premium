@@ -517,6 +517,18 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     window.addEventListener("keydown",          onKeyDown,     { capture: true  });
     window.addEventListener("chess-reveal-seek", onRevealSeek);
 
+    // ── When craft section is dismissed (scroll-up), re-activate ChessReveal at end ─
+    const onCraftDismiss = () => {
+      craftActivatedRef.current = false;
+      const s = stateRef.current;
+      s.active        = true;
+      s.virtualScroll = TOTAL;
+      window.dispatchEvent(new CustomEvent("chess-reveal-mode", { detail: { active: true } }));
+      window.dispatchEvent(new CustomEvent("chess-reveal-progress", { detail: { progress: 1 } }));
+      slideIn();
+    };
+    window.addEventListener("craft-section-dismiss", onCraftDismiss);
+
     const tick = (ts: number) => {
       s.rafId = requestAnimationFrame(tick);
       if (!s.active && s.virtualScroll <= 0) { s.lastTs = ts; return; }
@@ -630,6 +642,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       window.removeEventListener("touchmove",         onTouchMove,  { capture: true } as EventListenerOptions);
       window.removeEventListener("keydown",           onKeyDown,    { capture: true } as EventListenerOptions);
       window.removeEventListener("chess-reveal-seek", onRevealSeek);
+      window.removeEventListener("craft-section-dismiss", onCraftDismiss);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

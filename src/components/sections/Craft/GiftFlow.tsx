@@ -8,7 +8,7 @@ import PlayingCard from "./PlayingCard";
 // Joker is always index 0 (the default starting card).
 // The 10 selectable characters follow at index 1-10.
 const CHARACTERS = [
-  { name: "Joker",        file: "/characters/joker.svg",        label: "Techzilla Joker" },
+  { name: "Joker",        file: "/characters/joker.png",        label: "Techzilla Joker" },
   { name: "Developer",    file: "/characters/developer.png",    label: "Software Dev" },
   { name: "Doctor",       file: "/characters/doctor.png",       label: "Healthcare" },
   { name: "Designer",     file: "/characters/designer.png",     label: "UI/UX Design" },
@@ -77,6 +77,39 @@ function GiftCardDisplay({
         ctx.rect(0, 0, W, H);
       }
       ctx.fill();
+
+      // ── Dot-matrix shining effect (mimics the CanvasRevealEffect) ──
+      const dotColor = clicked ? [241, 43, 48] : [54, 98, 244];
+      const dotSize = 3;
+      const gridSize = 6;
+      const seed = (x: number, y: number) => {
+        const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+        return n - Math.floor(n);
+      };
+      const opacityLevels = [0.05, 0.08, 0.12, 0.18, 0.25, 0.35, 0.55, 0.7, 0.85, 1.0];
+      const cx = W / 2, cy = H / 2;
+      const maxDist = Math.sqrt(cx * cx + cy * cy);
+
+      for (let gy = 0; gy * gridSize < H; gy++) {
+        for (let gx = 0; gx * gridSize < W; gx++) {
+          const px = gx * gridSize + (gridSize - dotSize) / 2;
+          const py = gy * gridSize + (gridSize - dotSize) / 2;
+          const r = seed(gx, gy);
+          const distFactor = 1 - Math.sqrt((px - cx) ** 2 + (py - cy) ** 2) / maxDist;
+          const opIdx = Math.floor(r * 10);
+          const baseOp = opacityLevels[opIdx] ?? 0.1;
+          const alpha = baseOp * (0.4 + distFactor * 0.6);
+          ctx.fillStyle = `rgba(${dotColor[0]},${dotColor[1]},${dotColor[2]},${alpha.toFixed(3)})`;
+          ctx.fillRect(px, py, dotSize, dotSize);
+        }
+      }
+
+      // Radial vignette over the dots (dark toward edges)
+      const vignette = ctx.createRadialGradient(cx, cy * 0.7, 0, cx, cy * 0.7, Math.max(W, H) * 0.8);
+      vignette.addColorStop(0, "rgba(0,0,0,0)");
+      vignette.addColorStop(1, "rgba(0,0,0,0.75)");
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, W, H);
 
       // Character image centered (drawn first so text overlays it)
       if (charImg) {

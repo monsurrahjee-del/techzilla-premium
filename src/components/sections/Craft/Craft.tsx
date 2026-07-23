@@ -7,12 +7,9 @@ import {
   forwardRef,
   useImperativeHandle,
 } from "react";
+// Note: useState kept for showContact / showGift modals
 import { AnimatePresence } from "framer-motion";
 import styles from "./Craft.module.css";
-/* ── Hero sub-components used in Craft ──────────────────────────────────── */
-import StickerCloud     from "../Hero/StickerCloud";
-import FloatingElements from "../Hero/FloatingElements";
-import HeroNav          from "../Hero/HeroNav";
 
 import ContactModal from "./ContactModal";
 import GiftFlow     from "./GiftFlow";
@@ -30,10 +27,6 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
   const [showContact, setShowContact] = useState(false);
   const [showGift,    setShowGift]    = useState(false);
   const activeRef = useRef(false);
-
-  /* Nav state — same as Hero */
-  const [theme, setTheme] = useState<"dark" | "light">("light");
-  const [sound, setSound] = useState(false);
 
   const slideIn = () => {
     const w = wrapRef.current;
@@ -106,24 +99,6 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
       >
         {/* ── Liquid background — sole background layer ── */}
         <LiquidEffectAnimation />
-
-        {/* ── Top Nav wrapped for dark-on-liquid colour override ── */}
-        <div className={styles.craftNavWrap}>
-          <HeroNav
-            theme={theme}
-            sound={sound}
-            onThemeToggle={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-            onSoundToggle={() => setSound((s) => !s)}
-            navItems={["Home", "Work", "About"]}
-            craftMode={true}
-          />
-        </div>
-
-        {/* ── Hero sticker cloud ── */}
-        <StickerCloud />
-
-        {/* ── Hero floating tech-pill elements ── */}
-        <FloatingElements />
 
         {/* ── Centre: static "Craft With Taste" title + contact popover button ── */}
         <div className={styles.craftCenter}>
