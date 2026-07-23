@@ -14,6 +14,7 @@ interface HeroNavProps {
   onThemeToggle: () => void;
   onSoundToggle: () => void;
   navItems?: string[];
+  craftMode?: boolean; // hides THEME/SOUND, centers nav items
 }
 
 export default function HeroNav({
@@ -22,6 +23,7 @@ export default function HeroNav({
   onThemeToggle,
   onSoundToggle,
   navItems = [...DEFAULT_NAV_ITEMS],
+  craftMode = false,
 }: HeroNavProps) {
   const loaded = useLoaded();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -44,29 +46,36 @@ export default function HeroNav({
           <span className={`${styles.navLogo} cursor-target`}>TECHZILLA</span>
         </div>
 
-        <div className={styles.navCenter}>
+        <div
+          className={styles.navCenter}
+          style={craftMode ? { position: "absolute", left: "50%", transform: "translateX(-50%)" } : undefined}
+        >
           {navItems.filter(i => i !== "Home").map((item) => (
             <a key={item} href={`#${item.toLowerCase()}`} className="cursor-target">{item}</a>
           ))}
         </div>
 
         <div className={styles.navRight}>
-          <button
-            type="button"
-            className={`${styles.navToggle} cursor-target`}
-            onClick={onThemeToggle}
-            aria-label="Toggle theme"
-          >
-            THEME<span>[{theme === "dark" ? "A" : "B"}]</span>
-          </button>
-          <button
-            type="button"
-            className={`${styles.navToggle} cursor-target`}
-            onClick={onSoundToggle}
-            aria-label="Toggle sound"
-          >
-            SOUND<span>[{sound ? "•" : "|"}]</span>
-          </button>
+          {!craftMode && (
+            <>
+              <button
+                type="button"
+                className={`${styles.navToggle} cursor-target`}
+                onClick={onThemeToggle}
+                aria-label="Toggle theme"
+              >
+                THEME<span>[{theme === "dark" ? "A" : "B"}]</span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.navToggle} cursor-target`}
+                onClick={onSoundToggle}
+                aria-label="Toggle sound"
+              >
+                SOUND<span>[{sound ? "•" : "|"}]</span>
+              </button>
+            </>
+          )}
           <HeroClock />
         </div>
 

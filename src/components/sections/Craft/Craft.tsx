@@ -115,6 +115,7 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
             onThemeToggle={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
             onSoundToggle={() => setSound((s) => !s)}
             navItems={["Home", "Work", "About"]}
+            craftMode={true}
           />
         </div>
 

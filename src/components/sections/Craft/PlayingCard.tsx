@@ -574,6 +574,7 @@ const PlayingCard: React.FC<PlayingCardProps> = ({
           >
             <div
               style={{
+                position: "relative",
                 height: `${imageHeightPercentage}%`,
                 aspectRatio: "1/1",
                 width: "auto",

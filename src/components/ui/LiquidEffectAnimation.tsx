@@ -21,6 +21,16 @@ export function LiquidEffectAnimation() {
         app.liquidPlane.material.roughness = 0.25;
         app.liquidPlane.uniforms.displacementScale.value = 5;
         app.setRain(false);
+
+        // Speed up animation 3× by overriding the Three.js clock
+        if (app.clock) {
+          const startReal = performance.now();
+          const SPEED = 3.0;
+          app.clock.getElapsedTime = () =>
+            ((performance.now() - startReal) / 1000) * SPEED;
+          app.clock.getDelta = () => (1 / 60) * SPEED;
+        }
+
         window.__liquidApp = app;
       }
     `

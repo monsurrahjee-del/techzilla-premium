@@ -8,7 +8,7 @@ import PlayingCard from "./PlayingCard";
 // Joker is always index 0 (the default starting card).
 // The 10 selectable characters follow at index 1-10.
 const CHARACTERS = [
-  { name: "Joker",        file: "/characters/joker.png",        label: "Techzilla Joker" },
+  { name: "Joker",        file: "/characters/joker.svg",        label: "Techzilla Joker" },
   { name: "Developer",    file: "/characters/developer.png",    label: "Software Dev" },
   { name: "Doctor",       file: "/characters/doctor.png",       label: "Healthcare" },
   { name: "Designer",     file: "/characters/designer.png",     label: "UI/UX Design" },
