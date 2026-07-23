@@ -24,8 +24,6 @@ const TargetCursor = ({
   targetSelector = '.cursor-target',
   spinDuration = 2,
   hideDefaultCursor = true,
-  hoverDuration = 0.2,
-  parallaxOn = true,
   cursorColor = '#ffffff',
   cursorColorOnTarget
 }: TargetCursorProps) => {
@@ -46,8 +44,6 @@ const TargetCursor = ({
 
   const isActiveRef = useRef(false);
   const targetCornerPositionsRef = useRef<{ x: number; y: number }[] | null>(null);
-  const tickerFnRef = useRef<(() => void) | null>(null);
-  const activeStrengthRef = useRef({ current: 0 });
 
   const isMobile = useMemo(() => {
     if (typeof window === 'undefined') return false;
@@ -117,48 +113,25 @@ const TargetCursor = ({
 
     createSpinTimeline();
 
-    // ── Ticker: animate corners toward target element while hovering ───────
-    const tickerFn = () => {
-      if (!targetCornerPositionsRef.current || !spinnerRef.current || !cornersRef.current) {
-        return;
-      }
-
-      const strength = activeStrengthRef.current.current;
-      if (strength === 0) return;
-
-      const cursorX = cursorPosRef.current.x;
-      const cursorY = cursorPosRef.current.y;
-
+    // Keep target corners on the same direct path as the cursor. The previous
+    // GSAP ticker created four new tweens on every frame while hovering a
+    // target, which made pointer input feel delayed over the vapor text, Our
+    // Work canvas, and the reveal page.
+    const updateTargetCorners = () => {
+      if (!targetCornerPositionsRef.current || !cornersRef.current) return;
+      const { x: cursorX, y: cursorY } = cursorPosRef.current;
       const corners = Array.from(cornersRef.current) as HTMLElement[];
       corners.forEach((corner, i) => {
-        const currentX = gsap.getProperty(corner, 'x') as number;
-        const currentY = gsap.getProperty(corner, 'y') as number;
-
-        // targetCornerPositionsRef stores raw viewport coords.
-        // cursorPosRef also stores raw viewport coords.
-        // Delta = how far the corner should be offset from the cursor wrapper origin.
-        const targetX = targetCornerPositionsRef.current![i].x - cursorX;
-        const targetY = targetCornerPositionsRef.current![i].y - cursorY;
-
-        const finalX = currentX + (targetX - currentX) * strength;
-        const finalY = currentY + (targetY - currentY) * strength;
-
-        const duration = strength >= 0.99 ? (parallaxOn ? 0.2 : 0) : 0.05;
-
-        gsap.to(corner, {
-          x: finalX,
-          y: finalY,
-          duration: duration,
-          ease: duration === 0 ? 'none' : 'power1.out',
-          overwrite: 'auto'
-        });
+        const point = targetCornerPositionsRef.current![i];
+        corner.style.transform = `translate3d(${point.x - cursorX}px, ${point.y - cursorY}px, 0)`;
       });
     };
 
-    tickerFnRef.current = tickerFn;
-
     // ── Event handlers ─────────────────────────────────────────────────────
-    const moveHandler = (e: MouseEvent) => moveCursor(e.clientX, e.clientY);
+    const moveHandler = (e: MouseEvent) => {
+      moveCursor(e.clientX, e.clientY);
+      updateTargetCorners();
+    };
     window.addEventListener('mousemove', moveHandler);
 
     const scrollHandler = () => {
@@ -257,30 +230,18 @@ const TargetCursor = ({
       ];
 
       isActiveRef.current = true;
-      gsap.ticker.add(tickerFnRef.current!);
-
-      gsap.to(activeStrengthRef.current, {
-        current: 1,
-        duration: hoverDuration,
-        ease: 'power2.out'
-      });
-
       corners.forEach((corner, i) => {
-        gsap.to(corner, {
-          x: targetCornerPositionsRef.current![i].x - cursorX,
-          y: targetCornerPositionsRef.current![i].y - cursorY,
-          duration: 0.2,
-          ease: 'power2.out'
-        });
+        corner.style.transform = `translate3d(${
+          targetCornerPositionsRef.current![i].x - cursorX
+        }px, ${
+          targetCornerPositionsRef.current![i].y - cursorY
+        }px, 0)`;
       });
 
       // ── Leave target ─────────────────────────────────────────────────────
       const leaveHandler = () => {
-        gsap.ticker.remove(tickerFnRef.current!);
-
         isActiveRef.current = false;
         targetCornerPositionsRef.current = null;
-        gsap.set(activeStrengthRef.current, { current: 0, overwrite: true });
         activeTarget = null;
 
         if (cursorColorOnTarget && cornersRef.current) {
@@ -299,23 +260,10 @@ const TargetCursor = ({
         }
 
         if (cornersRef.current) {
-          const cs = Array.from(cornersRef.current) as HTMLElement[];
-          gsap.killTweensOf(cs, 'x,y');
-          const { cornerSize } = constants;
-          const positions = [
-            { x: -cornerSize * 1.5, y: -cornerSize * 1.5 },
-            { x:  cornerSize * 0.5, y: -cornerSize * 1.5 },
-            { x:  cornerSize * 0.5, y:  cornerSize * 0.5 },
-            { x: -cornerSize * 1.5, y:  cornerSize * 0.5 }
-          ];
-          const tl = gsap.timeline();
-          cs.forEach((corner, index) => {
-            tl.to(corner, {
-              x: positions[index].x,
-              y: positions[index].y,
-              duration: 0.3,
-              ease: 'power3.out'
-            }, 0);
+          // Return control to the static corner classes. No GSAP x/y tween is
+          // needed here; it would reintroduce a second transform writer.
+          Array.from(cornersRef.current).forEach((corner) => {
+            (corner as HTMLElement).style.transform = '';
           });
         }
 
@@ -350,10 +298,6 @@ const TargetCursor = ({
 
     // ── Cleanup ────────────────────────────────────────────────────────────
     return () => {
-      if (tickerFnRef.current) {
-        gsap.ticker.remove(tickerFnRef.current);
-      }
-
       window.removeEventListener('mousemove', moveHandler);
       window.removeEventListener('mouseover', enterHandler as EventListener);
       window.removeEventListener('scroll', scrollHandler);
@@ -369,7 +313,6 @@ const TargetCursor = ({
 
       isActiveRef.current = false;
       targetCornerPositionsRef.current = null;
-      activeStrengthRef.current.current = 0;
     };
   }, [
     targetSelector,
@@ -378,8 +321,6 @@ const TargetCursor = ({
     constants,
     hideDefaultCursor,
     isMobile,
-    hoverDuration,
-    parallaxOn,
     cursorColor,
     cursorColorOnTarget
   ]);

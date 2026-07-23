@@ -7,6 +7,7 @@ import styles from "./ChessReveal.module.css";
 export interface ChessRevealHandle {
   activate: () => void;
   deactivate: () => void;
+  scrollBy: (delta: number) => void;
 }
 
 /* ─── Math helpers ──────────────────────────────────────────────────────── */
@@ -381,6 +382,11 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     deactivate() {
       stateRef.current.active = false;
       slideOut(true);
+    },
+    scrollBy(delta: number) {
+      const s = stateRef.current;
+      if (!s.active) return;
+      s.virtualScroll = clamp(s.virtualScroll + delta, 0, TOTAL);
     },
   }));
 

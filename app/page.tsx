@@ -41,6 +41,8 @@ export default function Home() {
   // Portfolio 2-s hold (before chess reveal)
   const portfolioHoldRef          = useRef(false);
   const portfolioHoldTriggeredRef = useRef(false);
+  const portfolioGateReadyRef     = useRef(false);
+  const portfolioGateTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [portfolioHolding, setPortfolioHolding] = useState(false);
 
   // Chess reveal
@@ -68,6 +70,24 @@ export default function Home() {
     const VAPOR_RAW         = 1 / 3 + 0.90 * (2 / 3 - 1 / 3);
     const SERVICES_BOUNDARY = 2 / 3;
     const PORTFOLIO_FULL    = 0.97; // portfolio fully slid into view
+
+    const beginPortfolioGate = () => {
+      portfolioHoldTriggeredRef.current = true;
+      portfolioHoldRef.current          = true;
+      portfolioGateReadyRef.current     = false;
+      const pMax = document.documentElement.scrollHeight - window.innerHeight;
+      frozenScrollRef.current = Math.round(pMax);
+      setPortfolioHolding(true);
+
+      if (portfolioGateTimerRef.current) {
+        clearTimeout(portfolioGateTimerRef.current);
+      }
+      // The gate opens after two seconds, but it never advances on its own.
+      portfolioGateTimerRef.current = setTimeout(() => {
+        portfolioGateReadyRef.current = true;
+        portfolioGateTimerRef.current = null;
+      }, 2000);
+    };
 
     const driveFrame = (raw: number) => {
       /* ── Safari fallback ─────────────────────────────────────────────── */
@@ -169,24 +189,7 @@ export default function Home() {
         !vaporActiveRef.current &&
         !chessActiveRef.current
       ) {
-        portfolioHoldTriggeredRef.current = true;
-        portfolioHoldRef.current          = true;
-        const pMax = document.documentElement.scrollHeight - window.innerHeight;
-        frozenScrollRef.current = Math.round(pMax); // hold at very bottom
-        setPortfolioHolding(true);
-
-        // After 2 s hold: activate chess FIRST (no gap), then release hold
-        setTimeout(() => {
-          // Mark chess active before releasing hold → onScroll never runs unguarded
-          chessActiveRef.current = true;
-          chessRef.current?.activate();          // slides up from below
-
-          // Release hold after chess is already capturing scroll
-          portfolioHoldRef.current = false;
-          setPortfolioHolding(false);
-          // Portfolio layer is left untouched — CSS scroll-driven animation keeps
-          // it at translateX(0%) (fully visible), chess z-index 100 slides over it.
-        }, 2000);
+        beginPortfolioGate();
       }
     };
 
@@ -212,10 +215,11 @@ export default function Home() {
     /* Chess events ──────────────────────────────────────────────────────── */
     const onChessDismissed = () => {
       chessActiveRef.current            = false;
-      portfolioHoldTriggeredRef.current = false;
       // Portfolio CSS animation was never touched — it's still at translateX(0%)
       // (scroll frozen at pMax), so Our Work is already visible the moment chess
-      // slides back down. No DOM manipulation needed.
+      // slides back down. Start the same deliberate gate on the way back too:
+      // wait two seconds, then wait for a new user scroll before releasing.
+      beginPortfolioGate();
     };
     const onChessComplete = () => {
       chessActiveRef.current = false;
@@ -234,6 +238,10 @@ export default function Home() {
     isInitialEval = false;
 
     return () => {
+      if (portfolioGateTimerRef.current) {
+        clearTimeout(portfolioGateTimerRef.current);
+        portfolioGateTimerRef.current = null;
+      }
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("chess-reveal-dismissed", onChessDismissed);
       window.removeEventListener("chess-reveal-complete",  onChessComplete);
@@ -288,12 +296,42 @@ export default function Home() {
   /* ── Block wheel/touch during portfolio 2-s hold ───────────────────────── */
   useEffect(() => {
     if (!portfolioHolding) return;
-    const blockWheel = (e: WheelEvent) => { e.preventDefault(); e.stopImmediatePropagation(); };
+    const releaseFromGate = (delta: number) => {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      portfolioHoldRef.current = false;
+      setPortfolioHolding(false);
+
+      if (delta > 0) {
+        // Downward input moves into the new page. Activate it before releasing
+        // the hold so the page scroll handler cannot run in the gap.
+        chessActiveRef.current = true;
+        chessRef.current?.activate();
+        chessRef.current?.scrollBy(delta);
+        return;
+      }
+
+      // Upward input should be honored immediately after the gate, rather than
+      // being swallowed by the capture listener that opened the gate.
+      window.scrollTo(0, Math.max(0, Math.min(max, frozenScrollRef.current + delta)));
+      portfolioHoldTriggeredRef.current = false;
+    };
+    const blockWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (portfolioGateReadyRef.current) {
+        const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+        if (delta) releaseFromGate(delta);
+      }
+    };
     let ty = 0;
     const onTS = (e: TouchEvent) => { ty = e.touches[0]?.clientY ?? 0; };
     const blockTouch = (e: TouchEvent) => {
       e.preventDefault();
-      window.scrollTo(0, frozenScrollRef.current);
+      const currentY = e.touches[0]?.clientY ?? ty;
+      const delta = (ty - currentY) * 3;
+      ty = currentY;
+      if (portfolioGateReadyRef.current && delta) releaseFromGate(delta);
+      else window.scrollTo(0, frozenScrollRef.current);
     };
     window.addEventListener("wheel",      blockWheel,  { passive: false, capture: true });
     window.addEventListener("touchstart", onTS,        { passive: true });
