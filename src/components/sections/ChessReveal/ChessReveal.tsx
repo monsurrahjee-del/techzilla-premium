@@ -283,8 +283,8 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     /* Pre-load chess piece images ──────────────────────────────────────── */
     const pawnImg  = new Image();
     const queenImg = new Image();
-    pawnImg.src    = "/chess/pawn.webp";
-    queenImg.src   = "/chess/queen.png";
+    pawnImg.src    = "/chess/pawn.png";   // silver pawn, black bg → screen blend
+    queenImg.src   = "/chess/queen.png";  // gold queen, black bg → screen blend
     pawnImgRef.current  = pawnImg;
     queenImgRef.current = queenImg;
 
@@ -407,18 +407,9 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       const queen = queenImgRef.current;
 
       // Pawn fades out as morphP → 1
-      // pawn.webp has a white/transparent-ish bg → use normal blend
-      // but the image may have white bg, so let's use "multiply" to
-      // blend with the dark canvas (white * dark = dark, gold stays)
+      // pawn.png has a black bg → use screen blend to remove it
       if (morphP < 1 && pawn) {
-        const pawnAlpha = introP * (1 - morphP);
-        ctx.save();
-        ctx.globalAlpha = pawnAlpha;
-        // Use "multiply" so any white background disappears against dark canvas
-        ctx.globalCompositeOperation = "multiply";
-        const pw = pieceH * (pawn.naturalWidth / (pawn.naturalHeight || 1));
-        ctx.drawImage(pawn, cx - pw * 0.5, cy - pieceH * 0.5, pw, pieceH);
-        ctx.restore();
+        drawPieceImage(ctx, pawn, cx, cy, pieceH, introP * (1 - morphP), true);
       }
 
       // Queen fades in as morphP → 1
