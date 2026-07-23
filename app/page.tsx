@@ -363,22 +363,32 @@ export default function Home() {
     /**
      * Scrollbar sent a navigate intent while frozen.
      * fraction < current → release gate and scroll back.
-     * fraction ≥ PORTFOLIO_FULL threshold → release gate and open chess (if ready).
+     * fraction > current → release gate and open chess (if gate timer has fired).
+     *
+     * The fraction is expressed in the scrollbar's virtual model:
+     *   totalVirtH = docMax + clientH × CHESS_VH + clientH × CRAFT_VH
+     * These constants must match ScrollBar.tsx exactly.
      */
-    const PORTFOLIO_FULL_THRESH = 0.97;
+    const SB_CHESS_VH = 1.2;
+    const SB_CRAFT_VH = 0.5;
     const onScrollbarNavigate = (e: Event) => {
       if (gateReleased) return;
       const fraction = (e as CustomEvent<{ fraction?: number }>).detail?.fraction;
       if (typeof fraction !== "number") return;
-      const max        = document.documentElement.scrollHeight - window.innerHeight;
-      const frozenFrac = max > 0 ? frozenScrollRef.current / max : 1;
+      const max       = document.documentElement.scrollHeight - window.innerHeight;
+      const clientH   = window.innerHeight;
+      // Total virtual height — same formula as ScrollBar.tsx so fractions match.
+      const tv        = max + clientH * SB_CHESS_VH + clientH * SB_CRAFT_VH;
+      // Where "Our Work frozen" sits in the virtual model (~0.64 on a 400vh page).
+      const frozenFrac = tv > 0 ? frozenScrollRef.current / tv : 1;
 
       if (fraction < frozenFrac - 0.01) {
         // Backward — release immediately (no gate timer required for going back).
         releaseFromGate(-1);
-        if (max > 0) window.scrollTo(0, Math.max(0, fraction * max));
-      } else if (fraction >= PORTFOLIO_FULL_THRESH && portfolioGateReadyRef.current) {
-        // Forward past Our Work and gate is ready — open chess.
+        // Convert virtual fraction back to real document pixels (clamped to max).
+        if (max > 0) window.scrollTo(0, Math.max(0, Math.min(max, fraction * tv)));
+      } else if (fraction > frozenFrac + 0.01 && portfolioGateReadyRef.current) {
+        // Forward beyond Our Work and gate is ready — open chess.
         releaseFromGate(1);
       }
     };

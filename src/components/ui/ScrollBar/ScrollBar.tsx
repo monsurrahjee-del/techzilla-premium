@@ -265,9 +265,12 @@ export default function ScrollBar() {
       // Frozen (portfolio gate): dispatch navigate intent.
       if (scrollFrozen.current) {
         const targetFraction = fractionFromClientY(e.clientY);
-        const { scrollHeight, clientHeight } = getScrollInfo();
-        const docMax     = scrollHeight - clientHeight;
-        const frozenFrac = docMax > 0 ? getScrollInfo().scrollTop / docMax : 1;
+        const { scrollTop, scrollHeight, clientHeight } = getScrollInfo();
+        const docMax  = scrollHeight - clientHeight;
+        const tv      = totalVirtH(docMax, clientHeight);
+        // Use virtual-model fraction so the "at Our Work" position is ~0.64,
+        // not 1.0 — which would make goingForward impossible.
+        const frozenFrac = tv > 0 ? scrollTop / tv : 1;
 
         const goingBack    = targetFraction < frozenFrac - 0.01;
         const goingForward = targetFraction > frozenFrac + 0.01 && scrollGateReady.current;
