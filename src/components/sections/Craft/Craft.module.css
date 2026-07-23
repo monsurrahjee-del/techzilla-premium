@@ -1,0 +1,791 @@
+/* ─── Craft Section Overlay ──────────────────────────────────────────────── */
+.wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  transform: translateY(100%);
+  pointer-events: none;
+  transition: transform 0.70s cubic-bezier(0.22, 1, 0.36, 1);
+  background: #030912;
+  overflow: hidden;
+}
+
+.wrap.active {
+  transform: translateY(0%);
+  pointer-events: all;
+}
+
+/* ─── Background ──────────────────────────────────────────────────────────── */
+.bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 120% 80% at 50% 60%, #0a1a4f 0%, #05080f 55%, #030912 100%);
+  z-index: 0;
+}
+
+.grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: radial-gradient(circle at center, black, transparent 78%);
+  z-index: 1;
+}
+
+.crosshairTL, .crosshairTR, .crosshairBL, .crosshairBR {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  opacity: 0.35;
+  z-index: 2;
+}
+.crosshairTL { top: 56px; left: 20px; border-top: 1px solid #4466ff; border-left: 1px solid #4466ff; }
+.crosshairTR { top: 56px; right: 20px; border-top: 1px solid #4466ff; border-right: 1px solid #4466ff; }
+.crosshairBL { bottom: 44px; left: 20px; border-bottom: 1px solid #4466ff; border-left: 1px solid #4466ff; }
+.crosshairBR { bottom: 44px; right: 20px; border-bottom: 1px solid #4466ff; border-right: 1px solid #4466ff; }
+
+/* ─── Background Script Text (CRAFT / TASTE) ─────────────────────────────── */
+.scriptLayer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.scriptStage {
+  position: relative;
+  width: 100%;
+  text-align: center;
+  line-height: 0.82;
+  user-select: none;
+}
+
+.scriptWord {
+  display: block;
+  font-size: clamp(11vw, 16vw, 22vw);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  /* Iridescent blue gradient matching hero */
+  background: linear-gradient(
+    135deg,
+    #1a3bff 0%,
+    #2255ff 15%,
+    #3377ff 28%,
+    #66aaff 38%,
+    #aaccff 44%,
+    #ffffff 48%,
+    #aaccff 52%,
+    #66aaff 58%,
+    #2255ff 72%,
+    #1133cc 85%,
+    #0a1a88 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 80px rgba(50,110,255,0.5)) drop-shadow(0 0 140px rgba(30,70,200,0.3));
+  transform: perspective(800px) rotateX(4deg);
+  will-change: transform;
+}
+
+.scriptWord2 {
+  margin-top: -0.08em;
+  opacity: 0.85;
+  transform: perspective(800px) rotateX(4deg) scaleX(1.06);
+}
+
+/* ─── Nav ─────────────────────────────────────────────────────────────────── */
+.nav {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 28px;
+  font-size: 0.7rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.75);
+}
+
+.navLogo {
+  font-weight: 800;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  color: #fff;
+}
+
+.navCenter {
+  display: flex;
+  gap: 32px;
+}
+
+.navCenter a {
+  color: rgba(255,255,255,0.65);
+  text-decoration: none;
+  font-size: 0.68rem;
+  letter-spacing: 0.10em;
+  transition: color 0.2s;
+}
+.navCenter a:hover { color: #fff; }
+
+.navRight {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.navToggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.68rem;
+  letter-spacing: 0.10em;
+  color: rgba(255,255,255,0.65);
+  text-transform: uppercase;
+  transition: color 0.2s;
+  padding: 0;
+  font-family: inherit;
+}
+.navToggle:hover { color: #fff; }
+.navToggle span { color: rgba(255,255,255,0.45); }
+
+/* ─── Contact Us Button (in nav area) ────────────────────────────────────── */
+.contactBtn {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 4px;
+  padding: 6px 16px;
+  color: rgba(255,255,255,0.85);
+  font-size: 0.66rem;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.25s, border-color 0.25s, color 0.25s;
+}
+.contactBtn:hover {
+  background: rgba(255,255,255,0.15);
+  border-color: rgba(255,255,255,0.35);
+  color: #fff;
+}
+
+/* ─── Headline Overlay ────────────────────────────────────────────────────── */
+.headlineWrap {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.headline {
+  text-align: center;
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #fff;
+  line-height: 0.92;
+  letter-spacing: -0.03em;
+  font-size: clamp(4.5vw, 7.5vw, 9vw);
+  text-shadow: 0 2px 60px rgba(20,40,120,0.7);
+  mix-blend-mode: normal;
+}
+
+.headline span {
+  display: block;
+}
+
+/* ─── Stickers ────────────────────────────────────────────────────────────── */
+.stickerLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.sticker {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  opacity: 0;
+}
+
+/* ─── Bottom Bar ──────────────────────────────────────────────────────────── */
+.bottomBar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 28px 18px;
+  font-size: 0.63rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.5);
+}
+
+.bottomLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bottomLeft a {
+  color: rgba(255,255,255,0.5);
+  text-decoration: none;
+  font-size: 0.63rem;
+  letter-spacing: 0.05em;
+  transition: color 0.2s;
+}
+.bottomLeft a:hover { color: rgba(255,255,255,0.85); }
+
+.bottomLeft span {
+  font-size: 0.60rem;
+  color: rgba(255,255,255,0.38);
+}
+
+.bottomCenter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.giftBtn {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 4px;
+  padding: 7px 18px;
+  color: rgba(255,255,255,0.7);
+  font-size: 0.64rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.25s;
+}
+.giftBtn:hover {
+  background: rgba(80,140,255,0.18);
+  border-color: rgba(80,140,255,0.55);
+  color: #fff;
+  box-shadow: 0 0 18px rgba(50,100,255,0.3);
+}
+
+.bottomRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.socials {
+  display: flex;
+  gap: 20px;
+}
+.socials a {
+  color: rgba(255,255,255,0.5);
+  text-decoration: none;
+  font-size: 0.60rem;
+  letter-spacing: 0.09em;
+  transition: color 0.2s;
+}
+.socials a:hover { color: rgba(255,255,255,0.9); }
+
+.socialsRow2 {
+  display: flex;
+  gap: 20px;
+}
+.socialsRow2 a {
+  color: rgba(255,255,255,0.38);
+  text-decoration: none;
+  font-size: 0.60rem;
+  letter-spacing: 0.09em;
+  transition: color 0.2s;
+}
+.socialsRow2 a:hover { color: rgba(255,255,255,0.75); }
+
+.globeIcon {
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(255,255,255,0.28);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+  align-self: flex-end;
+  opacity: 0.5;
+}
+.globeIcon svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* ─── Contact Modal Overlay ──────────────────────────────────────────────── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(3, 9, 18, 0.82);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.modal {
+  background: #0a1228;
+  border: 1px solid rgba(60,100,255,0.28);
+  border-radius: 16px;
+  padding: 40px;
+  width: 100%;
+  max-width: 480px;
+  position: relative;
+  box-shadow: 0 0 80px rgba(30,70,200,0.25), 0 24px 60px rgba(0,0,0,0.6);
+}
+
+.modalClose {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.45);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: color 0.2s;
+  line-height: 1;
+}
+.modalClose:hover { color: #fff; }
+
+.modalTitle {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+.modalSubtitle {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.45);
+  margin-bottom: 28px;
+  letter-spacing: 0.02em;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.fieldLabel {
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.45);
+}
+.fieldInput, .fieldTextarea {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #fff;
+  font-size: 0.88rem;
+  font-family: inherit;
+  transition: border-color 0.2s;
+  outline: none;
+  width: 100%;
+}
+.fieldInput:focus, .fieldTextarea:focus {
+  border-color: rgba(70,120,255,0.6);
+  background: rgba(255,255,255,0.07);
+}
+.fieldTextarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.submitBtn {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #2255ff, #4477ff);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: opacity 0.2s, transform 0.15s;
+  font-family: inherit;
+}
+.submitBtn:hover { opacity: 0.88; transform: translateY(-1px); }
+.submitBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.successMsg {
+  text-align: center;
+  color: rgba(255,255,255,0.75);
+  font-size: 0.9rem;
+  padding: 20px 0;
+  line-height: 1.6;
+}
+.successMsg strong {
+  display: block;
+  font-size: 1.1rem;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+/* ─── Gift Modal ──────────────────────────────────────────────────────────── */
+.giftModal {
+  background: #080d1e;
+  border: 1px solid rgba(60,100,255,0.22);
+  border-radius: 20px;
+  padding: 36px 36px 28px;
+  width: 100%;
+  max-width: 560px;
+  position: relative;
+  box-shadow: 0 0 80px rgba(30,70,200,0.2), 0 24px 60px rgba(0,0,0,0.7);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.giftStep1 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+}
+
+.giftIcon {
+  font-size: 3rem;
+  margin-bottom: 4px;
+}
+
+.giftTitle {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.02em;
+}
+.giftSubtitle {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.5);
+  line-height: 1.6;
+  max-width: 340px;
+}
+.giftHighlight {
+  font-weight: 700;
+  color: rgba(100,160,255,0.9);
+}
+
+.giftInput {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 10px;
+  padding: 12px 18px;
+  color: #fff;
+  font-size: 1rem;
+  font-family: inherit;
+  text-align: center;
+  outline: none;
+  width: 100%;
+  max-width: 320px;
+  transition: border-color 0.2s;
+}
+.giftInput:focus {
+  border-color: rgba(70,120,255,0.6);
+}
+.giftInput::placeholder {
+  color: rgba(255,255,255,0.28);
+}
+
+.giftUnlockBtn {
+  background: linear-gradient(135deg, #2255ff, #4477ff);
+  border: none;
+  border-radius: 10px;
+  padding: 13px 36px;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.2s, transform 0.15s;
+}
+.giftUnlockBtn:hover { opacity: 0.88; transform: translateY(-1px); }
+
+/* ─── Gift Card Display ───────────────────────────────────────────────────── */
+.giftCardWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.giftCardHeader {
+  text-align: center;
+}
+.giftCardHeader h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.01em;
+  margin-bottom: 4px;
+}
+.giftCardHeader p {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 0.06em;
+}
+
+.cardContainer {
+  position: relative;
+  width: 100%;
+  max-width: 280px;
+}
+
+.card {
+  width: 100%;
+  aspect-ratio: 9/16;
+  border-radius: 20px;
+  padding: 1px;
+  background: #2f2f2f;
+  display: inline-block;
+  transition: background 2s ease-in-out 0.7s;
+  position: relative;
+  cursor: pointer;
+}
+.card.clicked {
+  background: #3a3a3a;
+}
+
+.cardInner {
+  background: #000;
+  border-radius: 19px;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Reveal canvas effect */
+.cardReveal {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 19px;
+  overflow: hidden;
+}
+
+.cardRevealGradient {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(400px at center, white, transparent);
+  background: radial-gradient(ellipse 200px 200px at center, rgba(0,0,0,0.1), rgba(0,0,0,0.85));
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Card content */
+.cardTopLabel {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cardBrand {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #3662f4;
+  transition: color 2s ease-in-out 1s;
+}
+.card.clicked .cardBrand {
+  color: #f12b30;
+}
+
+.cardCompany {
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.5);
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardBottomLabel {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  transform: scale(-1);
+}
+/* Mirror also changes color */
+.cardBottomLabel .cardBrand {
+  color: #3662f4;
+  transition: color 2s ease-in-out 1s;
+}
+.card.clicked .cardBottomLabel .cardBrand {
+  color: #f12b30;
+}
+
+.cardCenter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 4;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.cardCharacter {
+  width: 55%;
+  aspect-ratio: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cardCharacter img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+.cardDiscountBadge {
+  text-align: center;
+}
+.cardDiscountPct {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.cardDiscountLabel {
+  font-size: 0.45rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.55);
+}
+.cardCode {
+  font-size: 0.5rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.35);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 4px;
+  padding: 3px 8px;
+}
+
+/* ─── Arrow navigation ────────────────────────────────────────────────────── */
+.arrowsRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.arrowBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.arrowBtn:hover {
+  background: rgba(70,120,255,0.2);
+  border-color: rgba(70,120,255,0.5);
+  color: #fff;
+}
+
+.characterHint {
+  font-size: 0.62rem;
+  color: rgba(255,255,255,0.3);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ─── Download button ─────────────────────────────────────────────────────── */
+.downloadRow {
+  display: flex;
+  justify-content: center;
+}
+.downloadBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 8px;
+  padding: 9px 22px;
+  color: rgba(255,255,255,0.7);
+  font-size: 0.7rem;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.downloadBtn:hover {
+  background: rgba(70,120,255,0.15);
+  border-color: rgba(70,120,255,0.4);
+  color: #fff;
+}
+
+/* ─── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .nav { padding: 14px 16px; }
+  .navCenter { display: none; }
+  .headline { font-size: clamp(8vw, 12vw, 16vw); }
+  .bottomBar { padding: 0 16px 16px; gap: 8px; }
+  .modal, .giftModal { padding: 28px 20px; }
+  .sticker { width: 50px; height: 50px; }
+}

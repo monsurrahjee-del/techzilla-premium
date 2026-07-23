@@ -144,3 +144,8 @@ html {
 html::-webkit-scrollbar {
     display: none; /* Chrome / Safari / Edge */
 }
+/* ── Craft section dots pulse animation ─────────────────────────────────── */
+@keyframes craftDotsPulse {
+  0%, 100% { opacity: 0.35; }
+  50%       { opacity: 0.55; }
+}

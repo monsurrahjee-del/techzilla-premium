@@ -373,15 +373,23 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     );
   };
 
+  const craftActivatedRef = useRef(false);
+
   const applyVirtualDelta = (delta: number) => {
     const s = stateRef.current;
     const previous = s.virtualScroll;
     setVirtualScroll(previous + delta);
     if (s.virtualScroll <= 0 && delta < 0) {
       s.active = false;
+      craftActivatedRef.current = false;
       slideOut();
       window.dispatchEvent(new CustomEvent("chess-reveal-mode", { detail: { active: false } }));
       window.dispatchEvent(new CustomEvent("chess-reveal-dismissed"));
+    }
+    // Forward scroll past the end → activate craft section
+    if (previous >= TOTAL && delta > 0 && !craftActivatedRef.current) {
+      craftActivatedRef.current = true;
+      window.dispatchEvent(new CustomEvent("craft-section-activate"));
     }
   };
 

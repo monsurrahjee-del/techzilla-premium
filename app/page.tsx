@@ -9,6 +9,8 @@ import ServicesIntro from "@/components/sections/ServicesIntro/ServicesIntro";
 import type { ServicesIntroHandle } from "@/components/sections/ServicesIntro/ServicesIntro";
 import ChessReveal   from "@/components/sections/ChessReveal/ChessReveal";
 import type { ChessRevealHandle } from "@/components/sections/ChessReveal/ChessReveal";
+import CraftSection  from "@/components/sections/Craft/Craft";
+import type { CraftSectionHandle } from "@/components/sections/Craft/Craft";
 import styles        from "./page.module.css";
 
 export default function Home() {
@@ -18,6 +20,7 @@ export default function Home() {
   const portfolioRef = useRef<HTMLDivElement>(null);
   const introRef     = useRef<ServicesIntroHandle>(null);
   const chessRef     = useRef<ChessRevealHandle>(null);
+  const craftRef     = useRef<CraftSectionHandle>(null);
 
   const aboutActiveRef      = useRef(false);
   const heroActiveRef       = useRef(true);
@@ -450,6 +453,9 @@ export default function Home() {
 
       {/* Chess Reveal — slides up from below after Our Work holds for 2s */}
       <ChessReveal ref={chessRef} />
+
+      {/* Craft Section — slides up from below when Chess Reveal completes */}
+      <CraftSection ref={craftRef} />
     </main>
   );
 }
