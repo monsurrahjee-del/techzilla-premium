@@ -456,28 +456,10 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     resize();
     window.addEventListener("resize", resize);
 
-    const onWheel = (e: WheelEvent) => {
-      if (!s.active) return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-      applyVirtualDelta(delta);
-      // At the end — stay there; never auto-dismiss.
-    };
-
-    let touchY = 0;
-    const onTouchStart = (e: TouchEvent) => { if (s.active) touchY = e.touches[0]?.clientY ?? 0; };
-    const onTouchMove  = (e: TouchEvent) => {
-      if (!s.active) return;
-      e.preventDefault();
-      const dy = touchY - (e.touches[0]?.clientY ?? 0);
-      touchY   = e.touches[0]?.clientY ?? 0;
-      applyVirtualDelta(dy * 3);
-    };
-
-    window.addEventListener("wheel",      onWheel,      { passive: false, capture: true });
-    window.addEventListener("touchstart", onTouchStart, { passive: true  });
-    window.addEventListener("touchmove",  onTouchMove,  { passive: false, capture: true });
+    // Wheel and touch scroll are now handled via real document scroll in page.tsx.
+    // The chess animation is driven by chess-reveal-seek events dispatched from
+    // the page scroll handler, so native scroll and the browser scrollbar both
+    // cover the full journey from hero to the final screen.
     const onRevealSeek = (e: Event) => {
       const progress = (e as CustomEvent<{ progress?: number }>).detail?.progress;
       if (typeof progress === "number") seekVirtualScroll(progress);
@@ -592,9 +574,6 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     return () => {
       cancelAnimationFrame(s.rafId);
       window.removeEventListener("resize", resize);
-      window.removeEventListener("wheel",      onWheel,      { capture: true } as EventListenerOptions);
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchmove",  onTouchMove,  { capture: true } as EventListenerOptions);
       window.removeEventListener("chess-reveal-seek", onRevealSeek);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
