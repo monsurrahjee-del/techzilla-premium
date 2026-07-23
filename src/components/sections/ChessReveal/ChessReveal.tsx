@@ -8,163 +8,295 @@ export interface ChessRevealHandle {
   deactivate: () => void;
 }
 
-/* ─── Helpers ────────────────────────────────────────────────────────────── */
-function clamp(v: number, lo: number, hi: number) {
-  return Math.max(lo, Math.min(hi, v));
-}
-function invlerp(a: number, b: number, v: number) {
-  return clamp((v - a) / (b - a), 0, 1);
-}
-function ease(t: number) {
-  return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-}
-function easeOut(t: number) {
-  return 1 - (1 - t) * (1 - t);
-}
+/* ─── Math helpers ──────────────────────────────────────────────────────── */
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+const invlerp = (a: number, b: number, v: number) => clamp((v - a) / (b - a), 0, 1);
+const easeInOut = (t: number) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+const easeOut3 = (t: number) => 1 - Math.pow(1 - t, 3);
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-/* ─── Draw a chess piece image onto canvas ───────────────────────────────── */
-function drawPieceImage(
+/* ─── Warp line seeds (stable across frames) ────────────────────────────── */
+const WARP_COUNT = 280;
+type WarpSeed = { angle: number; speed: number; phase: number; width: number; colorIdx: number };
+const WARP_SEEDS: WarpSeed[] = Array.from({ length: WARP_COUNT }, (_, i) => ({
+  angle:    (i / WARP_COUNT) * Math.PI * 2 + (i % 11) * 0.017,
+  speed:    0.18 + (i % 7) * 0.085,
+  phase:    (i * 0.6180339887) % 1,
+  width:    1.0  + (i % 5) * 0.5,       // base width multiplier
+  colorIdx: i % 6,
+}));
+
+// haoqi-style palette: cyan, blue, purple, magenta, teal, faint white
+const WARP_COLORS = [
+  [0, 229, 255],    // #00e5ff  cyan
+  [26, 128, 229],   // #1a80e5  blue
+  [159, 85, 255],   // #9f55ff  purple
+  [255, 68, 204],   // #ff44cc  magenta
+  [0, 200, 170],    // #00c8aa  teal
+  [180, 200, 255],  // #b4c8ff  pale blue-white
+];
+
+/* ─── Draw perspective warp lines ───────────────────────────────────────── */
+/*
+   Each line is a wedge (trapezoid) that starts narrow at the vanishing
+   point (centre) and widens as it radiates outward — exactly the depth
+   perspective seen on haoqi.design.
+*/
+function drawWarpLines(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
-  cx: number,
-  cy: number,
-  size: number,       // desired height in px
-  alpha: number,
-  removeBlackBg: boolean
+  cx: number, cy: number,
+  W: number, H: number,
+  progress: number,
+  time: number,
 ) {
-  if (alpha <= 0 || size <= 0 || !img.complete || img.naturalWidth === 0) return;
-
-  const aspect = img.naturalWidth / img.naturalHeight;
-  const h = size;
-  const w = h * aspect;
-
+  if (progress <= 0) return;
+  const maxDist = Math.hypot(W, H) * 0.62;
   ctx.save();
-  ctx.globalAlpha = alpha;
+  ctx.globalCompositeOperation = "lighter";
 
-  if (removeBlackBg) {
-    // "screen" blend: black (0,0,0) + anything = anything → black bg disappears
-    ctx.globalCompositeOperation = "screen";
+  for (const seed of WARP_SEEDS) {
+    const t = (seed.phase + time * seed.speed * 0.055) % 1;
+
+    // Each line occupies a band along its radial direction
+    const bandLen  = maxDist * (0.06 + seed.speed * 0.09) * progress;
+    const startFrac = t * progress;
+    const startDist = startFrac * maxDist;
+    const endDist   = Math.min(startDist + bandLen, maxDist * 1.02);
+    if (endDist <= startDist) continue;
+
+    const [r, g, b] = WARP_COLORS[seed.colorIdx];
+    const baseAlpha = progress * (0.25 + 0.55 * easeInOut(t));
+
+    // Perpendicular direction for the wedge width
+    const cos  = Math.cos(seed.angle);
+    const sin  = Math.sin(seed.angle);
+    const pCos = Math.cos(seed.angle + Math.PI / 2);
+    const pSin = Math.sin(seed.angle + Math.PI / 2);
+
+    // Width scales from ~0 at centre to proportional at edge (perspective)
+    const wStart = (startDist / maxDist) * seed.width * (1.5 + progress * 2.5);
+    const wEnd   = (endDist   / maxDist) * seed.width * (1.5 + progress * 2.5);
+
+    // Corner points of the trapezoid
+    const x0 = cx + cos * startDist + pCos * wStart;
+    const y0 = cy + sin * startDist + pSin * wStart;
+    const x1 = cx + cos * endDist   + pCos * wEnd;
+    const y1 = cy + sin * endDist   + pSin * wEnd;
+    const x2 = cx + cos * endDist   - pCos * wEnd;
+    const y2 = cy + sin * endDist   - pSin * wEnd;
+    const x3 = cx + cos * startDist - pCos * wStart;
+    const y3 = cy + sin * startDist - pSin * wStart;
+
+    // Gradient along the radial axis: transparent → solid
+    const grad = ctx.createLinearGradient(
+      cx + cos * startDist, cy + sin * startDist,
+      cx + cos * endDist,   cy + sin * endDist,
+    );
+    grad.addColorStop(0,    `rgba(${r},${g},${b},0)`);
+    grad.addColorStop(0.25, `rgba(${r},${g},${b},${(baseAlpha * 0.5).toFixed(3)})`);
+    grad.addColorStop(1,    `rgba(${r},${g},${b},${baseAlpha.toFixed(3)})`);
+
+    ctx.beginPath();
+    ctx.moveTo(x0, y0); ctx.lineTo(x1, y1);
+    ctx.lineTo(x2, y2); ctx.lineTo(x3, y3);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
   }
-
-  ctx.drawImage(img, cx - w * 0.5, cy - h * 0.5, w, h);
   ctx.restore();
 }
 
-/* ─── Dark grid background ───────────────────────────────────────────────── */
-function drawGrid(ctx: CanvasRenderingContext2D, w: number, h: number, alpha: number) {
+/* ─── Crosshair grid (haoqi.design style) ──────────────────────────────── */
+function drawGrid(
+  ctx: CanvasRenderingContext2D,
+  W: number, H: number,
+  alpha: number,
+) {
   if (alpha <= 0) return;
   ctx.save();
-  ctx.globalAlpha = alpha * 0.30;
-  ctx.strokeStyle = "#1a2a40";
-  ctx.lineWidth = 0.5;
-  const cell = Math.min(w, h) / 12;
-  for (let x = 0; x <= w; x += cell) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+  const cell = Math.min(W, H) / 14;
+
+  // Thin grid lines
+  ctx.strokeStyle = "rgba(40,70,110,1)";
+  ctx.lineWidth   = 0.4;
+  ctx.globalAlpha = alpha * 0.35;
+  for (let x = 0; x <= W; x += cell) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
   }
-  for (let y = 0; y <= h; y += cell) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  for (let y = 0; y <= H; y += cell) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
   }
-  ctx.globalAlpha = alpha * 0.42;
-  ctx.strokeStyle = "#2a4060";
-  ctx.lineWidth = 1;
-  for (let x = 0; x <= w; x += cell) {
-    for (let y = 0; y <= h; y += cell) {
-      const s = 4;
-      ctx.beginPath(); ctx.moveTo(x - s, y); ctx.lineTo(x + s, y); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(x, y - s); ctx.lineTo(x, y + s); ctx.stroke();
+
+  // Crosshair + marks at every intersection
+  ctx.strokeStyle = "rgba(80,140,180,1)";
+  ctx.lineWidth   = 1;
+  ctx.globalAlpha = alpha * 0.55;
+  const arm = 5;
+  for (let xi = 0; xi * cell <= W + cell; xi++) {
+    for (let yi = 0; yi * cell <= H + cell; yi++) {
+      const px = xi * cell, py = yi * cell;
+      ctx.beginPath(); ctx.moveTo(px - arm, py); ctx.lineTo(px + arm, py); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(px, py - arm); ctx.lineTo(px, py + arm); ctx.stroke();
     }
   }
   ctx.restore();
 }
 
-/* ─── Hyperspeed warp lines ──────────────────────────────────────────────── */
-const LINE_SEEDS = Array.from({ length: 240 }, (_, i) => ({
-  angle:    (i / 240) * Math.PI * 2 + (i % 7) * 0.013,
-  speed:    0.22 + (i % 5) * 0.14,
-  width:    0.7  + (i % 4) * 0.55,
-  phase:    (i * 0.618033) % 1,
-  colorIdx: i % 5,
-}));
-const LINE_COLORS = ["#00e5ff", "#1a80e5", "#9f55ff", "#ff44cc", "#00ffaa"];
-
-function drawSpeedLines(
+/* ─── Corner HUD brackets ───────────────────────────────────────────────── */
+function drawCornerBrackets(
   ctx: CanvasRenderingContext2D,
-  cx: number, cy: number,
-  w: number, h: number,
-  progress: number, time: number
+  W: number, H: number,
+  alpha: number,
 ) {
-  if (progress <= 0) return;
-  const maxDist = Math.hypot(w, h) * 0.62;
+  if (alpha <= 0) return;
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-  for (const seed of LINE_SEEDS) {
-    const t         = (seed.phase + time * seed.speed * 0.08) % 1;
-    const startDist = t * maxDist * progress;
-    const endDist   = Math.min(startDist + maxDist * (0.09 + seed.speed * 0.11) * progress, maxDist * 1.05);
-    if (endDist <= startDist) continue;
-    const cos = Math.cos(seed.angle), sin = Math.sin(seed.angle);
-    const a   = clamp(progress, 0, 1) * (0.28 + 0.50 * ease(t));
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = "rgba(0,229,255,0.9)";
+  ctx.lineWidth   = 1.5;
+  ctx.lineCap     = "square";
+
+  // Rectangle sits 6% in from edges
+  const mx = W * 0.06, my = H * 0.08;
+  const rx = mx, ry = my, rw = W - mx * 2, rh = H - my * 2;
+  const arm = Math.min(W, H) * 0.04;
+
+  // Four corners: top-left, top-right, bottom-right, bottom-left
+  const corners = [
+    { x: rx,      y: ry,      dx:  1, dy:  1 },
+    { x: rx + rw, y: ry,      dx: -1, dy:  1 },
+    { x: rx + rw, y: ry + rh, dx: -1, dy: -1 },
+    { x: rx,      y: ry + rh, dx:  1, dy: -1 },
+  ];
+  for (const c of corners) {
     ctx.beginPath();
-    ctx.moveTo(cx + cos * startDist, cy + sin * startDist);
-    ctx.lineTo(cx + cos * endDist,   cy + sin * endDist);
-    ctx.strokeStyle = LINE_COLORS[seed.colorIdx];
-    ctx.globalAlpha = a;
-    ctx.lineWidth   = seed.width * (0.5 + progress * 1.5);
+    ctx.moveTo(c.x + c.dx * arm, c.y);
+    ctx.lineTo(c.x,               c.y);
+    ctx.lineTo(c.x,               c.y + c.dy * arm);
     ctx.stroke();
   }
+
+  // Small centre crosshair
+  ctx.lineWidth   = 1;
+  ctx.strokeStyle = "rgba(0,229,255,0.35)";
+  const carm = 12;
+  ctx.beginPath(); ctx.moveTo(W / 2 - carm, H / 2); ctx.lineTo(W / 2 + carm, H / 2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W / 2, H / 2 - carm); ctx.lineTo(W / 2, H / 2 + carm); ctx.stroke();
+  // dot at centre
+  ctx.beginPath(); ctx.arc(W / 2, H / 2, 2, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,229,255,0.5)"; ctx.fill();
+
   ctx.restore();
 }
 
-/* ─── Glowing orbit rings ────────────────────────────────────────────────── */
+/* ─── Status / HUD bar at bottom ────────────────────────────────────────── */
+function drawStatusBar(
+  ctx: CanvasRenderingContext2D,
+  W: number, H: number,
+  alpha: number,
+  time: number,
+) {
+  if (alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.75;
+  const fs = Math.round(clamp(W * 0.011, 10, 13));
+  ctx.font      = `400 ${fs}px 'Courier New','Courier',monospace`;
+  ctx.fillStyle = "rgba(0,229,255,0.85)";
+  ctx.textBaseline = "middle";
+
+  const py = H * 0.935;
+
+  // Left: site name + live coordinates that drift slightly
+  const coordX = (W * 0.5 + Math.sin(time * 0.3) * 40).toFixed(0).padStart(4, "0");
+  const coordY = (H * 0.5 + Math.cos(time * 0.22) * 30).toFixed(0).padStart(4, "0");
+  ctx.textAlign = "left";
+  ctx.fillText(`TECHZILLA.STUDIO`, W * 0.065, py);
+  ctx.fillText(`${coordX} X  ${coordY} Y`, W * 0.38, py);
+
+  // Right: "system" label
+  ctx.textAlign = "right";
+  ctx.fillText(`SYS·ONLINE`, W * 0.935, py);
+
+  // Horizontal rule above status
+  ctx.strokeStyle = "rgba(0,229,255,0.18)";
+  ctx.lineWidth   = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(W * 0.065, H * 0.92);
+  ctx.lineTo(W * 0.935, H * 0.92);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/* ─── Orbit rings ────────────────────────────────────────────────────────── */
 function drawRings(
   ctx: CanvasRenderingContext2D,
   cx: number, cy: number,
-  progress: number, time: number
+  W: number, _H: number,
+  progress: number,
+  time: number,
 ) {
   if (progress <= 0) return;
   ctx.save();
-  const base = Math.min(ctx.canvas.width, ctx.canvas.height) * 0.5;
+  const base = W * 0.32;
   const rings = [
-    { rx: 0.38, ry: 0.10, spd:  0.18, color: "#d4ff00", lw: 2.2 },
-    { rx: 0.55, ry: 0.14, spd: -0.13, color: "#00eaff", lw: 1.5 },
-    { rx: 0.68, ry: 0.18, spd:  0.09, color: "#8040ff", lw: 1.8 },
-    { rx: 0.82, ry: 0.22, spd: -0.07, color: "#ff44aa", lw: 1.2 },
+    { rx: 1.05, ry: 0.22, spd:  0.20, color: [212, 255, 0],   lw: 1.8 },
+    { rx: 0.80, ry: 0.16, spd: -0.14, color: [0, 234, 255],   lw: 1.4 },
+    { rx: 0.60, ry: 0.12, spd:  0.10, color: [128, 64, 255],  lw: 1.2 },
+    { rx: 1.28, ry: 0.28, spd: -0.08, color: [255, 68, 170],  lw: 1.0 },
   ];
   rings.forEach((r, i) => {
-    const rot = time * r.spd + i * 0.6;
+    const rot = time * r.spd + i * 0.72;
+    const [red, grn, blu] = r.color;
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(rot);
     ctx.beginPath();
     ctx.ellipse(0, 0, base * r.rx * progress, base * r.ry * progress, 0, 0, Math.PI * 2);
-    ctx.strokeStyle = r.color;
-    ctx.lineWidth   = r.lw;
-    ctx.globalAlpha = 0.65 * progress;
-    ctx.shadowColor = r.color;
-    ctx.shadowBlur  = 10;
+    ctx.strokeStyle  = `rgba(${red},${grn},${blu},${(0.7 * progress).toFixed(2)})`;
+    ctx.lineWidth    = r.lw;
+    ctx.globalAlpha  = progress;
+    ctx.shadowColor  = `rgb(${red},${grn},${blu})`;
+    ctx.shadowBlur   = 12;
     ctx.stroke();
     ctx.restore();
   });
   ctx.restore();
 }
 
-/* ─── Blue radial fill ───────────────────────────────────────────────────── */
+/* ─── Radial blue fill from centre ──────────────────────────────────────── */
 function drawBlueFill(
   ctx: CanvasRenderingContext2D,
   cx: number, cy: number,
-  w: number, h: number,
-  progress: number
+  W: number, H: number,
+  progress: number,
 ) {
   if (progress <= 0) return;
-  const maxR = Math.hypot(w, h);
-  const r    = maxR * easeOut(progress);
+  const maxR = Math.hypot(W, H);
+  const r    = maxR * easeOut3(progress);
   const g    = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-  g.addColorStop(0,   `rgba(20,120,255,${(progress * 0.95).toFixed(3)})`);
-  g.addColorStop(0.5, `rgba(10,70,200,${(progress * 0.90).toFixed(3)})`);
-  g.addColorStop(1,   `rgba(0,30,120,${(progress * 0.85).toFixed(3)})`);
+  g.addColorStop(0,    `rgba(20,120,255,${(progress * 0.92).toFixed(3)})`);
+  g.addColorStop(0.45, `rgba(10,70,200,${(progress * 0.88).toFixed(3)})`);
+  g.addColorStop(1,    `rgba(0,25,110,${(progress * 0.80).toFixed(3)})`);
   ctx.save();
   ctx.fillStyle = g;
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+/* ─── Chess piece image (screen-blend removes black bg) ─────────────────── */
+function drawPiece(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  cx: number, cy: number,
+  size: number, alpha: number,
+) {
+  if (alpha <= 0 || size <= 0 || !img.complete || img.naturalWidth === 0) return;
+  const aspect = img.naturalWidth / img.naturalHeight;
+  const h = size, w = h * aspect;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.globalCompositeOperation = "screen";
+  ctx.drawImage(img, cx - w * 0.5, cy - h * 0.5, w, h);
   ctx.restore();
 }
 
@@ -176,89 +308,85 @@ const PHRASES = [
   "Ship in small loops.\nAim for long arcs.",
 ];
 const PHRASE_POS = [
-  { ax: 0.72, ay: 0.30, align: "left"  as CanvasTextAlign },
-  { ax: 0.70, ay: 0.60, align: "left"  as CanvasTextAlign },
-  { ax: 0.08, ay: 0.38, align: "left"  as CanvasTextAlign },
-  { ax: 0.08, ay: 0.65, align: "left"  as CanvasTextAlign },
+  { ax: 0.72, ay: 0.30 },
+  { ax: 0.70, ay: 0.60 },
+  { ax: 0.065, ay: 0.36 },
+  { ax: 0.065, ay: 0.62 },
 ];
-
-function drawPhrases(ctx: CanvasRenderingContext2D, w: number, h: number, progress: number) {
+function drawPhrases(ctx: CanvasRenderingContext2D, W: number, H: number, progress: number) {
   if (progress <= 0) return;
-  const fs = Math.round(clamp(w * 0.020, 13, 24));
+  const fs = Math.round(clamp(W * 0.018, 12, 22));
   ctx.save();
-  ctx.font = `400 ${fs}px 'Inter','Helvetica Neue',sans-serif`;
+  ctx.font = `300 ${fs}px 'Inter','Helvetica Neue',sans-serif`;
   PHRASES.forEach((phrase, i) => {
-    const delay = i * 0.12;
-    const a     = ease(clamp((progress - delay) / 0.4, 0, 1));
+    const a = easeInOut(clamp((progress - i * 0.12) / 0.4, 0, 1));
     if (a <= 0) return;
-    const p = PHRASE_POS[i];
-    ctx.textAlign = p.align;
+    const { ax, ay } = PHRASE_POS[i];
+    ctx.globalAlpha = a * 0.80;
+    ctx.fillStyle   = "#ffffff";
+    ctx.textAlign   = "left";
     phrase.split("\n").forEach((line, li) => {
-      ctx.globalAlpha = a * 0.85;
-      ctx.fillStyle   = "#ffffff";
-      ctx.fillText(line, w * p.ax, h * p.ay + li * fs * 1.38);
+      ctx.fillText(line, W * ax, H * ay + li * fs * 1.4);
     });
   });
   ctx.restore();
 }
 
+/* ─── Main headline ─────────────────────────────────────────────────────── */
 function drawHeadline(
   ctx: CanvasRenderingContext2D,
-  w: number, h: number,
+  W: number, H: number,
   text: string,
   progress: number,
-  yFrac = 0.50
+  yFrac = 0.50,
 ) {
   if (progress <= 0) return;
-  const fs = Math.round(clamp(w * 0.068, 34, 104));
+  const fs    = Math.round(clamp(W * 0.066, 32, 102));
+  const lineH = fs * 1.08;
+  const lines = text.split("\n");
+  const startY = H * yFrac - (lines.length * lineH) / 2 + lineH * 0.5;
   ctx.save();
   ctx.textAlign    = "center";
   ctx.textBaseline = "middle";
   ctx.font         = `900 ${fs}px 'Inter','Helvetica Neue',Arial,sans-serif`;
-  ctx.globalAlpha  = ease(progress);
-  const lines  = text.split("\n");
-  const lineH  = fs * 1.10;
-  const startY = h * yFrac - (lines.length * lineH) * 0.5 + lineH * 0.5;
+  ctx.globalAlpha  = easeInOut(progress);
   lines.forEach((line, li) => {
-    ctx.shadowColor = "rgba(0,60,180,0.55)";
-    ctx.shadowBlur  = 28;
+    ctx.shadowColor = "rgba(0,80,220,0.65)";
+    ctx.shadowBlur  = 36;
     ctx.fillStyle   = "#ffffff";
-    ctx.fillText(line, w * 0.5, startY + li * lineH);
-    ctx.shadowBlur  = 0;
+    ctx.fillText(line, W * 0.5, startY + li * lineH);
   });
   ctx.restore();
 }
 
-/* ─── Component ──────────────────────────────────────────────────────────── */
+/* ─── Component ─────────────────────────────────────────────────────────── */
 const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
   const canvasRef  = useRef<HTMLCanvasElement>(null);
   const wrapRef    = useRef<HTMLDivElement>(null);
-  const pawnImgRef = useRef<HTMLImageElement | null>(null);
-  const queenImgRef = useRef<HTMLImageElement | null>(null);
+  const pawnRef    = useRef<HTMLImageElement | null>(null);
+  const queenRef   = useRef<HTMLImageElement | null>(null);
   const stateRef   = useRef({
     active:        false,
-    virtualScroll: 0,
+    virtualScroll: 0,   // 0 → TOTAL
     time:          0,
-    rafId:         0,
     lastTs:        0,
+    rafId:         0,
   });
+  const TOTAL = 5200;
 
-  const TOTAL_VIRTUAL = 5000;
-
-  /* Slide wrap up/down ─────────────────────────────────────────────────── */
+  /* Slide helpers ─────────────────────────────────────────────────────── */
   const slideIn = () => {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    wrap.style.transition    = "transform 0.65s cubic-bezier(0.32,0,0.12,1)";
-    wrap.style.transform     = "translateY(0%)";
-    wrap.style.pointerEvents = "all";
+    const w = wrapRef.current; if (!w) return;
+    // Brief pause lets the portfolio exit animation play first
+    w.style.transition    = "transform 0.70s cubic-bezier(0.22,1,0.36,1)";
+    w.style.transform     = "translateY(0%)";
+    w.style.pointerEvents = "all";
   };
-  const slideOut = () => {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    wrap.style.transition    = "transform 0.55s cubic-bezier(0.32,0,0.12,1)";
-    wrap.style.transform     = "translateY(100%)";
-    wrap.style.pointerEvents = "none";
+  const slideOut = (fast = false) => {
+    const w = wrapRef.current; if (!w) return;
+    w.style.transition    = `transform ${fast ? 0.40 : 0.55}s cubic-bezier(0.32,0,0.12,1)`;
+    w.style.transform     = "translateY(100%)";
+    w.style.pointerEvents = "none";
   };
 
   useImperativeHandle(ref, () => ({
@@ -271,7 +399,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     },
     deactivate() {
       stateRef.current.active = false;
-      slideOut();
+      slideOut(true);
     },
   }));
 
@@ -280,166 +408,170 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     if (!canvas) return;
     const s = stateRef.current;
 
-    /* Pre-load chess piece images ──────────────────────────────────────── */
-    const pawnImg  = new Image();
-    const queenImg = new Image();
-    pawnImg.src    = "/chess/pawn.png";   // silver pawn, black bg → screen blend
-    queenImg.src   = "/chess/queen.png";  // gold queen, black bg → screen blend
-    pawnImgRef.current  = pawnImg;
-    queenImgRef.current = queenImg;
+    /* Pre-load chess images ─────────────────────────────────────────── */
+    const pawn  = new Image(); pawn.src  = "/chess/pawn.png";
+    const queen = new Image(); queen.src = "/chess/queen.png";
+    pawnRef.current  = pawn;
+    queenRef.current = queen;
 
-    /* Resize ──────────────────────────────────────────────────────────── */
+    /* Resize ────────────────────────────────────────────────────────── */
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
       const W = window.innerWidth, H = window.innerHeight;
-      canvas.width  = W * dpr;
-      canvas.height = H * dpr;
-      canvas.style.width  = W + "px";
-      canvas.style.height = H + "px";
+      canvas.width  = W * dpr; canvas.height = H * dpr;
+      canvas.style.width  = `${W}px`; canvas.style.height = `${H}px`;
       const c = canvas.getContext("2d");
       if (c) { c.setTransform(1, 0, 0, 1, 0, 0); c.scale(dpr, dpr); }
     };
     resize();
     window.addEventListener("resize", resize);
 
-    /* Scroll accumulation ─────────────────────────────────────────────── */
+    /* Scroll accumulation ───────────────────────────────────────────── */
     const onWheel = (e: WheelEvent) => {
       if (!s.active) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-      s.virtualScroll = clamp(s.virtualScroll + delta, 0, TOTAL_VIRTUAL);
+      s.virtualScroll = clamp(s.virtualScroll + delta, 0, TOTAL);
 
-      // Scroll up at start → dismiss (slide back down)
       if (s.virtualScroll <= 0 && delta < 0) {
         s.active = false;
         slideOut();
         window.dispatchEvent(new CustomEvent("chess-reveal-dismissed"));
       }
-
-      // Reach the end → auto-dismiss
-      if (s.virtualScroll >= TOTAL_VIRTUAL) {
+      if (s.virtualScroll >= TOTAL) {
         setTimeout(() => {
           s.active = false;
           slideOut();
           window.dispatchEvent(new CustomEvent("chess-reveal-complete"));
-        }, 600);
+        }, 500);
       }
     };
 
     let touchY = 0;
-    const onTouchStart = (e: TouchEvent) => {
-      if (!s.active) return;
-      touchY = e.touches[0]?.clientY ?? 0;
-    };
-    const onTouchMove = (e: TouchEvent) => {
+    const onTouchStart = (e: TouchEvent) => { if (s.active) touchY = e.touches[0]?.clientY ?? 0; };
+    const onTouchMove  = (e: TouchEvent) => {
       if (!s.active) return;
       e.preventDefault();
       const dy = touchY - (e.touches[0]?.clientY ?? 0);
       touchY   = e.touches[0]?.clientY ?? 0;
-      s.virtualScroll = clamp(s.virtualScroll + dy * 3, 0, TOTAL_VIRTUAL);
+      s.virtualScroll = clamp(s.virtualScroll + dy * 3, 0, TOTAL);
     };
 
     window.addEventListener("wheel",      onWheel,      { passive: false, capture: true });
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchstart", onTouchStart, { passive: true  });
     window.addEventListener("touchmove",  onTouchMove,  { passive: false, capture: true });
 
-    /* Render loop ─────────────────────────────────────────────────────── */
+    /* Render loop ───────────────────────────────────────────────────── */
     const tick = (ts: number) => {
       s.rafId = requestAnimationFrame(tick);
       if (!s.active && s.virtualScroll <= 0) { s.lastTs = ts; return; }
 
-      const dt = Math.min((ts - (s.lastTs || ts)) / 1000, 0.05);
+      const dt  = Math.min((ts - (s.lastTs || ts)) / 1000, 0.05);
       s.lastTs  = ts;
       s.time   += dt;
 
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
+
       const W = window.innerWidth, H = window.innerHeight;
-      const cx = W * 0.5, cy = H * 0.5;
+      const cx = W / 2, cy = H / 2;
 
       ctx.clearRect(0, 0, W, H);
 
-      const p = s.virtualScroll / TOTAL_VIRTUAL; // 0 → 1
+      /* overall progress 0→1 */
+      const p = s.virtualScroll / TOTAL;
 
-      // ── Phase breakpoints ────────────────────────────────────────────
-      // 0.00–0.08  dark intro, piece appears
-      // 0.08–0.48  piece grows, warp lines build
-      // 0.48–0.64  pawn → queen morph, blue fills
-      // 0.64–0.78  full blue, headline
-      // 0.78–0.90  rings + manifesto phrases
-      // 0.90–1.00  final "Your satisfaction always"
+      /*
+        Phase map (designed to match haoqi.design video timing):
+        0.00–0.07  dark intro, grid + piece appears
+        0.07–0.46  piece grows, warp lines build in intensity
+        0.46–0.62  pawn → queen cross-fade; blue fill expands
+        0.62–0.76  full blue screen, warp lines peak, headline reveals
+        0.76–0.88  orbit rings + manifesto phrases
+        0.88–1.00  final screen: "YOUR SATISFACTION ALWAYS"
+      */
+      const introP    = easeInOut(invlerp(0.00, 0.07, p));
+      const growP     = easeInOut(invlerp(0.07, 0.46, p));
+      const morphP    = easeInOut(invlerp(0.46, 0.62, p));
+      const blueP     = easeInOut(invlerp(0.50, 0.72, p));
+      const linesP    = easeInOut(invlerp(0.40, 0.80, p));
+      const headlineP = easeInOut(invlerp(0.62, 0.76, p));
+      const ringsP    = easeInOut(invlerp(0.74, 0.87, p));
+      const phrasesP  = easeInOut(invlerp(0.76, 1.00, p));
+      const finalP    = easeInOut(invlerp(0.87, 0.97, p));
 
-      const introP    = ease(invlerp(0.00, 0.08, p));
-      const growP     = ease(invlerp(0.08, 0.48, p));
-      const morphP    = ease(invlerp(0.48, 0.64, p));   // 0=pawn, 1=queen
-      const blueP     = ease(invlerp(0.52, 0.74, p));
-      const linesP    = ease(invlerp(0.44, 0.82, p));
-      const headlineP = ease(invlerp(0.62, 0.76, p));
-      const ringsP    = ease(invlerp(0.74, 0.88, p));
-      const phrasesP  = ease(invlerp(0.76, 1.00, p));
-      const finalP    = ease(invlerp(0.88, 0.98, p));
-
-      // Background
-      ctx.fillStyle = "#05080f";
+      /* ── 1. Background ────────────────────────────────────────── */
+      ctx.fillStyle = "#030508";
       ctx.fillRect(0, 0, W, H);
 
-      // Grid (fades out as blue fills)
-      drawGrid(ctx, W, H, introP * (1 - blueP * 0.92));
+      /* ── 2. Crosshair grid (fades out as blue fills) ──────────── */
+      drawGrid(ctx, W, H, introP * (1 - blueP * 0.95));
 
-      // Warp speed lines
-      drawSpeedLines(ctx, cx, cy, W, H, linesP, s.time);
+      /* ── 3. Perspective warp lines ────────────────────────────── */
+      drawWarpLines(ctx, cx, cy, W, H, linesP, s.time);
 
-      // Blue fill
+      /* ── 4. Radial blue fill ──────────────────────────────────── */
       drawBlueFill(ctx, cx, cy, W, H, blueP);
 
-      // Orbit rings (above blue)
-      drawRings(ctx, cx, cy, ringsP, s.time);
+      /* ── 5. HUD corner brackets ───────────────────────────────── */
+      drawCornerBrackets(ctx, W, H, introP * (1 - blueP * 0.5));
 
-      // ── Chess pieces (image-based) ─────────────────────────────────
-      // Size: starts ~5% of screen, grows to ~55% height
-      const maxH   = H * 0.55;
-      const minH   = maxH * 0.050;
-      const sizeT  = ease(clamp(growP + morphP * 0.28, 0, 1));
-      const pieceH = minH + (maxH - minH) * sizeT;
+      /* ── 6. Orbit rings ───────────────────────────────────────── */
+      drawRings(ctx, cx, cy, W, H, ringsP, s.time);
 
-      const pawn  = pawnImgRef.current;
-      const queen = queenImgRef.current;
+      /* ── 7. Chess piece ───────────────────────────────────────── */
+      // Size: 4% → 52% of screen height
+      const maxH   = H * 0.52;
+      const minH   = maxH * 0.04;
+      const sizeT  = easeOut3(clamp(growP + morphP * 0.30, 0, 1));
+      const pieceH = lerp(minH, maxH, sizeT);
 
-      // Pawn fades out as morphP → 1
-      // pawn.png has a black bg → use screen blend to remove it
-      if (morphP < 1 && pawn) {
-        drawPieceImage(ctx, pawn, cx, cy, pieceH, introP * (1 - morphP), true);
+      // Centre vertically slightly above mid to leave headline room
+      const pieceCY = cy - H * 0.03;
+
+      if (morphP < 1 && pawnRef.current) {
+        drawPiece(ctx, pawnRef.current, cx, pieceCY, pieceH, introP * (1 - morphP));
+      }
+      if (morphP > 0 && queenRef.current) {
+        drawPiece(ctx, queenRef.current, cx, pieceCY, pieceH, introP * clamp(morphP * 1.6, 0, 1));
       }
 
-      // Queen fades in as morphP → 1
-      // queen.png has black background → use "screen" to remove it
-      if (morphP > 0 && queen) {
-        const queenAlpha = introP * Math.min(1, morphP * 1.6);
-        drawPieceImage(ctx, queen, cx, cy, pieceH, queenAlpha, true);
+      /* ── 8. Main headline ─────────────────────────────────────── */
+      if (headlineP > 0) {
+        drawHeadline(ctx, W, H, "TURN YOUR\nDREAMS TO\nREALITY", headlineP, 0.50);
       }
 
-      // Main headline
-      if (headlineP > 0) drawHeadline(ctx, W, H, "TURN YOUR\nDREAMS TO\nREALITY", headlineP, 0.50);
-
-      // Manifesto phrases
+      /* ── 9. Manifesto phrases ─────────────────────────────────── */
       if (phrasesP > 0) drawPhrases(ctx, W, H, phrasesP);
 
-      // Final screen
+      /* ── 10. Final screen ─────────────────────────────────────── */
       if (finalP > 0) {
+        // Dim previous elements
         ctx.save();
-        ctx.globalAlpha = finalP * 0.75;
-        ctx.fillStyle   = "#05080f";
+        ctx.globalAlpha = finalP * 0.80;
+        ctx.fillStyle   = "#030508";
         ctx.fillRect(0, 0, W, H);
         ctx.restore();
 
-        drawRings(ctx, cx, cy, 1, s.time);
-        drawSpeedLines(ctx, cx, cy, W, H, 0.30, s.time * 0.6);
+        // Keep warp lines + rings at low intensity
+        drawWarpLines(ctx, cx, cy, W, H, 0.28, s.time * 0.6);
+        drawRings(ctx, cx, cy, W, H, finalP, s.time);
+
+        // Final headline
         drawHeadline(ctx, W, H, "YOUR SATISFACTION\nALWAYS", finalP, 0.44);
 
-        // Small queen below text
-        if (queen) drawPieceImage(ctx, queen, cx, cy + H * 0.27, H * 0.18, finalP * 0.60, true);
+        // Small queen icon below text
+        if (queenRef.current) {
+          drawPiece(ctx, queenRef.current, cx, cy + H * 0.27, H * 0.18, finalP * 0.60);
+        }
+
+        // Corner brackets remain
+        drawCornerBrackets(ctx, W, H, finalP * 0.70);
       }
+
+      /* ── 11. Status bar (always on when visible) ──────────────── */
+      drawStatusBar(ctx, W, H, introP * (finalP > 0 ? finalP : 1), s.time);
     };
 
     s.rafId = requestAnimationFrame(tick);
@@ -451,7 +583,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("touchmove",  onTouchMove,  { capture: true } as EventListenerOptions);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
