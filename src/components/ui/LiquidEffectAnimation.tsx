@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react"
 
 export function LiquidEffectAnimation() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const appRef = useRef<any>(null)
 
   useEffect(() => {
     if (!canvasRef.current) return
@@ -12,28 +13,16 @@ export function LiquidEffectAnimation() {
     script.type = "module"
     script.textContent = `
       import LiquidBackground from 'https://cdn.jsdelivr.net/npm/threejs-components@0.0.22/build/backgrounds/liquid1.min.js';
-
+      
       const canvas = document.getElementById('liquid-canvas');
-      if (!canvas) return;
-
-      const app = LiquidBackground(canvas);
-
-      // Material — metallic sheen, full opacity, NO transparent hack
-      app.liquidPlane.material.metalness = 0.8;
-      app.liquidPlane.material.roughness = 0.2;
-      app.liquidPlane.uniforms.displacementScale.value = 4;
-      app.setRain(false);
-
-      // Faster animation — clock runs at 2× real speed
-      if (app.clock) {
-        const startReal = performance.now();
-        const SPEED = 2.0;
-        app.clock.getElapsedTime = () =>
-          ((performance.now() - startReal) / 1000) * SPEED;
-        app.clock.getDelta = () => (1 / 60) * SPEED;
+      if (canvas) {
+        const app = LiquidBackground(canvas);
+        app.liquidPlane.material.metalness = 0.75;
+        app.liquidPlane.material.roughness = 0.25;
+        app.liquidPlane.uniforms.displacementScale.value = 5;
+        app.setRain(false);
+        window.__liquidApp = app;
       }
-
-      window.__liquidApp = app;
     `
     document.body.appendChild(script)
 
@@ -48,13 +37,9 @@ export function LiquidEffectAnimation() {
   return (
     <div
       className="absolute inset-0 m-0 w-full h-full touch-none overflow-hidden pointer-events-none"
-      style={{ zIndex: 1 }}
+      style={{ fontFamily: '"Montserrat", serif', zIndex: 1 }}
     >
-      <canvas
-        ref={canvasRef}
-        id="liquid-canvas"
-        className="absolute inset-0 w-full h-full"
-      />
+      <canvas ref={canvasRef} id="liquid-canvas" className="absolute inset-0 w-full h-full" />
     </div>
   )
 }
