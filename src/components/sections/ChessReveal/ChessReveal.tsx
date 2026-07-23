@@ -394,7 +394,9 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       s.active = false;
       slideOut();
       window.dispatchEvent(new CustomEvent("chess-reveal-mode", { detail: { active: false } }));
-      window.dispatchEvent(new CustomEvent("chess-reveal-dismissed"));
+      // Tag as "scrollbar" so page.tsx can release the freeze immediately
+      // instead of re-arming the portfolio gate — the user explicitly dragged back.
+      window.dispatchEvent(new CustomEvent("chess-reveal-dismissed", { detail: { source: "scrollbar" } }));
       return;
     }
     setVirtualScroll(next);

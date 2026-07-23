@@ -88,6 +88,8 @@ export default function Home() {
       portfolioGateTimerRef.current = setTimeout(() => {
         portfolioGateReadyRef.current = true;
         portfolioGateTimerRef.current = null;
+        // Tell the scrollbar the gate is open so it can navigate again.
+        window.dispatchEvent(new CustomEvent("tz-scroll-gate-ready"));
       }, 2000);
     };
 
@@ -215,13 +217,20 @@ export default function Home() {
     window.addEventListener("scroll", onScroll, { passive: true });
 
     /* Chess events ──────────────────────────────────────────────────────── */
-    const onChessDismissed = () => {
+    const onChessDismissed = (e: Event) => {
       chessActiveRef.current = false;
-      // Portfolio CSS animation was never touched — it's still at translateX(0%)
-      // (scroll frozen at pMax), so Our Work is already visible the moment chess
-      // slides back down. Start the same deliberate gate on the way back too:
-      // wait two seconds, then wait for a new user scroll before releasing.
-      beginPortfolioGate();
+      const source = (e as CustomEvent<{ source?: string }>).detail?.source;
+      if (source === "scrollbar") {
+        // The user explicitly dragged the scrollbar backward out of chess.
+        // Release the freeze immediately so the scrollbar can continue scrolling
+        // back — don't re-arm the gate or they'll be stuck.
+        portfolioHoldRef.current = false;
+        window.dispatchEvent(new CustomEvent("tz-scroll-released"));
+      } else {
+        // Dismissed via wheel/touch — show the deliberate 2-s gate so the user
+        // can't accidentally re-trigger chess the moment they release the wheel.
+        beginPortfolioGate();
+      }
     };
     const onChessComplete = () => {
       chessActiveRef.current = false;
@@ -348,13 +357,38 @@ export default function Home() {
       if (portfolioGateReadyRef.current && delta) releaseFromGate(delta);
       else window.scrollTo(0, frozenScrollRef.current);
     };
-    window.addEventListener("wheel",      blockWheel,  { passive: false, capture: true });
-    window.addEventListener("touchstart", onTS,        { passive: true });
-    window.addEventListener("touchmove",  blockTouch,  { passive: false });
+    /**
+     * Scrollbar sent a navigate intent while frozen.
+     * fraction < current → release gate and scroll back.
+     * fraction ≥ PORTFOLIO_FULL threshold → release gate and open chess (if ready).
+     */
+    const PORTFOLIO_FULL_THRESH = 0.97;
+    const onScrollbarNavigate = (e: Event) => {
+      if (gateReleased) return;
+      const fraction = (e as CustomEvent<{ fraction?: number }>).detail?.fraction;
+      if (typeof fraction !== "number") return;
+      const max        = document.documentElement.scrollHeight - window.innerHeight;
+      const frozenFrac = max > 0 ? frozenScrollRef.current / max : 1;
+
+      if (fraction < frozenFrac - 0.01) {
+        // Backward — release immediately (no gate timer required for going back).
+        releaseFromGate(-1);
+        if (max > 0) window.scrollTo(0, Math.max(0, fraction * max));
+      } else if (fraction >= PORTFOLIO_FULL_THRESH && portfolioGateReadyRef.current) {
+        // Forward past Our Work and gate is ready — open chess.
+        releaseFromGate(1);
+      }
+    };
+
+    window.addEventListener("wheel",               blockWheel,          { passive: false, capture: true });
+    window.addEventListener("touchstart",          onTS,                { passive: true });
+    window.addEventListener("touchmove",           blockTouch,          { passive: false });
+    window.addEventListener("tz-scrollbar-navigate", onScrollbarNavigate);
     return () => {
-      window.removeEventListener("wheel",      blockWheel,  { capture: true } as EventListenerOptions);
-      window.removeEventListener("touchstart", onTS);
-      window.removeEventListener("touchmove",  blockTouch);
+      window.removeEventListener("wheel",               blockWheel,          { capture: true } as EventListenerOptions);
+      window.removeEventListener("touchstart",          onTS);
+      window.removeEventListener("touchmove",           blockTouch);
+      window.removeEventListener("tz-scrollbar-navigate", onScrollbarNavigate);
     };
   }, [portfolioHolding]);
 
