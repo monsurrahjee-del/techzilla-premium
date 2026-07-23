@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import styles from "./Craft.module.css";
+import PlayingCard from "./PlayingCard";
 
 const CHARACTERS = [
   { name: "Developer",     file: "/characters/developer.png",    label: "Software Dev" },
@@ -34,23 +35,15 @@ interface GiftCardDisplayProps {
 
 function GiftCardDisplay({ businessName, discountCode, charIndex, onCharChange, onClose }: GiftCardDisplayProps) {
   const [clicked, setClicked] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const [downloadMsg, setDownloadMsg] = useState<string | null>(null);
 
   const char = CHARACTERS[charIndex];
 
   const handleCardClick = () => setClicked((p) => !p);
-
   const handlePrev = () => onCharChange((charIndex - 1 + CHARACTERS.length) % CHARACTERS.length);
   const handleNext = () => onCharChange((charIndex + 1) % CHARACTERS.length);
 
-  const [downloadMsg, setDownloadMsg] = useState<string | null>(null);
-
-  // Download the card as PNG using canvas API
   const handleDownload = useCallback(() => {
-    const el = cardRef.current;
-    if (!el) return;
-
-    // Build a simple canvas representation of the card data
     const canvas = document.createElement("canvas");
     const W = 320, H = Math.round(W * 16 / 9);
     canvas.width = W * 2; canvas.height = H * 2;
@@ -58,39 +51,44 @@ function GiftCardDisplay({ businessName, discountCode, charIndex, onCharChange, 
     if (!ctx) return;
     ctx.scale(2, 2);
 
-    // Background
     ctx.fillStyle = "#000";
     ctx.roundRect(0, 0, W, H, 18);
     ctx.fill();
 
-    // Dot pattern
-    ctx.fillStyle = clicked ? "rgba(241,43,48,0.4)" : "rgba(54,98,244,0.4)";
-    for (let x = 4; x < W; x += 8) {
-      for (let y = 4; y < H; y += 8) {
-        ctx.beginPath(); ctx.arc(x, y, 1, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-
-    // Brand text
+    // Brand text (Techzilla corner inscription)
     ctx.fillStyle = clicked ? "#f12b30" : "#3662f4";
-    ctx.font = "bold 8px monospace";
-    ctx.fillText("TECHZILLA INC.", 16, 24);
+    ctx.font = "bold 14px monospace";
+    ctx.fillText("T", 16, 34);
+    ctx.fillText("Z", 16, 54);
 
-    // Company
-    ctx.fillStyle = "rgba(255,255,255,0.5)";
-    ctx.font = "6px monospace";
-    ctx.fillText(businessName.toUpperCase().slice(0, 20), 16, 34);
+    // Mirrored at bottom-right
+    ctx.save();
+    ctx.translate(W - 16, H - 20);
+    ctx.scale(-1, -1);
+    ctx.fillText("T", 0, 20);
+    ctx.fillText("Z", 0, 40);
+    ctx.restore();
+
+    // Company name
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.font = "bold 8px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("TECHZILLA INC.", W / 2, H / 2 - 40);
+
+    // Business name
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.font = "7px monospace";
+    ctx.fillText(businessName.toUpperCase().slice(0, 22), W / 2, H / 2 - 28);
 
     // Discount
     ctx.fillStyle = "#fff";
     ctx.font = "bold 32px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("5% OFF", W / 2, H / 2 + 20);
+    ctx.fillText("5% OFF", W / 2, H / 2 + 12);
 
     // Code
     ctx.fillStyle = "rgba(255,255,255,0.4)";
     ctx.font = "7px monospace";
-    ctx.fillText(discountCode, W / 2, H / 2 + 40);
+    ctx.fillText(discountCode, W / 2, H / 2 + 32);
 
     ctx.textAlign = "left";
 
@@ -107,7 +105,7 @@ function GiftCardDisplay({ businessName, discountCode, charIndex, onCharChange, 
     <div className={styles.giftCardWrap}>
       <div className={styles.giftCardHeader}>
         <h3>Your Exclusive Gift Card 🎁</h3>
-        <p>Click the card to change colour · Use the arrows to switch character</p>
+        <p>Click the card to change colour · Use arrows to switch character</p>
       </div>
 
       {/* Arrows + Card */}
@@ -116,55 +114,88 @@ function GiftCardDisplay({ businessName, discountCode, charIndex, onCharChange, 
           &#8592;
         </button>
 
-        {/* The card itself */}
-        <div ref={cardRef} className={`${styles.card} ${clicked ? styles.clicked : ""}`} onClick={handleCardClick}>
-          <div className={styles.cardInner}>
-            {/* Reveal canvas dots background */}
-            <div className={styles.cardReveal}>
-              <DotsBackground clicked={clicked} />
-              <div className={styles.cardRevealGradient} />
-            </div>
+        {/* PlayingCard — 100% as provided */}
+        <div style={{ position: "relative", maxWidth: 240, width: "100%" }}>
+          <PlayingCard
+            componentId={`gift-card-${charIndex}`}
+            textArray={["T", "Z"]}
+            imageSrc={char.file}
+            imageAlt={char.name}
+            componentWidth="240px"
+            aspectRatio="9/16"
+            imageHeightPercentage={55}
+            verticalPadding="16px"
+            horizontalPadding="14px"
+            onCardClicked={handleCardClick}
+            revealCanvas={true}
+            revealCanvasColors={clicked
+              ? [[241, 43, 48], [255, 100, 80]]
+              : [[54, 98, 244], [80, 140, 255]]
+            }
+            inscriptionColor={clicked ? "#f12b30" : "#3662f4"}
+            inscriptionColorHovered={clicked ? "#ff4444" : "#5580ff"}
+            minWidth={180}
+            maxWidth={280}
+            minTextSize={18}
+            maxTextSize={28}
+            manualLetterSpacing={4}
+          />
 
-            {/* Top-left label */}
-            <div className={styles.cardTopLabel}>
-              <div className={styles.cardBrand}>TECHZILLA INC.</div>
-              <div className={styles.cardCompany}>{businessName}</div>
+          {/* Info overlay: TECHZILLA brand + business name + discount + code */}
+          <div
+            style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              zIndex: 10,
+              textAlign: "center",
+              pointerEvents: "none",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 2,
+              marginTop: 40,
+            }}
+          >
+            <div style={{
+              fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: "0.52rem",
+              letterSpacing: "0.15em",
+              color: "rgba(255,255,255,0.65)",
+              textTransform: "uppercase",
+              fontWeight: 700,
+            }}>
+              TECHZILLA INC.
             </div>
-
-            {/* Bottom-right label (mirrored) */}
-            <div className={styles.cardBottomLabel}>
-              <div className={styles.cardBrand}>TECHZILLA INC.</div>
-              <div className={styles.cardCompany}>{businessName}</div>
+            <div style={{
+              fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: "0.45rem",
+              letterSpacing: "0.1em",
+              color: "rgba(255,255,255,0.4)",
+              textTransform: "uppercase",
+            }}>
+              {businessName.slice(0, 18)}
             </div>
-
-            {/* Center: character + discount */}
-            <div className={styles.cardCenter}>
-              <div className={styles.cardCharacter}>
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={charIndex}
-                    initial={{ opacity: 0, scale: 0.8, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.8, y: -10 }}
-                    transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                    style={{ width: "100%", height: "100%", position: "relative" }}
-                  >
-                    <Image
-                      src={char.file}
-                      alt={char.name}
-                      fill
-                      style={{ objectFit: "contain" }}
-                      sizes="200px"
-                      priority
-                    />
-                  </motion.div>
-                </AnimatePresence>
-              </div>
-              <div className={styles.cardDiscountBadge}>
-                <div className={styles.cardDiscountPct}>5% OFF</div>
-                <div className={styles.cardDiscountLabel}>Your next project</div>
-              </div>
-              <div className={styles.cardCode}>{discountCode}</div>
+            <div style={{
+              fontFamily: "var(--font-geist-sans), sans-serif",
+              fontSize: "1.3rem",
+              fontWeight: 900,
+              color: "#fff",
+              letterSpacing: "-0.02em",
+              lineHeight: 1,
+              marginTop: 4,
+            }}>
+              5% OFF
+            </div>
+            <div style={{
+              fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: "0.42rem",
+              letterSpacing: "0.12em",
+              color: "rgba(255,255,255,0.38)",
+              textTransform: "uppercase",
+            }}>
+              {discountCode}
             </div>
           </div>
         </div>
@@ -176,7 +207,7 @@ function GiftCardDisplay({ businessName, discountCode, charIndex, onCharChange, 
 
       <div className={styles.characterHint}>{char.name} · {char.label}</div>
 
-      {/* Download button */}
+      {/* Download */}
       <div className={styles.downloadRow}>
         <button className={styles.downloadBtn} onClick={handleDownload}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -210,23 +241,6 @@ function GiftCardDisplay({ businessName, discountCode, charIndex, onCharChange, 
         Close
       </button>
     </div>
-  );
-}
-
-/* Simple CSS-based animated dots background (no Three.js dependency) */
-function DotsBackground({ clicked }: { clicked: boolean }) {
-  return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        backgroundImage: `radial-gradient(circle, ${clicked ? "rgba(241,43,48,0.6)" : "rgba(54,98,244,0.6)"} 1px, transparent 1px)`,
-        backgroundSize: "8px 8px",
-        opacity: 0.45,
-        transition: "background-image 2s ease-in-out 0.7s",
-        animation: "craftDotsPulse 3s ease-in-out infinite",
-      }}
-    />
   );
 }
 

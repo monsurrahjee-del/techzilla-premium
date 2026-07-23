@@ -16,11 +16,12 @@ import MeshGradient     from "../Hero/MeshGradient";
 import HeroLight        from "../Hero/HeroLight";
 import WaterRipple      from "../Hero/WaterRipple";
 import StickerCloud     from "../Hero/StickerCloud";
-import HeroScript       from "../Hero/HeroScript";
 import FloatingElements from "../Hero/FloatingElements";
+import HeroNav          from "../Hero/HeroNav";
 
 import ContactModal from "./ContactModal";
 import GiftFlow     from "./GiftFlow";
+import { LiquidEffectAnimation } from "@/components/ui/LiquidEffectAnimation";
 
 export interface CraftSectionHandle {
   activate:   () => void;
@@ -35,8 +36,9 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
   const [showGift,    setShowGift]    = useState(false);
   const activeRef = useRef(false);
 
-  /* HeroScript needs a theme — default light (3-D fluid canvas) */
-  const [theme] = useState<"dark" | "light">("light");
+  /* Nav state — same as Hero */
+  const [theme, setTheme] = useState<"dark" | "light">("light");
+  const [sound, setSound] = useState(false);
 
   const slideIn = () => {
     const w = wrapRef.current;
@@ -107,20 +109,46 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
         style={{ transform: "translateY(100%)", pointerEvents: "none", transition: "none" }}
         aria-hidden={!active}
       >
+        {/* ── Liquid background effect ── */}
+        <LiquidEffectAnimation />
+
         {/* ── Exact Hero backgrounds ── */}
         <MeshGradient />
         <div className={heroStyles.grid} />
         <HeroLight />
         <WaterRipple />
 
+        {/* ── Top Nav — exactly as in the Hero section ── */}
+        <HeroNav
+          theme={theme}
+          sound={sound}
+          onThemeToggle={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+          onSoundToggle={() => setSound((s) => !s)}
+        />
+
         {/* ── Hero sticker cloud ── */}
         <StickerCloud />
 
-        {/* ── Hero 3-D / script centre text ── */}
-        <HeroScript theme={theme} />
-
         {/* ── Hero floating tech-pill elements ── */}
         <FloatingElements />
+
+        {/* ── Centre: static "Craft With Taste" title + contact popover button ── */}
+        <div className={styles.craftCenter}>
+          {/* Contact Us button above the title — styled like "Start Tour" in Portfolio */}
+          <button
+            className={styles.contactPopoverBtn}
+            onClick={() => setShowContact(true)}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+              <polyline points="22,6 12,13 2,6" />
+            </svg>
+            Contact Us
+          </button>
+
+          {/* Static "Craft With Taste" title — no mouse tracking */}
+          <h1 className={styles.craftTitle}>Craft With Taste</h1>
+        </div>
 
         {/* ── Bottom Bar ── */}
         <div className={styles.bottomBar}>
