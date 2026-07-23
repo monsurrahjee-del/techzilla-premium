@@ -81,7 +81,7 @@ const TargetCursor = ({
 
     const cursor  = cursorRef.current;
     const spinner = spinnerRef.current;
-    cornersRef.current = spinner.querySelectorAll('.target-cursor-corner');
+    cornersRef.current = cursor.querySelectorAll('.target-cursor-corner');
     const corners = Array.from(cornersRef.current) as HTMLElement[];
 
     let activeTarget: Element | null = null;
@@ -322,11 +322,19 @@ const TargetCursor = ({
       {/* spinnerRef: GSAP owns rotation only, never position */}
       <div ref={spinnerRef} className="target-cursor-spinner">
         <div ref={dotRef} className="target-cursor-dot" style={{ backgroundColor: cursorColor }} />
-        <div className="target-cursor-corner corner-tl" style={{ borderColor: cursorColor }} />
-        <div className="target-cursor-corner corner-tr" style={{ borderColor: cursorColor }} />
-        <div className="target-cursor-corner corner-br" style={{ borderColor: cursorColor }} />
-        <div className="target-cursor-corner corner-bl" style={{ borderColor: cursorColor }} />
       </div>
+      {/*
+        Corners are siblings of the spinner, NOT children.
+        The spinner has a CSS rotation animation; corners placed inside it inherit
+        that rotation, so their translate3d offsets land in the wrong direction
+        (the "standing straight" bug). As direct children of the wrapper (which
+        is only translated, never rotated) the offsets map straight to viewport
+        coords and the capture brackets spread to the full element width/height.
+      */}
+      <div className="target-cursor-corner corner-tl" style={{ borderColor: cursorColor }} />
+      <div className="target-cursor-corner corner-tr" style={{ borderColor: cursorColor }} />
+      <div className="target-cursor-corner corner-br" style={{ borderColor: cursorColor }} />
+      <div className="target-cursor-corner corner-bl" style={{ borderColor: cursorColor }} />
     </div>
   );
 };
