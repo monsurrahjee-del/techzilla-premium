@@ -307,7 +307,7 @@ const CIRCULAR_ITEMS = [
   },
   {
     text: "DESIGN",
-    image: "https://kxptt4m9j4.ufs.sh/f/9YHhEDeslzkcZY3vRlCe5wpMsRmKntGfIu4E6OSxhgzL3kU1",
+    image: "/design-icon.png",
   },
   {
     text: "GROWTH",
@@ -526,6 +526,8 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
         ctx.fillStyle   = "#030508";
         ctx.fillRect(0, 0, W, H);
         ctx.restore();
+        // Warp lines on top of dark fill
+        drawWarpLines(ctx, cx, cy, W, H, 0.28, s.time * 0.6);
         // Final text — 3 lines
         drawHeadline(ctx, W, H, "YOUR\nSATISFACTION\nALWAYS", easeInOut(pC), 0.44);
         if (queenRef.current) {
