@@ -1,11 +1,13 @@
-/* ── Custom scrollbar — matches the dark-track / thin-white-thumb reference ── */
+/* ── Custom scrollbar — thin white thumb on a dark track ── */
 
 .track {
   position: fixed;
   top: 50%;
   right: 6px;
   transform: translateY(-50%);
-  height: 54vh;
+  /* Taller track so the thumb travels the full page range
+     while staying visually thin (capped at 40 px in JS). */
+  height: 80vh;
   /* Wider hit area than visual width */
   width: 10px;
   z-index: 9999;
@@ -40,7 +42,8 @@
   /* Visual width of the thumb bar */
   width: 2px;
   margin-left: -1px;
-  min-height: 40px;
+  /* min-height matched to the JS formula minimum (12 px) */
+  min-height: 12px;
   border-radius: 9999px;
   background: rgba(255 255 255 / 0.90);
   box-shadow:

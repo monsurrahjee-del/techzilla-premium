@@ -77,6 +77,8 @@ export default function Home() {
       portfolioGateReadyRef.current     = false;
       const pMax = document.documentElement.scrollHeight - window.innerHeight;
       frozenScrollRef.current = Math.round(pMax);
+      // Tell the custom scrollbar to stop fighting the frozen position.
+      window.dispatchEvent(new CustomEvent("tz-scroll-frozen"));
       setPortfolioHolding(true);
 
       if (portfolioGateTimerRef.current) {
@@ -302,6 +304,8 @@ export default function Home() {
       const max = document.documentElement.scrollHeight - window.innerHeight;
       gateReleased = true;
       portfolioHoldRef.current = false;
+      // Let the custom scrollbar accept drag input again.
+      window.dispatchEvent(new CustomEvent("tz-scroll-released"));
       setPortfolioHolding(false);
 
       if (delta > 0) {

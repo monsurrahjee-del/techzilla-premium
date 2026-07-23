@@ -14,10 +14,15 @@ export default function ScrollBar() {
   const dragging   = useRef(false);
   const dragStartY = useRef(0);
   const dragStartScroll = useRef(0);
-  // Chess reveal mode: while active the thumb tracks chess progress (0–1) so
-  // the scrollbar looks identical to normal mode — same size, same position logic.
+  // Chess reveal mode: while active the thumb tracks chess progress (0–1)
   const revealActive   = useRef(false);
   const revealProgress = useRef(0);
+  // Progress fraction (0–1) of the normal scroll when chess reveal begins
+  // so the thumb doesn't reset — it continues from where it was.
+  const chessStartProgress = useRef(1);
+  // While page.tsx has scroll locked (portfolio gate / services hold), block
+  // thumb drag so the scrollbar doesn't fight with the frozen position.
+  const scrollFrozen = useRef(false);
 
   useEffect(() => {
     const track = trackRef.current;
@@ -54,16 +59,16 @@ export default function ScrollBar() {
       const { scrollHeight, clientHeight } = getScrollInfo();
       return {
         trackH: track.clientHeight,
-        thumbH: Math.max(40, (clientHeight / scrollHeight) * track.clientHeight),
+        // Cap thumb at 40 px so it stays visually thin across all page lengths.
+        thumbH: Math.max(12, Math.min(40, (clientHeight / scrollHeight) * track.clientHeight)),
       };
     };
 
     const updateThumb = () => {
       const { scrollTop, scrollHeight, clientHeight } = getScrollInfo();
       const docHeight = scrollHeight - clientHeight;
-      // During chess reveal, use the chess progress (0–1) so the thumb travels
-      // from top to bottom of the track — exactly like normal scroll progress —
-      // without changing size or appearance.
+      // During chess reveal, blend from where normal scroll ended (chessStartProgress)
+      // toward 1.0 as chess progresses — thumb never resets or jumps.
       const progress = revealActive.current
         ? revealProgress.current
         : docHeight > 0
@@ -71,14 +76,20 @@ export default function ScrollBar() {
           : 0;
       const { trackH, thumbH } = getThumbMetrics();
       thumb.style.height    = `${thumbH}px`;
-      thumb.style.transform = `translateY(${progress * (trackH - thumbH)}px)`;
+      thumb.style.transform = `translateY(${Math.max(0, Math.min(trackH - thumbH, progress * (trackH - thumbH)))}px)`;
     };
 
     // ── chess reveal helpers ──────────────────────────────────────────────────
-    const seekReveal = (progress: number) => {
-      revealProgress.current = Math.max(0, Math.min(1, progress));
+    const seekReveal = (rawProgress: number) => {
+      // rawProgress is 0–1 within the track. Map it back into chess space.
+      const start = chessStartProgress.current;
+      const remaining = 1 - start;
+      const chessProgress = remaining > 0
+        ? Math.max(0, Math.min(1, (rawProgress - start) / remaining))
+        : rawProgress;
+      revealProgress.current = Math.max(start, Math.min(1, rawProgress));
       window.dispatchEvent(new CustomEvent("chess-reveal-seek", {
-        detail: { progress: revealProgress.current },
+        detail: { progress: chessProgress },
       }));
       updateThumb();
       show();
@@ -86,23 +97,44 @@ export default function ScrollBar() {
     };
 
     const onRevealMode = (e: Event) => {
-      revealActive.current = Boolean(
+      const active = Boolean(
         (e as CustomEvent<{ active?: boolean }>).detail?.active,
       );
-      revealProgress.current = 0;
+      revealActive.current = active;
+      if (active) {
+        // Capture the exact scroll fraction we're at so the thumb continues
+        // from its current bottom position instead of resetting to 0.
+        const { scrollTop, scrollHeight, clientHeight } = getScrollInfo();
+        const docHeight = scrollHeight - clientHeight;
+        chessStartProgress.current = docHeight > 0 ? Math.min(1, scrollTop / docHeight) : 1;
+        revealProgress.current = chessStartProgress.current;
+      } else {
+        // Chess dismissed — leave revealProgress wherever it was; normal
+        // scroll updateThumb will take over on the next scroll event.
+        revealProgress.current = 0;
+        chessStartProgress.current = 1;
+      }
       updateThumb();
       if (revealActive.current) show();
     };
 
     const onRevealProgress = (e: Event) => {
       if (!revealActive.current) return;
-      const progress = (e as CustomEvent<{ progress?: number }>).detail?.progress;
-      if (typeof progress !== "number") return;
-      revealProgress.current = Math.max(0, Math.min(1, progress));
+      const chessProgress = (e as CustomEvent<{ progress?: number }>).detail?.progress;
+      if (typeof chessProgress !== "number") return;
+      // Map chess progress (0→1) into the remaining scrollbar range
+      // (chessStartProgress → 1.0) so thumb travel is continuous.
+      const start = chessStartProgress.current;
+      const clamped = Math.max(0, Math.min(1, chessProgress));
+      revealProgress.current = start + (1 - start) * clamped;
       updateThumb();
       show();
       scheduleHide();
     };
+
+    // ── scroll-freeze events from page.tsx ────────────────────────────────────
+    const onScrollFrozen   = () => { scrollFrozen.current = true;  };
+    const onScrollReleased = () => { scrollFrozen.current = false; };
 
     // ── scroll tracking ───────────────────────────────────────────────────────
     const onScroll = () => {
@@ -136,11 +168,13 @@ export default function ScrollBar() {
       if (!dragging.current) return;
       if (revealActive.current) {
         const { trackH, thumbH } = getThumbMetrics();
-        const progress = (e.clientY - track.getBoundingClientRect().top - thumbH / 2) /
+        const rawProgress = (e.clientY - track.getBoundingClientRect().top - thumbH / 2) /
           (trackH - thumbH);
-        seekReveal(progress);
+        seekReveal(rawProgress);
         return;
       }
+      // Respect page scroll-lock (portfolio gate / services hold).
+      if (scrollFrozen.current) return;
       const { scrollHeight, clientHeight } = getScrollInfo();
       const docHeight = scrollHeight - clientHeight;
       const { trackH, thumbH } = getThumbMetrics();
@@ -174,6 +208,8 @@ export default function ScrollBar() {
         seekReveal((e.clientY - trackRect.top - thumbH / 2) / (trackH - thumbH));
         return;
       }
+      // Respect page scroll-lock.
+      if (scrollFrozen.current) return;
       const { scrollHeight, clientHeight } = getScrollInfo();
       const docHeight  = scrollHeight - clientHeight;
       const trackRect  = track.getBoundingClientRect();
@@ -199,6 +235,8 @@ export default function ScrollBar() {
     scrollTarget.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("chess-reveal-mode",     onRevealMode);
     window.addEventListener("chess-reveal-progress", onRevealProgress);
+    window.addEventListener("tz-scroll-frozen",      onScrollFrozen);
+    window.addEventListener("tz-scroll-released",    onScrollReleased);
 
     window.addEventListener("mousemove", onWindowMouseMove, { passive: true });
     document.addEventListener("mousemove", onDocMouseMove,  { passive: true });
@@ -214,6 +252,8 @@ export default function ScrollBar() {
       scrollTarget.removeEventListener("scroll", onScroll);
       window.removeEventListener("chess-reveal-mode",     onRevealMode);
       window.removeEventListener("chess-reveal-progress", onRevealProgress);
+      window.removeEventListener("tz-scroll-frozen",      onScrollFrozen);
+      window.removeEventListener("tz-scroll-released",    onScrollReleased);
       window.removeEventListener("mousemove", onWindowMouseMove);
       document.removeEventListener("mousemove", onDocMouseMove);
       document.removeEventListener("mouseup",   onDocMouseUp);

@@ -100,16 +100,25 @@ const TargetCursor = ({
     cursorPosRef.current = { x: initX, y: initY };
     cursor.style.transform = `translate3d(${initX}px, ${initY}px, 0)`;
 
-    // Keep target corners on the same direct path as the cursor. The previous
-    // GSAP ticker created four new tweens on every frame while hovering a
-    // target, which made pointer input feel delayed over the vapor text, Our
-    // Work canvas, and the reveal page.
+    // Keep target corners on the same direct path as the cursor. Re-reads the
+    // target's bounding rect on every pointer-move so corners track through
+    // scroll-driven animations and framer-motion transitions correctly.
     const updateTargetCorners = () => {
-      if (!targetCornerPositionsRef.current || !cornersRef.current) return;
+      if (!activeTarget || !cornersRef.current) return;
+      // Re-read the element's position every frame — handles the case where
+      // the target moves after the initial hover (CSS animations, scroll).
+      const rect = activeTarget.getBoundingClientRect();
+      const { borderWidth, cornerSize } = constants;
+      const pts = [
+        { x: rect.left  - borderWidth,               y: rect.top    - borderWidth },
+        { x: rect.right + borderWidth - cornerSize,   y: rect.top    - borderWidth },
+        { x: rect.right + borderWidth - cornerSize,   y: rect.bottom + borderWidth - cornerSize },
+        { x: rect.left  - borderWidth,               y: rect.bottom + borderWidth - cornerSize },
+      ];
+      targetCornerPositionsRef.current = pts;
       const { x: cursorX, y: cursorY } = cursorPosRef.current;
       corners.forEach((corner, i) => {
-        const point = targetCornerPositionsRef.current![i];
-        corner.style.transform = `translate3d(${point.x - cursorX}px, ${point.y - cursorY}px, 0)`;
+        corner.style.transform = `translate3d(${pts[i].x - cursorX}px, ${pts[i].y - cursorY}px, 0)`;
       });
     };
 
@@ -224,13 +233,9 @@ const TargetCursor = ({
       ];
 
       isActiveRef.current = true;
-      corners.forEach((corner, i) => {
-        corner.style.transform = `translate3d(${
-          targetCornerPositionsRef.current![i].x - cursorX
-        }px, ${
-          targetCornerPositionsRef.current![i].y - cursorY
-        }px, 0)`;
-      });
+      // Use updateTargetCorners for the initial spread so both the enter
+      // snapshot and the continuous move tracker share one code path.
+      updateTargetCorners();
 
       // ── Leave target ─────────────────────────────────────────────────────
       const leaveHandler = () => {
