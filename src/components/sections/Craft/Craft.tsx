@@ -75,8 +75,12 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
     const onWheel = (e: WheelEvent) => {
       if (!activeRef.current) return;
       if (showContact || showGift) return;
-      const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-      if (delta < -40) {
+      // Normalise across deltaMode (0=px, 1=lines, 2=pages)
+      const multiplier = e.deltaMode === 1 ? 20 : e.deltaMode === 2 ? 400 : 1;
+      const deltaY = e.deltaY * multiplier;
+      const deltaX = e.deltaX * multiplier;
+      const delta = Math.abs(deltaY) > Math.abs(deltaX) ? deltaY : deltaX;
+      if (delta < 0) {
         e.preventDefault();
         e.stopImmediatePropagation();
         activeRef.current = false;
