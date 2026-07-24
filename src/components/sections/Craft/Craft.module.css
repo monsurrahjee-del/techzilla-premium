@@ -497,7 +497,7 @@
   position: relative;
   box-shadow: 0 24px 64px rgba(0,0,0,0.72), 0 2px 0 rgba(255,255,255,0.06) inset;
   max-height: 90vh;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .giftStep1 {

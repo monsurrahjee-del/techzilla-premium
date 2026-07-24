@@ -51,7 +51,22 @@ export default function HeroNav({
           style={craftMode ? { position: "absolute", left: "50%", transform: "translateX(-50%)" } : undefined}
         >
           {navItems.filter(i => i !== "Home").map((item) => (
-            <a key={item} href={`#${item.toLowerCase()}`} className="cursor-target">{item}</a>
+            <a
+              key={item}
+              href={`#${item.toLowerCase()}`}
+              className="cursor-target"
+              onClick={(e) => {
+                e.preventDefault();
+                if (item === "Work") {
+                  const max = document.documentElement.scrollHeight - window.innerHeight;
+                  window.scrollTo({ top: max * 0.85, behavior: "smooth" });
+                } else if (item === "Contact") {
+                  window.dispatchEvent(new CustomEvent("craft-section-activate"));
+                }
+              }}
+            >
+              {item}
+            </a>
           ))}
         </div>
 
@@ -134,7 +149,17 @@ export default function HeroNav({
                     <a
                       href={item === "Home" ? "#" : `#${item.toLowerCase()}`}
                       className={styles.mobileMenuLink}
-                      onClick={() => setMenuOpen(false)}
+                      onClick={(e) => {
+                        setMenuOpen(false);
+                        if (item === "Work") {
+                          e.preventDefault();
+                          const max = document.documentElement.scrollHeight - window.innerHeight;
+                          window.scrollTo({ top: max * 0.85, behavior: "smooth" });
+                        } else if (item === "Contact") {
+                          e.preventDefault();
+                          window.dispatchEvent(new CustomEvent("craft-section-activate"));
+                        }
+                      }}
                     >
                       {item.toUpperCase()}
                     </a>

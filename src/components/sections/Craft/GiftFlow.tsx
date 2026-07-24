@@ -299,22 +299,6 @@ function GiftCardDisplay({
         </p>
       )}
 
-      <button
-        onClick={onClose}
-        style={{
-          background: "none",
-          border: "none",
-          color: "rgba(255,255,255,0.3)",
-          fontSize: "0.65rem",
-          letterSpacing: "0.08em",
-          cursor: "pointer",
-          padding: "4px",
-          fontFamily: "inherit",
-          textTransform: "uppercase",
-        }}
-      >
-        Close
-      </button>
     </div>
   );
 }
