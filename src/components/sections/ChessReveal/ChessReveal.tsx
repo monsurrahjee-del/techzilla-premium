@@ -3,6 +3,7 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 import { CircularRevealHeading } from "@/components/ui/CircularRevealHeading";
 import styles from "./ChessReveal.module.css";
+import SectionNav from "@/components/ui/SectionNav";
 
 export interface ChessRevealHandle {
   activate: () => void;
@@ -526,6 +527,13 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     window.addEventListener("keydown",          onKeyDown,     { capture: true  });
     window.addEventListener("chess-reveal-seek", onRevealSeek);
 
+    // ── Section-nav navigation: dismiss chess so the user can navigate away ──
+    const onSectionNavNavigate = () => {
+      if (!s.active) return;
+      dismissChess();
+    };
+    window.addEventListener("section-nav-navigate", onSectionNavNavigate);
+
     // ── When craft section is dismissed (scroll-up), re-activate ChessReveal at end ─
     const onCraftDismiss = () => {
       craftActivatedRef.current = false;
@@ -656,6 +664,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       window.removeEventListener("keydown",           onKeyDown,    { capture: true } as EventListenerOptions);
       window.removeEventListener("chess-reveal-seek", onRevealSeek);
       window.removeEventListener("craft-section-dismiss", onCraftDismiss);
+      window.removeEventListener("section-nav-navigate", onSectionNavNavigate);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -667,6 +676,9 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       style={{ transform: "translateY(100%)", pointerEvents: "none", transition: "none" }}
     >
       <canvas ref={canvasRef} className={styles.canvas} />
+
+      {/* Section-level hamburger nav */}
+      <SectionNav navItems={["About", "Service", "Work", "Contact"]} />
 
       {/* Circular component — opacity follows the Phase B crossfade */}
       <div

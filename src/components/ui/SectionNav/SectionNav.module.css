@@ -1,0 +1,144 @@
+/* ─── Hamburger toggle ─────────────────────────────────────────────────────── */
+.toggle {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  z-index: 500;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+  /* Ensure button is always on top within its stacking context */
+}
+
+.toggle:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.30);
+  color: #fff;
+}
+
+/* ─── Nav bar — slides in from top ────────────────────────────────────────── */
+.navBar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 490;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 22px 5vw 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+
+  /* Exact same blue gradient as Hero / Craft backgrounds */
+  background:
+    radial-gradient(
+      160% 110% at 50% -8%,
+      #3a5cff 0%,
+      #2348e8 10%,
+      #1430a8 38%,
+      #080f58 72%,
+      #040a3a 100%
+    ),
+    #040a3a;
+
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.navLeft .navLogo {
+  color: #ffffff;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  font-size: 14px;
+}
+
+.navCenter {
+  display: flex;
+  gap: 30px;
+  padding-top: 2px;
+}
+
+.navLink {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.72);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  transition: color 0.3s ease;
+  padding: 0;
+}
+
+.navLink:hover {
+  color: #ffffff;
+}
+
+.navRight {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding-top: 2px;
+}
+
+.navToggle {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.72);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+.navToggle:hover {
+  color: #ffffff;
+}
+
+.navToggle span {
+  margin-left: 3px;
+  opacity: 0.7;
+}
+
+/* ─── Click-outside backdrop ───────────────────────────────────────────────── */
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 480;
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  cursor: pointer;
+}
+
+/* ─── Responsive ────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .navCenter {
+    display: none;
+  }
+  .navBar {
+    padding: 18px 5vw 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .toggle {
+    top: 14px;
+    right: 14px;
+    width: 32px;
+    height: 32px;
+  }
+}

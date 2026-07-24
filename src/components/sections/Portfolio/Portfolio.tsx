@@ -6,6 +6,7 @@ import styles from "./Portfolio.module.css";
 import { projects } from "@/lib/projects";
 import type { Theme, CarColors } from "./ProjectWorld";
 import { STATIONS } from "./ProjectWorld";
+import SectionNav from "@/components/ui/SectionNav";
 
 const RCCG_IDX   = STATIONS.length - 1; // last station — locked until Zennyola visited
 const UNLOCK_IDX = STATIONS.length - 2; // Zennyola
@@ -230,6 +231,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
 
   return (
     <section className={`${styles.section} ${isDark ? styles.dark : styles.light}`}>
+      <SectionNav navItems={["About", "Service", "Contact"]} />
 
       {/* Three.js canvas */}
       {/* Render ProjectWorld only while Portfolio is active. Once mounted is true

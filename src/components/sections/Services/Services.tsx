@@ -8,6 +8,7 @@ import ServiceThreeHeading from "./ServiceThreeHeading";
 import CursorGrid from "@/components/ui/CursorGrid";
 import ClickSpark from "@/components/ui/ClickSpark";
 import styles from "./Services.module.css";
+import SectionNav from "@/components/ui/SectionNav";
 
 /* ─── SVG Icons ─────────────────────────────────────────────── */
 const IconCode = () => (
@@ -388,6 +389,7 @@ export default function Services({ active = false }: { active?: boolean }) {
     // sectionRef is passed to CursorGrid as eventRef so it receives pointer
     // events even though the canvas sits behind the content layer.
     <section ref={sectionRef} className={styles.section} id="services">
+      <SectionNav navItems={["About", "Work", "Contact"]} />
 
       {/* CursorGrid fills entire section — always rendered, colour tracks
           active card. eventRef = sectionRef so events bubble from any child. */}

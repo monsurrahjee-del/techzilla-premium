@@ -59,7 +59,7 @@ export default function HeroNav({
                 e.preventDefault();
                 if (item === "Work") {
                   const max = document.documentElement.scrollHeight - window.innerHeight;
-                  window.scrollTo({ top: max * 0.85, behavior: "smooth" });
+                  window.scrollTo({ top: max * 0.97, behavior: "smooth" });
                 } else if (item === "Contact") {
                   window.dispatchEvent(new CustomEvent("craft-section-activate"));
                 }
@@ -154,7 +154,7 @@ export default function HeroNav({
                         if (item === "Work") {
                           e.preventDefault();
                           const max = document.documentElement.scrollHeight - window.innerHeight;
-                          window.scrollTo({ top: max * 0.85, behavior: "smooth" });
+                          window.scrollTo({ top: max * 0.97, behavior: "smooth" });
                         } else if (item === "Contact") {
                           e.preventDefault();
                           window.dispatchEvent(new CustomEvent("craft-section-activate"));

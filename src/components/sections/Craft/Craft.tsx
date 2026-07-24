@@ -14,6 +14,7 @@ import styles from "./Craft.module.css";
 import ContactModal from "./ContactModal";
 import GiftFlow     from "./GiftFlow";
 import { LiquidEffectAnimation } from "@/components/ui/LiquidEffectAnimation";
+import SectionNav from "@/components/ui/SectionNav";
 
 export interface CraftSectionHandle {
   activate:   () => void;
@@ -83,6 +84,23 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
     return () => window.removeEventListener("craft-section-dismiss", onExternalDismiss);
   }, []);
 
+  /* Section-nav navigation: dismiss Craft so the user can navigate away */
+  useEffect(() => {
+    const onSectionNavNavigate = (e: Event) => {
+      const target = (e as CustomEvent<{ target?: string }>).detail?.target;
+      if (!activeRef.current) return;
+      // "contact" = re-activate craft, so don't dismiss for that target
+      if (target === "contact") return;
+      activeRef.current = false;
+      setActive(false);
+      slideOut();
+      window.dispatchEvent(new CustomEvent("craft-section-dismiss"));
+    };
+    window.addEventListener("section-nav-navigate", onSectionNavNavigate);
+    return () => window.removeEventListener("section-nav-navigate", onSectionNavNavigate);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /* Scroll-up dismisses back to ChessReveal */
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
@@ -114,6 +132,9 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
         style={{ transform: "translateY(100%)", pointerEvents: "none", transition: "none" }}
         aria-hidden={!active}
       >
+        {/* ── Section-level hamburger nav ── */}
+        <SectionNav navItems={["About", "Service", "Work"]} />
+
         {/* ── Liquid background — sole background layer ── */}
         <LiquidEffectAnimation />
 

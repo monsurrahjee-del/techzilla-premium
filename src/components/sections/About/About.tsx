@@ -6,6 +6,7 @@ import LiquidEther from "./LiquidEther";
 import FaultyTerminal from "./FaultyTerminal";
 import DecryptedText from "@/components/ui/DecryptedText";
 import RichTypewriter, { RichSegment } from "@/components/ui/RichTypewriter";
+import SectionNav from "@/components/ui/SectionNav";
 
 // ── Clock that updates DOM directly — no React re-render per tick ─────────────
 function useClock(spanRef: React.RefObject<HTMLSpanElement | null>) {
@@ -112,6 +113,7 @@ export default function About({ active = false }: AboutProps) {
 
   return (
     <section id="about" ref={sectionRef} className={styles.section}>
+      <SectionNav navItems={["Service", "Work", "Contact"]} />
 
       {/* ── WebGL backgrounds ── */}
       <div className={styles.bgLayer}>
