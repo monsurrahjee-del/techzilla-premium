@@ -256,12 +256,14 @@ export default function Home() {
     };
     window.addEventListener("craft-section-nav-exit", onCraftNavExit);
 
-    /* Section-nav navigation: suppress services hold during nav-scroll transit ─ */
+    /* Section-nav navigation: suppress services & portfolio gates during nav-scroll ─ */
     const onNavNavigate = () => {
-      // Mark services hold as already triggered so the user doesn't get stuck
-      // at the services boundary while smooth-scrolling to another section.
+      // Suppress services hold so scroll passes through the 2/3 boundary freely.
       // The hold resets naturally when raw drops below SERVICES_BOUNDARY - 0.03.
       servicesHoldTriggeredRef.current = true;
+      // Suppress portfolio gate so navigating directly to Work doesn't re-arm the
+      // chess-reveal hold. Resets naturally when raw drops below PORTFOLIO_FULL - 0.06.
+      portfolioHoldTriggeredRef.current = true;
     };
     window.addEventListener("section-nav-navigate", onNavNavigate);
 

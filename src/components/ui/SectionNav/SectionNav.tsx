@@ -55,9 +55,10 @@ function navigateTo(item: string) {
       // Services is fully in view at raw = 2/3 of total scroll
       window.scrollTo({ top: max * (2 / 3), behavior: "smooth" });
     } else if (lc === "work") {
-      // Portfolio is at ~99% at 0.997 — just under the portfolio-gate threshold (0.999)
-      // Use instant scroll to avoid triggering the intermediate services hold
-      window.scrollTo({ top: Math.round(max * 0.997) });
+      // Portfolio reaches 100% only at the very bottom (raw = 1 → scrollY = max).
+      // Use instant scroll so the intermediate services-hold can't trap the scroll;
+      // page.tsx suppresses both the services and portfolio gates via section-nav-navigate.
+      window.scrollTo({ top: max });
     } else if (lc === "contact") {
       window.dispatchEvent(new CustomEvent("craft-section-activate"));
     }

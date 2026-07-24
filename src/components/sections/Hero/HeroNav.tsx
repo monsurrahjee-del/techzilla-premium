@@ -59,7 +59,9 @@ export default function HeroNav({
                 e.preventDefault();
                 if (item === "Work") {
                   const max = document.documentElement.scrollHeight - window.innerHeight;
-                  window.scrollTo({ top: max * 0.97, behavior: "smooth" });
+                  // Dispatch first so page.tsx suppresses services + portfolio gates
+                  window.dispatchEvent(new CustomEvent("section-nav-navigate"));
+                  window.scrollTo({ top: max }); // instant — bypasses intermediate holds
                 } else if (item === "Contact") {
                   window.dispatchEvent(new CustomEvent("craft-section-activate"));
                 }
@@ -154,7 +156,8 @@ export default function HeroNav({
                         if (item === "Work") {
                           e.preventDefault();
                           const max = document.documentElement.scrollHeight - window.innerHeight;
-                          window.scrollTo({ top: max * 0.97, behavior: "smooth" });
+                          window.dispatchEvent(new CustomEvent("section-nav-navigate"));
+                          window.scrollTo({ top: max }); // instant — bypasses intermediate holds
                         } else if (item === "Contact") {
                           e.preventDefault();
                           window.dispatchEvent(new CustomEvent("craft-section-activate"));
