@@ -30,29 +30,26 @@ export function LiquidEffectAnimation() {
         app.renderer.setSize(canvas.offsetWidth, canvas.offsetHeight, false);
       }
 
-      // ── Speed up animation + mouse tracking ───────────────────────────────
-      // The library uses clock.getDelta() to lerp the liquid surface toward
-      // the cursor position each frame. A larger delta = faster lerp = snappier
-      // mouse response AND faster wave animation. SPEED of 2.0 gives a natural
-      // feel without over-shooting. Real-delta (not fixed 1/60) keeps it smooth
-      // at any frame rate.
+      // ── Speed up animation and mouse tracking ──────────────────────────────
+      // getDelta drives the liquid surface lerp toward the cursor each frame —
+      // a larger value = faster response. getElapsedTime drives wave animation.
+      // Keep them on COMPLETELY SEPARATE time trackers so whichever the library
+      // calls first in a frame doesn't starve the other of elapsed time.
       if (app.clock) {
         const SPEED = 2.0;
-        let lastRealTime = performance.now();
-        let elapsed = 0;
 
+        // getElapsedTime: wall-clock seconds * SPEED, no shared state
+        const startReal = performance.now();
+        app.clock.getElapsedTime = () =>
+          ((performance.now() - startReal) / 1000) * SPEED;
+
+        // getDelta: real frame delta with its own tracker, capped at 50 ms
+        let lastDelta = performance.now();
         app.clock.getDelta = () => {
           const now = performance.now();
-          const dt  = Math.min((now - lastRealTime) / 1000, 0.05); // cap at 50ms
-          lastRealTime = now;
+          const dt  = Math.min((now - lastDelta) / 1000, 0.05);
+          lastDelta = now;
           return dt * SPEED;
-        };
-
-        app.clock.getElapsedTime = () => {
-          const now = performance.now();
-          elapsed += Math.min((now - lastRealTime) / 1000, 0.05) * SPEED;
-          lastRealTime = now;
-          return elapsed;
         };
       }
 
