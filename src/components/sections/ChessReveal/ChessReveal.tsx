@@ -19,7 +19,12 @@ const easeOut3 = (t: number) => 1 - Math.pow(1 - t, 3);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /* ─── Warp line seeds ───────────────────────────────────────────────────── */
-const WARP_COUNT = 280;
+// Reduced from 280 → 80: each line requires createLinearGradient + fill,
+// so 280 lines at 60 fps was burning ~12 ms of main-thread time per frame —
+// starving the mousemove queue and making the cursor feel laggy.
+// 80 lines still look rich but cut canvas work by ~71 %, keeping the thread
+// free for pointer events (same fix pattern as FrameDriver in ProjectWorld).
+const WARP_COUNT = 80;
 type WarpSeed = { angle: number; speed: number; phase: number; width: number; colorIdx: number };
 const WARP_SEEDS: WarpSeed[] = Array.from({ length: WARP_COUNT }, (_, i) => ({
   angle:    (i / WARP_COUNT) * Math.PI * 2 + (i % 11) * 0.017,
@@ -551,9 +556,20 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     };
     window.addEventListener("craft-section-dismiss", onCraftDismiss);
 
+    // Cap canvas redraws to ~30 fps (same as FrameDriver in ProjectWorld).
+    // At 60 fps the 16 ms frame budget was exhausted by canvas drawing,
+    // leaving almost no slack for mousemove events — making the cursor laggy.
+    // 30 fps gives ~33 ms per frame so pointer events are always processed first.
+    const FRAME_MS = 1000 / 30;
+    let lastDrawTs = 0;
+
     const tick = (ts: number) => {
       s.rafId = requestAnimationFrame(tick);
       if (!s.active && s.virtualScroll <= 0) { s.lastTs = ts; return; }
+
+      // Skip this RAF tick if we haven't waited long enough for the next frame
+      if (ts - lastDrawTs < FRAME_MS) return;
+      lastDrawTs = ts;
 
       const dt  = Math.min((ts - (s.lastTs || ts)) / 1000, 0.05);
       s.lastTs  = ts;
