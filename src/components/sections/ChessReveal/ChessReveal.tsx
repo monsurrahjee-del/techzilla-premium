@@ -678,7 +678,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       <canvas ref={canvasRef} className={styles.canvas} />
 
       {/* Section-level hamburger nav */}
-      <SectionNav navItems={["About", "Service", "Work", "Contact"]} />
+      <SectionNav navItems={["About", "Service", "Work", "Contact"]} proximityReveal />
 
       {/* Circular component — opacity follows the Phase B crossfade */}
       <div

@@ -16,6 +16,12 @@ interface SectionNavProps {
    * "dark" (default) — white text, for dark-background sections.
    */
   variant?: "dark" | "light";
+  /**
+   * When true, the hamburger is invisible by default and only fades in
+   * when the cursor enters an 80px radius around it.
+   * Default: false (always visible).
+   */
+  proximityReveal?: boolean;
 }
 
 /**
@@ -27,12 +33,9 @@ function navigateTo(item: string) {
   const max = document.documentElement.scrollHeight - window.innerHeight;
   const lc  = item.toLowerCase();
 
-  // 1. Signal ChessReveal to dismiss (it sets s.active = false synchronously)
   window.dispatchEvent(
     new CustomEvent("section-nav-navigate", { detail: { target: lc } }),
   );
-
-  // 2. Signal Craft to slide out without triggering the chess re-activate path
   window.dispatchEvent(
     new CustomEvent("craft-section-nav-exit", { detail: { target: lc } }),
   );
@@ -47,23 +50,20 @@ function navigateTo(item: string) {
     } else if (lc === "work") {
       window.scrollTo({ top: max * 0.97, behavior: "smooth" });
     } else if (lc === "contact") {
-      // Re-open Craft / Contact section
       window.dispatchEvent(new CustomEvent("craft-section-activate"));
     }
   };
 
-  // 400 ms — enough for chess/craft slide-out animations to complete
-  // and for s.active to be false before we scroll
   setTimeout(doScroll, 400);
 }
 
-/** Proximity threshold in px — toggle becomes visible within this distance */
 const PROXIMITY_PX = 80;
 
 export default function SectionNav({
   navItems,
-  topOffset = 18,
-  variant   = "dark",
+  topOffset       = 18,
+  variant         = "dark",
+  proximityReveal = false,
 }: SectionNavProps) {
   const [open,  setOpen]  = useState(false);
   const [near,  setNear]  = useState(false);
@@ -74,11 +74,11 @@ export default function SectionNav({
 
   const close = () => setOpen(false);
 
-  // Proximity detection — show toggle when cursor is within PROXIMITY_PX of the button
+  // Proximity detection — only active when proximityReveal is true
   const onPointerMove = useCallback((e: PointerEvent) => {
     const btn = toggleRef.current;
     if (!btn) return;
-    const r = btn.getBoundingClientRect();
+    const r  = btn.getBoundingClientRect();
     const cx = r.left + r.width  / 2;
     const cy = r.top  + r.height / 2;
     const dx = e.clientX - cx;
@@ -87,21 +87,19 @@ export default function SectionNav({
   }, []);
 
   useEffect(() => {
+    if (!proximityReveal) return;
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     return () => window.removeEventListener("pointermove", onPointerMove);
-  }, [onPointerMove]);
+  }, [proximityReveal, onPointerMove]);
 
-  const handleNavClick = (item: string) => {
-    close();
-    navigateTo(item);
-  };
+  // When proximityReveal is off the button is always visible;
+  // when it's on, visibility is driven by nearness or open state.
+  const isVisible = !proximityReveal || near || open;
 
-  const handleLogoClick = () => {
-    close();
-    navigateTo("home");
-  };
+  const handleNavClick = (item: string) => { close(); navigateTo(item); };
+  const handleLogoClick = () => { close(); navigateTo("home"); };
 
-  const v = variant; // shorthand for data-variant attribute
+  const v = variant;
 
   return (
     <>
@@ -111,7 +109,7 @@ export default function SectionNav({
         type="button"
         className={styles.toggle}
         data-variant={v}
-        data-visible={near || open ? "true" : "false"}
+        data-visible={isVisible ? "true" : "false"}
         style={{ "--section-nav-toggle-top": `${topOffset}px` } as React.CSSProperties}
         onClick={() => setOpen((o) => !o)}
         aria-label={open ? "Close navigation" : "Open navigation"}

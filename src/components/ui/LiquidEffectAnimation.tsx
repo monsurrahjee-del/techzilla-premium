@@ -25,38 +25,11 @@ export function LiquidEffectAnimation() {
       app.setRain(false);
 
       // ── Performance: render at 1× pixel ratio regardless of device DPR ────
-      // High-DPR screens (2×, 3×) quadruple/nonuple the fill-rate cost.
-      // Rendering at 1× and letting CSS scale is the single biggest GPU win.
+      // High-DPR screens (2×, 3×) multiply fill-rate cost — this is the
+      // single biggest GPU win without any visual quality loss at canvas size.
       if (app.renderer) {
         app.renderer.setPixelRatio(1);
         app.renderer.setSize(canvas.offsetWidth, canvas.offsetHeight, false);
-      }
-
-      // ── Speed up animation 3× with a real-delta clock override ────────────
-      // Using a fixed delta (1/60 * SPEED) causes stutter on slow frames
-      // because physics advances faster than actual elapsed time.
-      // Real delta keeps the animation smooth at any frame rate.
-      if (app.clock) {
-        const SPEED = 3.0;
-        let lastRealTime = performance.now();
-
-        app.clock.getElapsedTime = (() => {
-          let elapsed = 0;
-          let last = performance.now();
-          return () => {
-            const now = performance.now();
-            elapsed += ((now - last) / 1000) * SPEED;
-            last = now;
-            return elapsed;
-          };
-        })();
-
-        app.clock.getDelta = () => {
-          const now = performance.now();
-          const dt  = Math.min((now - lastRealTime) / 1000, 0.05); // cap at 50ms
-          lastRealTime = now;
-          return dt * SPEED;
-        };
       }
 
       window.__liquidApp = app;
@@ -81,7 +54,6 @@ export function LiquidEffectAnimation() {
         ref={canvasRef}
         id="liquid-canvas"
         className="absolute inset-0 w-full h-full"
-        style={{ imageRendering: "auto" }}
       />
     </div>
   )
