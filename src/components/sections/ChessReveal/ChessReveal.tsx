@@ -375,14 +375,14 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
   };
 
   const craftActivatedRef  = useRef(false);
-  const dismissChess = () => {
+  const dismissChess = (source?: string) => {
     const s = stateRef.current;
     s.active = false;
     s.virtualScroll = 0;
     craftActivatedRef.current = false;
     slideOut();
     window.dispatchEvent(new CustomEvent("chess-reveal-mode", { detail: { active: false } }));
-    window.dispatchEvent(new CustomEvent("chess-reveal-dismissed"));
+    window.dispatchEvent(new CustomEvent("chess-reveal-dismissed", { detail: { source: source ?? "" } }));
   };
 
   const applyVirtualDelta = (delta: number) => {
@@ -530,7 +530,8 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     // ── Section-nav navigation: dismiss chess so the user can navigate away ──
     const onSectionNavNavigate = () => {
       if (!s.active) return;
-      dismissChess();
+      // Pass "nav" so page.tsx releases the portfolio hold without re-arming the gate
+      dismissChess("nav");
     };
     window.addEventListener("section-nav-navigate", onSectionNavNavigate);
 

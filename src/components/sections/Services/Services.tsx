@@ -276,6 +276,7 @@ function ServiceCard({ item, active, isMobile = false }: { item: ServiceItem; ac
 /* ─── Main Services Section ──────────────────────────────────── */
 export default function Services({ active = false }: { active?: boolean }) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [navOpen, setNavOpen] = useState(false);
   const sectionRef = useRef<HTMLDivElement>(null);
   const currentAccent = SERVICES[activeIndex]?.accentColor ?? "#5227FF";
 
@@ -301,7 +302,7 @@ export default function Services({ active = false }: { active?: boolean }) {
       animate={{ opacity: active ? 1 : 0 }}
       transition={{ duration: 0.55, ease: "easeOut" }}
     >
-      {/* Micro label */}
+      {/* Micro label — hidden while the section nav overlay is open */}
       <p
         style={{
           fontFamily: "var(--font-display, sans-serif)",
@@ -311,7 +312,9 @@ export default function Services({ active = false }: { active?: boolean }) {
           textTransform: "uppercase" as const,
           color: currentAccent,
           marginBottom: isMobile ? "0.2rem" : "0.4rem",
-          transition: "color 0.4s ease",
+          transition: "opacity 0.2s ease, color 0.4s ease",
+          opacity: navOpen ? 0 : 1,
+          pointerEvents: navOpen ? "none" : "auto",
         }}
       >
         What We Do
@@ -389,7 +392,7 @@ export default function Services({ active = false }: { active?: boolean }) {
     // sectionRef is passed to CursorGrid as eventRef so it receives pointer
     // events even though the canvas sits behind the content layer.
     <section ref={sectionRef} className={styles.section} id="services">
-      <SectionNav navItems={["About", "Work", "Contact"]} />
+      <SectionNav navItems={["About", "Work", "Contact"]} onOpenChange={setNavOpen} />
 
       {/* CursorGrid fills entire section — always rendered, colour tracks
           active card. eventRef = sectionRef so events bubble from any child. */}

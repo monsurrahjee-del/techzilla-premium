@@ -159,13 +159,12 @@ export default function Home() {
         vaporTriggered = false;
       }
 
-      /* ── Services-at-100% hold (repeat visits after vapor) ───────────── */
+      /* ── Services-at-100% hold (fires on every visit, not just repeat) ──── */
       if (raw < SERVICES_BOUNDARY - 0.03) {
         servicesHoldTriggeredRef.current = false;
       }
       if (
         raw >= SERVICES_BOUNDARY &&
-        sessionAlreadyDone &&
         !servicesHoldTriggeredRef.current &&
         !isInitialEval
       ) {
@@ -230,11 +229,11 @@ export default function Home() {
     const onChessDismissed = (e: Event) => {
       chessActiveRef.current = false;
       const source = (e as CustomEvent<{ source?: string }>).detail?.source;
-      if (source === "scrollbar") {
-        // The user explicitly dragged the scrollbar backward out of chess.
-        // Release the freeze immediately so the scrollbar can continue scrolling
-        // back — don't re-arm the gate or they'll be stuck.
+      if (source === "scrollbar" || source === "nav") {
+        // Explicit navigation (scrollbar drag back, or section-nav click):
+        // release the freeze immediately without re-arming the portfolio gate.
         portfolioHoldRef.current = false;
+        setPortfolioHolding(false);
         window.dispatchEvent(new CustomEvent("tz-scroll-released"));
       } else {
         // Dismissed via wheel/touch — show the deliberate 2-s gate so the user
@@ -247,6 +246,24 @@ export default function Home() {
     };
     window.addEventListener("chess-reveal-dismissed", onChessDismissed);
     window.addEventListener("chess-reveal-complete",  onChessComplete);
+
+    /* Craft section-nav exit: release portfolio hold so the nav doScroll works ── */
+    const onCraftNavExit = () => {
+      if (!portfolioHoldRef.current) return;
+      portfolioHoldRef.current = false;
+      setPortfolioHolding(false);
+      window.dispatchEvent(new CustomEvent("tz-scroll-released"));
+    };
+    window.addEventListener("craft-section-nav-exit", onCraftNavExit);
+
+    /* Section-nav navigation: suppress services hold during nav-scroll transit ─ */
+    const onNavNavigate = () => {
+      // Mark services hold as already triggered so the user doesn't get stuck
+      // at the services boundary while smooth-scrolling to another section.
+      // The hold resets naturally when raw drops below SERVICES_BOUNDARY - 0.03.
+      servicesHoldTriggeredRef.current = true;
+    };
+    window.addEventListener("section-nav-navigate", onNavNavigate);
 
     /* Initial evaluation ────────────────────────────────────────────────── */
     const initMax = document.documentElement.scrollHeight - window.innerHeight;
@@ -266,6 +283,8 @@ export default function Home() {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("chess-reveal-dismissed", onChessDismissed);
       window.removeEventListener("chess-reveal-complete",  onChessComplete);
+      window.removeEventListener("craft-section-nav-exit", onCraftNavExit);
+      window.removeEventListener("section-nav-navigate",   onNavNavigate);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -22,6 +22,11 @@ interface SectionNavProps {
    * Default: false (always visible).
    */
   proximityReveal?: boolean;
+  /**
+   * Called whenever the nav opens or closes.
+   * Receives `true` when opening, `false` when closing.
+   */
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -44,11 +49,15 @@ function navigateTo(item: string) {
     if (lc === "home") {
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else if (lc === "about") {
-      window.scrollTo({ top: max * 0.25, behavior: "smooth" });
+      // About is fully in view at raw = 1/3 of total scroll
+      window.scrollTo({ top: max * (1 / 3), behavior: "smooth" });
     } else if (lc === "service" || lc === "services") {
-      window.scrollTo({ top: max * 0.55, behavior: "smooth" });
+      // Services is fully in view at raw = 2/3 of total scroll
+      window.scrollTo({ top: max * (2 / 3), behavior: "smooth" });
     } else if (lc === "work") {
-      window.scrollTo({ top: max * 0.97, behavior: "smooth" });
+      // Portfolio is at ~99% at 0.997 — just under the portfolio-gate threshold (0.999)
+      // Use instant scroll to avoid triggering the intermediate services hold
+      window.scrollTo({ top: Math.round(max * 0.997) });
     } else if (lc === "contact") {
       window.dispatchEvent(new CustomEvent("craft-section-activate"));
     }
@@ -64,6 +73,7 @@ export default function SectionNav({
   topOffset       = 18,
   variant         = "dark",
   proximityReveal = false,
+  onOpenChange,
 }: SectionNavProps) {
   const [open,  setOpen]  = useState(false);
   const [near,  setNear]  = useState(false);
@@ -72,7 +82,10 @@ export default function SectionNav({
 
   const toggleRef = useRef<HTMLButtonElement>(null);
 
-  const close = () => setOpen(false);
+  const close = () => {
+    setOpen(false);
+    onOpenChange?.(false);
+  };
 
   // Proximity detection — only active when proximityReveal is true
   const onPointerMove = useCallback((e: PointerEvent) => {
@@ -111,7 +124,11 @@ export default function SectionNav({
         data-variant={v}
         data-visible={isVisible ? "true" : "false"}
         style={{ "--section-nav-toggle-top": `${topOffset}px` } as React.CSSProperties}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          const next = !open;
+          setOpen(next);
+          onOpenChange?.(next);
+        }}
         aria-label={open ? "Close navigation" : "Open navigation"}
       >
         <AnimatePresence mode="wait" initial={false}>
