@@ -1,30 +1,26 @@
 /* ─── Hamburger toggle ─────────────────────────────────────────────────────── */
 .toggle {
   position: absolute;
-  top: 18px;
+  top: var(--section-nav-toggle-top, 18px);
   right: 20px;
   z-index: 500;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 8px;
+  background: none;
+  border: none;
   color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s, color 0.2s;
-  /* Ensure button is always on top within its stacking context */
+  transition: color 0.2s;
 }
 
 .toggle:hover {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.30);
-  color: #fff;
+  color: #ffffff;
 }
 
-/* ─── Nav bar — slides in from top ────────────────────────────────────────── */
+/* ─── Nav bar — no background, mirrors hero nav ────────────────────────────── */
 .navBar {
   position: absolute;
   top: 0;
@@ -35,20 +31,11 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
-  padding: 22px 5vw 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 30px 5vw 28px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 
-  /* Exact same blue gradient as Hero / Craft backgrounds */
-  background:
-    radial-gradient(
-      160% 110% at 50% -8%,
-      #3a5cff 0%,
-      #2348e8 10%,
-      #1430a8 38%,
-      #080f58 72%,
-      #040a3a 100%
-    ),
-    #040a3a;
+  /* No background — section's own background shows through */
+  background: transparent;
 
   font-family: var(--font-geist-mono), monospace;
   font-size: 12px;
@@ -102,6 +89,7 @@
   text-transform: inherit;
   cursor: pointer;
   transition: color 0.3s ease;
+  padding: 0;
 }
 
 .navToggle:hover {
@@ -118,9 +106,7 @@
   position: absolute;
   inset: 0;
   z-index: 480;
-  background: rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  background: transparent;
   cursor: pointer;
 }
 
@@ -130,15 +116,19 @@
     display: none;
   }
   .navBar {
-    padding: 18px 5vw 16px;
+    padding: 24px 5vw 0;
   }
 }
 
 @media (max-width: 640px) {
   .toggle {
-    top: 14px;
     right: 14px;
-    width: 32px;
-    height: 32px;
+  }
+  .navBar {
+    align-items: center;
+    gap: 12px;
+  }
+  .navRight {
+    gap: 14px;
   }
 }

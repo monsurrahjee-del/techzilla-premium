@@ -8,6 +8,9 @@ import HeroClock from "@/components/sections/Hero/HeroClock";
 interface SectionNavProps {
   /** Nav items to show in the center (e.g. ["About", "Service", "Work", "Contact"]) */
   navItems: string[];
+  /** Override the top position of the hamburger toggle (px). Useful when another
+   *  button already sits at the default top-right position. Default: 18 */
+  topOffset?: number;
 }
 
 /**
@@ -41,7 +44,7 @@ function navigateTo(item: string) {
   setTimeout(doScroll, 150);
 }
 
-export default function SectionNav({ navItems }: SectionNavProps) {
+export default function SectionNav({ navItems, topOffset = 18 }: SectionNavProps) {
   const [open, setOpen]   = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [sound, setSound] = useState(false);
@@ -59,6 +62,7 @@ export default function SectionNav({ navItems }: SectionNavProps) {
       <button
         type="button"
         className={styles.toggle}
+        style={{ "--section-nav-toggle-top": `${topOffset}px` } as React.CSSProperties}
         onClick={() => setOpen((o) => !o)}
         aria-label={open ? "Close navigation" : "Open navigation"}
       >
