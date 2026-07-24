@@ -232,7 +232,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
   return (
     <section className={`${styles.section} ${isDark ? styles.dark : styles.light}`}>
       {/* topOffset pushes hamburger below the day/night toggle (top:22px + ~42px height) */}
-      <SectionNav navItems={["About", "Service", "Contact"]} topOffset={74} />
+      <SectionNav navItems={["About", "Service", "Contact"]} topOffset={74} proximityReveal />
 
       {/* Three.js canvas */}
       {/* Render ProjectWorld only while Portfolio is active. Once mounted is true
