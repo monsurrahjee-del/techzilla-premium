@@ -6,24 +6,35 @@ import styles from "./SectionNav.module.css";
 import HeroClock from "@/components/sections/Hero/HeroClock";
 
 interface SectionNavProps {
-  /** Nav items to show in the center (e.g. ["About", "Service", "Work", "Contact"]) */
+  /** Nav items to show in the centre (e.g. ["About", "Service", "Work", "Contact"]) */
   navItems: string[];
-  /** Override the top position of the hamburger toggle (px). Useful when another
-   *  button already sits at the default top-right position. Default: 18 */
+  /** Override the top position of the hamburger toggle (px). Default: 18 */
   topOffset?: number;
+  /**
+   * "light" — for sections with a light background (e.g. Craft/Contact):
+   *   toggle icon and nav text render in dark/black.
+   * "dark" (default) — white text, for dark-background sections.
+   */
+  variant?: "dark" | "light";
 }
 
 /**
- * Navigates to the given section, dispatching a "section-nav-navigate" custom
- * event first so that ChessReveal and CraftSection can dismiss themselves.
+ * Dismiss chess / craft, then scroll to the target section.
+ * Uses a dedicated "craft-section-nav-exit" event so ChessReveal's
+ * onCraftDismiss does NOT re-activate chess after nav navigation.
  */
 function navigateTo(item: string) {
   const max = document.documentElement.scrollHeight - window.innerHeight;
-  const lc = item.toLowerCase();
+  const lc  = item.toLowerCase();
 
-  // Signal ChessReveal / CraftSection to dismiss so navigation is not blocked
+  // 1. Signal ChessReveal to dismiss (it sets s.active = false synchronously)
   window.dispatchEvent(
     new CustomEvent("section-nav-navigate", { detail: { target: lc } }),
+  );
+
+  // 2. Signal Craft to slide out without triggering the chess re-activate path
+  window.dispatchEvent(
+    new CustomEvent("craft-section-nav-exit", { detail: { target: lc } }),
   );
 
   const doScroll = () => {
@@ -36,16 +47,22 @@ function navigateTo(item: string) {
     } else if (lc === "work") {
       window.scrollTo({ top: max * 0.97, behavior: "smooth" });
     } else if (lc === "contact") {
+      // Re-open Craft / Contact section
       window.dispatchEvent(new CustomEvent("craft-section-activate"));
     }
   };
 
-  // Small delay — gives ChessReveal / Craft time to release event capture
-  setTimeout(doScroll, 150);
+  // 400 ms — enough for chess/craft slide-out animations to complete
+  // and for s.active to be false before we scroll
+  setTimeout(doScroll, 400);
 }
 
-export default function SectionNav({ navItems, topOffset = 18 }: SectionNavProps) {
-  const [open, setOpen]   = useState(false);
+export default function SectionNav({
+  navItems,
+  topOffset = 18,
+  variant   = "dark",
+}: SectionNavProps) {
+  const [open,  setOpen]  = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [sound, setSound] = useState(false);
 
@@ -56,12 +73,20 @@ export default function SectionNav({ navItems, topOffset = 18 }: SectionNavProps
     navigateTo(item);
   };
 
+  const handleLogoClick = () => {
+    close();
+    navigateTo("home");
+  };
+
+  const v = variant; // shorthand for data-variant attribute
+
   return (
     <>
       {/* ── Hamburger / X toggle ── */}
       <button
         type="button"
         className={styles.toggle}
+        data-variant={v}
         style={{ "--section-nav-toggle-top": `${topOffset}px` } as React.CSSProperties}
         onClick={() => setOpen((o) => !o)}
         aria-label={open ? "Close navigation" : "Open navigation"}
@@ -102,13 +127,21 @@ export default function SectionNav({ navItems, topOffset = 18 }: SectionNavProps
             {/* ── Nav bar ── */}
             <motion.nav
               className={styles.navBar}
+              data-variant={v}
               initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1,  y: 0 }}
-              exit={{   opacity: 0,  y: -10 }}
+              animate={{ opacity: 1,  y: 0   }}
+              exit={{   opacity: 0,  y: -10  }}
               transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className={styles.navLeft}>
-                <span className={styles.navLogo}>TECHZILLA</span>
+                <button
+                  type="button"
+                  className={styles.navLogo}
+                  onClick={handleLogoClick}
+                  aria-label="Go to home"
+                >
+                  TECHZILLA
+                </button>
               </div>
 
               <div className={styles.navCenter}>

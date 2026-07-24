@@ -84,20 +84,24 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
     return () => window.removeEventListener("craft-section-dismiss", onExternalDismiss);
   }, []);
 
-  /* Section-nav navigation: dismiss Craft so the user can navigate away */
+  /**
+   * Section-nav navigation: Craft slides out WITHOUT firing "craft-section-dismiss".
+   * "craft-section-dismiss" would cause ChessReveal's onCraftDismiss to re-activate
+   * chess (s.active = true) and block the subsequent window.scrollTo call.
+   * SectionNav dispatches the dedicated "craft-section-nav-exit" event instead.
+   */
   useEffect(() => {
-    const onSectionNavNavigate = (e: Event) => {
+    const onNavExit = (e: Event) => {
       const target = (e as CustomEvent<{ target?: string }>).detail?.target;
       if (!activeRef.current) return;
-      // "contact" = re-activate craft, so don't dismiss for that target
-      if (target === "contact") return;
+      if (target === "contact") return; // re-opening contact — don't dismiss
       activeRef.current = false;
       setActive(false);
       slideOut();
-      window.dispatchEvent(new CustomEvent("craft-section-dismiss"));
+      // Do NOT dispatch craft-section-dismiss — that would re-activate ChessReveal.
     };
-    window.addEventListener("section-nav-navigate", onSectionNavNavigate);
-    return () => window.removeEventListener("section-nav-navigate", onSectionNavNavigate);
+    window.addEventListener("craft-section-nav-exit", onNavExit);
+    return () => window.removeEventListener("craft-section-nav-exit", onNavExit);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -132,8 +136,8 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
         style={{ transform: "translateY(100%)", pointerEvents: "none", transition: "none" }}
         aria-hidden={!active}
       >
-        {/* ── Section-level hamburger nav ── */}
-        <SectionNav navItems={["About", "Service", "Work"]} />
+        {/* ── Section-level hamburger nav — light variant for Craft's background ── */}
+        <SectionNav navItems={["About", "Service", "Work"]} variant="light" />
 
         {/* ── Liquid background — sole background layer ── */}
         <LiquidEffectAnimation />

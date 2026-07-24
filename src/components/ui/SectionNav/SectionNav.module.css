@@ -15,26 +15,31 @@
   cursor: pointer;
   transition: color 0.2s;
 }
+.toggle:hover { color: #ffffff; }
 
-.toggle:hover {
-  color: #ffffff;
+/* Light variant — used on the Craft / Contact section */
+.toggle[data-variant="light"] {
+  color: rgba(0, 0, 0, 0.65);
+}
+.toggle[data-variant="light"]:hover {
+  color: rgba(0, 0, 0, 0.9);
 }
 
-/* ─── Nav bar — no background, mirrors hero nav ────────────────────────────── */
+/* ─── Nav bar — no background, CSS-grid so center column is perfectly centred ─ */
 .navBar {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   z-index: 490;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+
+  /* Three-column grid: wings take equal remaining space, centre is auto */
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
   gap: 24px;
   padding: 30px 5vw 28px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-
-  /* No background — section's own background shows through */
   background: transparent;
 
   font-family: var(--font-geist-mono), monospace;
@@ -44,13 +49,37 @@
   color: rgba(255, 255, 255, 0.8);
 }
 
-.navLeft .navLogo {
+/* Light variant */
+.navBar[data-variant="light"] {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+  color: rgba(0, 0, 0, 0.7);
+}
+
+/* ─── Left: TECHZILLA logo ─────────────────────────────────────────────────── */
+.navLeft {
+  justify-self: start;
+}
+
+.navLogo {
+  background: none;
+  border: none;
+  padding: 0;
   color: #ffffff;
+  font: inherit;
   font-weight: 700;
   letter-spacing: 0.22em;
   font-size: 14px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.navLogo:hover { opacity: 0.8; }
+
+.navBar[data-variant="light"] .navLogo {
+  color: rgba(0, 0, 0, 0.85);
 }
 
+/* ─── Centre: nav links ────────────────────────────────────────────────────── */
 .navCenter {
   display: flex;
   gap: 30px;
@@ -68,12 +97,18 @@
   transition: color 0.3s ease;
   padding: 0;
 }
+.navLink:hover { color: #ffffff; }
 
-.navLink:hover {
-  color: #ffffff;
+.navBar[data-variant="light"] .navLink {
+  color: rgba(0, 0, 0, 0.6);
+}
+.navBar[data-variant="light"] .navLink:hover {
+  color: rgba(0, 0, 0, 0.9);
 }
 
+/* ─── Right: THEME / SOUND / clock ────────────────────────────────────────── */
 .navRight {
+  justify-self: end;
   display: flex;
   align-items: center;
   gap: 22px;
@@ -91,14 +126,18 @@
   transition: color 0.3s ease;
   padding: 0;
 }
-
-.navToggle:hover {
-  color: #ffffff;
-}
+.navToggle:hover { color: #ffffff; }
 
 .navToggle span {
   margin-left: 3px;
   opacity: 0.7;
+}
+
+.navBar[data-variant="light"] .navToggle {
+  color: rgba(0, 0, 0, 0.6);
+}
+.navBar[data-variant="light"] .navToggle:hover {
+  color: rgba(0, 0, 0, 0.9);
 }
 
 /* ─── Click-outside backdrop ───────────────────────────────────────────────── */
@@ -112,23 +151,12 @@
 
 /* ─── Responsive ────────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
-  .navCenter {
-    display: none;
-  }
-  .navBar {
-    padding: 24px 5vw 0;
-  }
+  .navCenter { display: none; }
+  .navBar     { padding: 24px 5vw 0; }
 }
 
 @media (max-width: 640px) {
-  .toggle {
-    right: 14px;
-  }
-  .navBar {
-    align-items: center;
-    gap: 12px;
-  }
-  .navRight {
-    gap: 14px;
-  }
+  .toggle { right: 14px; }
+  .navBar { align-items: center; gap: 12px; }
+  .navRight { gap: 14px; }
 }
