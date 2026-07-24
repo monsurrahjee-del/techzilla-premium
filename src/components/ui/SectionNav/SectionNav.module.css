@@ -25,7 +25,7 @@
   color: rgba(0, 0, 0, 0.9);
 }
 
-/* ─── Nav bar — no background, CSS-grid so center column is perfectly centred ─ */
+/* ─── Nav bar — all items centred in a single row ──────────────────────────── */
 .navBar {
   position: absolute;
   top: 0;
@@ -33,7 +33,6 @@
   right: 0;
   z-index: 490;
 
-  /* Single centred row — all items flow together in the middle */
   display: flex;
   justify-content: center;
   align-items: center;
@@ -57,6 +56,9 @@
 
 /* ─── Left: TECHZILLA logo ─────────────────────────────────────────────────── */
 .navLeft {
+  display: flex;
+  align-items: center;
+}
 
 .navLogo {
   background: none;
