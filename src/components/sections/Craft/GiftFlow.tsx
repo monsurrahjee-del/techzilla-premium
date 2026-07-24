@@ -370,6 +370,7 @@ export default function GiftFlow({ onClose }: GiftFlowProps) {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
               >
+                {/* ── Gift icon + heading ── */}
                 <div className={styles.giftIcon}>🎁</div>
                 <div className={styles.giftTitle}>Claim Your Free Gift</div>
                 <div className={styles.giftSubtitle}>
@@ -379,16 +380,8 @@ export default function GiftFlow({ onClose }: GiftFlowProps) {
                   your personalised gift card.
                 </div>
 
-                <form
-                  onSubmit={handleUnlock}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 16,
-                  }}
-                >
+                {/* ── Form — input + black pill button ── */}
+                <form className={styles.giftForm} onSubmit={handleUnlock}>
                   <input
                     className={styles.giftInput}
                     type="text"
@@ -405,14 +398,7 @@ export default function GiftFlow({ onClose }: GiftFlowProps) {
                   </button>
                 </form>
 
-                <p
-                  style={{
-                    fontSize: "0.62rem",
-                    color: "rgba(255,255,255,0.25)",
-                    letterSpacing: "0.05em",
-                    margin: 0,
-                  }}
-                >
+                <p className={styles.giftDisclaimer}>
                   No credit card required. Gift applies to your first project quote.
                 </p>
               </motion.div>
