@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import styles from "./SectionNav.module.css";
 import HeroClock from "@/components/sections/Hero/HeroClock";
@@ -57,16 +57,39 @@ function navigateTo(item: string) {
   setTimeout(doScroll, 400);
 }
 
+/** Proximity threshold in px — toggle becomes visible within this distance */
+const PROXIMITY_PX = 80;
+
 export default function SectionNav({
   navItems,
   topOffset = 18,
   variant   = "dark",
 }: SectionNavProps) {
   const [open,  setOpen]  = useState(false);
+  const [near,  setNear]  = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [sound, setSound] = useState(false);
 
+  const toggleRef = useRef<HTMLButtonElement>(null);
+
   const close = () => setOpen(false);
+
+  // Proximity detection — show toggle when cursor is within PROXIMITY_PX of the button
+  const onPointerMove = useCallback((e: PointerEvent) => {
+    const btn = toggleRef.current;
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    const cx = r.left + r.width  / 2;
+    const cy = r.top  + r.height / 2;
+    const dx = e.clientX - cx;
+    const dy = e.clientY - cy;
+    setNear(Math.sqrt(dx * dx + dy * dy) < PROXIMITY_PX);
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    return () => window.removeEventListener("pointermove", onPointerMove);
+  }, [onPointerMove]);
 
   const handleNavClick = (item: string) => {
     close();
@@ -84,9 +107,11 @@ export default function SectionNav({
     <>
       {/* ── Hamburger / X toggle ── */}
       <button
+        ref={toggleRef}
         type="button"
         className={styles.toggle}
         data-variant={v}
+        data-visible={near || open ? "true" : "false"}
         style={{ "--section-nav-toggle-top": `${topOffset}px` } as React.CSSProperties}
         onClick={() => setOpen((o) => !o)}
         aria-label={open ? "Close navigation" : "Open navigation"}

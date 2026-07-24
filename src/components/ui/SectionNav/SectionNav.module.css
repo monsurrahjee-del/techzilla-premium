@@ -13,8 +13,17 @@
   border: none;
   color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
-  transition: color 0.2s;
+
+  /* Hidden by default — proximity detection controls visibility */
+  opacity: 0;
+  transition: opacity 0.25s ease, color 0.2s;
 }
+
+/* Show when cursor is near or menu is open */
+.toggle[data-visible="true"] {
+  opacity: 1;
+}
+
 .toggle:hover { color: #ffffff; }
 
 /* Light variant — used on the Craft / Contact section */
