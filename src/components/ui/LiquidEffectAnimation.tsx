@@ -9,7 +9,6 @@ export function LiquidEffectAnimation() {
   useEffect(() => {
     if (!canvasRef.current) return
 
-    // Load the script dynamically
     const script = document.createElement("script")
     script.type = "module"
     script.textContent = `
@@ -18,11 +17,20 @@ export function LiquidEffectAnimation() {
       const canvas = document.getElementById('liquid-canvas');
       if (canvas) {
         const app = LiquidBackground(canvas);
-        app.loadImage('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/enhanced_8bfe61b0-d431-433a-8acb-49d508bf88b4-image-vWzKFKS7vQy7s8wfQYzEpaoiYaVMkr.png');
         app.liquidPlane.material.metalness = 0.75;
         app.liquidPlane.material.roughness = 0.25;
         app.liquidPlane.uniforms.displacementScale.value = 5;
         app.setRain(false);
+
+        // Speed up animation 3× by overriding the Three.js clock
+        if (app.clock) {
+          const startReal = performance.now();
+          const SPEED = 3.0;
+          app.clock.getElapsedTime = () =>
+            ((performance.now() - startReal) / 1000) * SPEED;
+          app.clock.getDelta = () => (1 / 60) * SPEED;
+        }
+
         window.__liquidApp = app;
       }
     `
@@ -32,16 +40,16 @@ export function LiquidEffectAnimation() {
       if (window.__liquidApp && window.__liquidApp.dispose) {
         window.__liquidApp.dispose()
       }
-      document.body.removeChild(script)
+      try { document.body.removeChild(script) } catch (_) {}
     }
   }, [])
 
   return (
     <div
-      className="fixed inset-0 m-0 w-full h-full touch-none overflow-hidden"
-      style={{ fontFamily: '"Montserrat", serif' }}
+      className="absolute inset-0 m-0 w-full h-full touch-none overflow-hidden pointer-events-none"
+      style={{ fontFamily: '"Montserrat", serif', zIndex: 1 }}
     >
-      <canvas ref={canvasRef} id="liquid-canvas" className="fixed inset-0 w-full h-full" />
+      <canvas ref={canvasRef} id="liquid-canvas" className="absolute inset-0 w-full h-full" />
     </div>
   )
 }
