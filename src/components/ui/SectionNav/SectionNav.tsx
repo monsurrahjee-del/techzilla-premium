@@ -121,7 +121,7 @@ export default function SectionNav({
       <button
         ref={toggleRef}
         type="button"
-        className={styles.toggle}
+        className={`${styles.toggle} cursor-target`}
         data-variant={v}
         data-visible={isVisible ? "true" : "false"}
         style={{ "--section-nav-toggle-top": `${topOffset}px` } as React.CSSProperties}
@@ -177,7 +177,7 @@ export default function SectionNav({
               <div className={styles.navLeft}>
                 <button
                   type="button"
-                  className={styles.navLogo}
+                  className={`${styles.navLogo} cursor-target`}
                   onClick={handleLogoClick}
                   aria-label="Go to home"
                 >
@@ -190,7 +190,7 @@ export default function SectionNav({
                   <button
                     key={item}
                     type="button"
-                    className={styles.navLink}
+                    className={`${styles.navLink} cursor-target`}
                     onClick={() => handleNavClick(item)}
                   >
                     {item}
@@ -201,7 +201,7 @@ export default function SectionNav({
               <div className={styles.navRight}>
                 <button
                   type="button"
-                  className={styles.navToggle}
+                  className={`${styles.navToggle} cursor-target`}
                   onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
                   aria-label="Toggle theme"
                 >
@@ -209,7 +209,7 @@ export default function SectionNav({
                 </button>
                 <button
                   type="button"
-                  className={styles.navToggle}
+                  className={`${styles.navToggle} cursor-target`}
                   onClick={() => setSound((s) => !s)}
                   aria-label="Toggle sound"
                 >
