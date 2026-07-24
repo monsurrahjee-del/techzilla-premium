@@ -80,6 +80,13 @@ export default function Home() {
       portfolioGateReadyRef.current     = false;
       const pMax = document.documentElement.scrollHeight - window.innerHeight;
       frozenScrollRef.current = Math.round(pMax);
+      // Immediately snap scroll to pMax so CSS scroll-driven animations
+      // reach 100% in the same frame the gate activates, and fix the JS
+      // fallback (which relies on driveFrame calls that are now blocked).
+      window.scrollTo(0, Math.round(pMax));
+      if (!supportsScrollDriven && portfolio) {
+        portfolio.style.transform = "translateX(0%)";
+      }
       // Tell the custom scrollbar to stop fighting the frozen position.
       window.dispatchEvent(new CustomEvent("tz-scroll-frozen"));
       setPortfolioHolding(true);
@@ -346,7 +353,11 @@ export default function Home() {
       e.stopImmediatePropagation();
       if (portfolioGateReadyRef.current) {
         const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-        if (delta) releaseFromGate(delta);
+        // Require a minimum delta (> 10px) before releasing the gate.
+        // This filters out residual trackpad inertia from the scroll that
+        // originally triggered the gate — tiny trailing events shouldn't
+        // jump the user straight into chess reveal.
+        if (delta && Math.abs(delta) > 10) releaseFromGate(delta);
       }
     };
     let ty = 0;

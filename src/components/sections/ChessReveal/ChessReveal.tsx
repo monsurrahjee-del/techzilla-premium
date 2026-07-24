@@ -531,9 +531,11 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       craftActivatedRef.current = false;
       const s = stateRef.current;
       s.active        = true;
-      // Land at the start of Phase C ("Your Satisfaction Always") so the user
-      // can scroll backward through chess content normally before exiting.
-      s.virtualScroll = Math.floor(PH_C_START * TOTAL);
+      // Land at the very end of chess (full TOTAL) so the user sees
+      // "Your Satisfaction Always" at full opacity and has maximum scroll
+      // buffer before chess dismisses — prevents trackpad inertia from
+      // draining Phase C in a single large-delta event.
+      s.virtualScroll = TOTAL;
       window.dispatchEvent(new CustomEvent("chess-reveal-mode", { detail: { active: true } }));
       window.dispatchEvent(new CustomEvent("chess-reveal-progress", { detail: { progress: PH_C_START } }));
       slideIn();
