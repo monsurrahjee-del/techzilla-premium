@@ -565,7 +565,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
 
     const tick = (ts: number) => {
       s.rafId = requestAnimationFrame(tick);
-      if (!s.active && s.virtualScroll <= 0) { s.lastTs = ts; return; }
+      if (!s.active) { s.lastTs = ts; return; }
 
       // Skip this RAF tick if we haven't waited long enough for the next frame
       if (ts - lastDrawTs < FRAME_MS) return;

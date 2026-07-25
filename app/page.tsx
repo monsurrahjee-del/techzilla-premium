@@ -51,6 +51,9 @@ export default function Home() {
   // Chess reveal
   const chessActiveRef = useRef(false);
 
+  // Craft active — while Craft is visible, pause Portfolio Three.js and Chess canvas
+  const [craftActive, setCraftActive] = useState(false);
+
   const VAPOR_SESSION_KEY = "tz_vapor_done";
 
   /* ── Scroll-driven state logic ─────────────────────────────────────────── */
@@ -256,6 +259,13 @@ export default function Home() {
     };
     window.addEventListener("craft-section-nav-exit", onCraftNavExit);
 
+    /* Craft active — pause Portfolio Three.js + Chess canvas while Craft is showing */
+    const onCraftActivate = () => setCraftActive(true);
+    const onCraftDismissOrExit = () => setCraftActive(false);
+    window.addEventListener("craft-section-activate", onCraftActivate);
+    window.addEventListener("craft-section-dismiss",  onCraftDismissOrExit);
+    window.addEventListener("craft-section-nav-exit", onCraftDismissOrExit);
+
     /* Section-nav navigation: suppress services & portfolio gates during nav-scroll ─ */
     const onNavNavigate = () => {
       // Suppress services hold so scroll passes through the 2/3 boundary freely.
@@ -286,6 +296,9 @@ export default function Home() {
       window.removeEventListener("chess-reveal-dismissed", onChessDismissed);
       window.removeEventListener("chess-reveal-complete",  onChessComplete);
       window.removeEventListener("craft-section-nav-exit", onCraftNavExit);
+      window.removeEventListener("craft-section-activate", onCraftActivate);
+      window.removeEventListener("craft-section-dismiss",  onCraftDismissOrExit);
+      window.removeEventListener("craft-section-nav-exit", onCraftDismissOrExit);
       window.removeEventListener("section-nav-navigate",   onNavNavigate);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -482,7 +495,7 @@ export default function Home() {
           <Services active={vaporDone} />
         </div>
         <div ref={portfolioRef} className={styles.portfolioLayer}>
-          <Portfolio active={portfolioActive} />
+          <Portfolio active={portfolioActive && !craftActive} />
         </div>
       </div>
 
