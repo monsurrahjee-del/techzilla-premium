@@ -282,15 +282,20 @@ const TargetCursor = ({
     window.addEventListener('mouseover', enterHandler as EventListener, { passive: true });
 
     // ── Chess page: restore OS cursor while Chess is active ───────────────
+    const CHESS_STYLE_ID = 'chess-cursor-override';
     const onChessMode = (e: Event) => {
       const chessActive = (e as CustomEvent<{ active: boolean }>).detail.active;
       if (chessActive) {
-        // Show normal OS arrow cursor; hide the custom widget entirely
-        document.body.style.cursor = 'default';
+        // globals.css has `* { cursor: none }` — override with !important
+        if (!document.getElementById(CHESS_STYLE_ID)) {
+          const s = document.createElement('style');
+          s.id = CHESS_STYLE_ID;
+          s.textContent = '*, html, body { cursor: default !important; }';
+          document.head.appendChild(s);
+        }
         if (cursorRef.current) cursorRef.current.style.visibility = 'hidden';
       } else {
-        // Chess dismissed — put the custom cursor back
-        if (hideDefaultCursor) document.body.style.cursor = 'none';
+        document.getElementById(CHESS_STYLE_ID)?.remove();
         if (cursorRef.current) cursorRef.current.style.visibility = 'visible';
       }
     };
@@ -310,6 +315,7 @@ const TargetCursor = ({
       window.removeEventListener('mousedown', mouseDownHandler);
       window.removeEventListener('mouseup', mouseUpHandler);
       window.removeEventListener('chess-reveal-mode', onChessMode);
+      document.getElementById(CHESS_STYLE_ID)?.remove();
 
       if (activeTarget) {
         cleanupTarget(activeTarget);
