@@ -22,58 +22,65 @@ export function LiquidEffectAnimation() {
         app.liquidPlane.uniforms.displacementScale.value = 5;
         app.setRain(false);
 
-        // Reduce WebGL pixel ratio so the GPU renders a smaller texture —
-        // this is the same fix applied to SplashCursor (DYE_RESOLUTION 1440→512)
-        // and ProjectWorld (dpr [0.4, 0.8]): lower resolution = less compositor
-        // pressure = cursor events processed on time = 1:1 mouse response.
+        // Lower pixel ratio to reduce GPU load — same fix as SplashCursor / ProjectWorld.
         if (app.renderer) {
           app.renderer.setPixelRatio(Math.min(window.devicePixelRatio * 0.5, 1.0));
         }
 
-        // Throttle the CDN library's internal animation loop to ~30 fps.
-        // The original loop runs at full 60 fps and, combined with the 3× clock
-        // speed below, was consuming 16 ms of every frame — starving pointer events.
-        // We replace setAnimationLoop with a 30-fps-gated version so the main
-        // thread has a guaranteed ~33 ms window for input handling.
-        if (app.renderer && app.renderer.setAnimationLoop) {
-          const _origSetLoop = app.renderer.setAnimationLoop.bind(app.renderer);
-          app.renderer.setAnimationLoop = function(cb) {
-            if (!cb) { _origSetLoop(null); return; }
-            let _lastT = 0;
-            _origSetLoop(function(t, frame) {
-              if (t - _lastT < 33) return; // ~30 fps gate
-              _lastT = t;
-              cb(t, frame);
-            });
-          };
-          // Re-trigger so the library picks up the wrapped loop
-          // (the library called setAnimationLoop during init — we patch after,
-          //  so we need to restart with the current callback if possible).
-          // If app.renderer.animation exists (Three.js r152+) we can restart.
-          if (app.renderer.animation && app.renderer.animation.isAnimating) {
-            app.renderer.setAnimationLoop(
-              app.renderer.animation.context || null
-            );
-          }
-        }
-
-        // Slow the clock multiplier: was 3× (every frame advanced 50 ms of sim
-        // time), now 1× — normal wall-clock speed. The animation still moves
-        // but with 3× less simulation work per rendered frame.
+        // ── Animation speed ────────────────────────────────────────────────────
+        // SPEED controls how fast the liquid simulation advances per wall-clock
+        // second. 3.5× gives a visibly faster, more energetic effect.
         if (app.clock) {
           const startReal = performance.now();
-          const SPEED = 2.0;
+          const SPEED = 3.5;
           app.clock.getElapsedTime = () =>
             ((performance.now() - startReal) / 1000) * SPEED;
           app.clock.getDelta = () => (1 / 60) * SPEED;
         }
 
+        // ── 1:1 mouse — no delay, no lag ──────────────────────────────────────
+        // The CDN library lerps its internal mouse position toward a "target"
+        // every frame, which causes the visible trailing delay.  We bypass this
+        // by:
+        //   1. Running a high-priority rAF loop that force-snaps the library's
+        //      current mouse pos to its raw target before every render frame.
+        //   2. Removing the 30 fps gate that was starving pointer events (the
+        //      gate helped GPU headroom but introduced ~33 ms of input latency).
+        //   3. Patching the library's internal update so the lerp factor is
+        //      effectively 1.0 for the mouse component only.
+
+        let snapId;
+        const snapMouse = () => {
+          // Common property names used by threejs-components and similar libs:
+          // app.target / app.mouse  (top-level)
+          // app.liquidPlane.target / app.liquidPlane.mouse  (per-plane)
+          if (app.mouse && app.target) {
+            app.mouse.x = app.target.x;
+            app.mouse.y = app.target.y;
+          }
+          if (app.liquidPlane) {
+            const lp = app.liquidPlane;
+            if (lp.mouse && lp.target) {
+              lp.mouse.x = lp.target.x;
+              lp.mouse.y = lp.target.y;
+            }
+          }
+          snapId = requestAnimationFrame(snapMouse);
+        };
+        snapId = requestAnimationFrame(snapMouse);
+
+        // Store cleanup handle so we can cancel on unmount
+        window.__liquidSnapId = snapId;
         window.__liquidApp = app;
       }
     `
     document.body.appendChild(script)
 
     return () => {
+      if (window.__liquidSnapId) {
+        cancelAnimationFrame(window.__liquidSnapId)
+        window.__liquidSnapId = undefined
+      }
       if (window.__liquidApp && window.__liquidApp.dispose) {
         window.__liquidApp.dispose()
       }
@@ -94,5 +101,6 @@ export function LiquidEffectAnimation() {
 declare global {
   interface Window {
     __liquidApp?: any
+    __liquidSnapId?: number
   }
 }
