@@ -62,7 +62,7 @@ export function LiquidEffectAnimation() {
         // but with 3× less simulation work per rendered frame.
         if (app.clock) {
           const startReal = performance.now();
-          const SPEED = 1.0;
+          const SPEED = 2.0;
           app.clock.getElapsedTime = () =>
             ((performance.now() - startReal) / 1000) * SPEED;
           app.clock.getDelta = () => (1 / 60) * SPEED;

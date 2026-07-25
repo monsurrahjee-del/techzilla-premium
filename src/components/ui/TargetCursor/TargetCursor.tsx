@@ -100,14 +100,15 @@ const TargetCursor = ({
     cursorPosRef.current = { x: initX, y: initY };
     cursor.style.transform = `translate3d(${initX}px, ${initY}px, 0)`;
 
-    // Keep target corners on the same direct path as the cursor. Re-reads the
-    // target's bounding rect on every pointer-move so corners track through
-    // scroll-driven animations and framer-motion transitions correctly.
+    // Cache the target rect; refresh only on hover/scroll/resize — never per pointermove.
+    const cachedRectRef: { current: DOMRect | null } = { current: null };
+    const refreshCachedRect = () => {
+      if (activeTarget) cachedRectRef.current = activeTarget.getBoundingClientRect();
+    };
+
     const updateTargetCorners = () => {
-      if (!activeTarget || !cornersRef.current) return;
-      // Re-read the element's position every frame — handles the case where
-      // the target moves after the initial hover (CSS animations, scroll).
-      const rect = activeTarget.getBoundingClientRect();
+      if (!activeTarget || !cornersRef.current || !cachedRectRef.current) return;
+      const rect = cachedRectRef.current;
       const { borderWidth, cornerSize } = constants;
       const pts = [
         { x: rect.left  - borderWidth,               y: rect.top    - borderWidth },
@@ -147,6 +148,7 @@ const TargetCursor = ({
 
     const scrollHandler = () => {
       if (!activeTarget || !cursorRef.current) return;
+      refreshCachedRect(); // keep corners accurate after scroll
       // cursorPosRef is already in viewport coords — use directly.
       const elementUnderMouse = document.elementFromPoint(
         cursorPosRef.current.x,
@@ -199,6 +201,8 @@ const TargetCursor = ({
         cleanupTarget(activeTarget);
       }
       activeTarget = target;
+      refreshCachedRect();
+      refreshCachedRect();
       corners.forEach(corner => gsap.killTweensOf(corner, 'x,y'));
 
       spinner.style.animationPlayState = 'paused';

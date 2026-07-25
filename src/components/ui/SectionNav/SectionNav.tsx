@@ -89,22 +89,41 @@ export default function SectionNav({
   };
 
   // Proximity detection — only active when proximityReveal is true
-  const onPointerMove = useCallback((e: PointerEvent) => {
+  // Cache button centre — getBoundingClientRect is never called inside pointermove.
+  const btnCenterRef = useRef({ cx: 0, cy: 0 });
+  const nearRef      = useRef(false);
+
+  const updateBtnCenter = useCallback(() => {
     const btn = toggleRef.current;
     if (!btn) return;
-    const r  = btn.getBoundingClientRect();
-    const cx = r.left + r.width  / 2;
-    const cy = r.top  + r.height / 2;
+    const r = btn.getBoundingClientRect();
+    btnCenterRef.current = { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+  }, []);
+
+  const onPointerMove = useCallback((e: PointerEvent) => {
+    const { cx, cy } = btnCenterRef.current;
     const dx = e.clientX - cx;
     const dy = e.clientY - cy;
-    setNear(Math.sqrt(dx * dx + dy * dy) < PROXIMITY_PX);
+    const isNear = Math.sqrt(dx * dx + dy * dy) < PROXIMITY_PX;
+    // Only setState when the value changes — avoids a React re-render on every pointermove.
+    if (isNear !== nearRef.current) {
+      nearRef.current = isNear;
+      setNear(isNear);
+    }
   }, []);
 
   useEffect(() => {
     if (!proximityReveal) return;
-    window.addEventListener("pointermove", onPointerMove, { passive: true });
-    return () => window.removeEventListener("pointermove", onPointerMove);
-  }, [proximityReveal, onPointerMove]);
+    updateBtnCenter();
+    window.addEventListener("pointermove", onPointerMove,   { passive: true });
+    window.addEventListener("resize",      updateBtnCenter, { passive: true });
+    window.addEventListener("scroll",      updateBtnCenter, { passive: true, capture: true });
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("resize",      updateBtnCenter);
+      window.removeEventListener("scroll",      updateBtnCenter, { capture: true } as any);
+    };
+  }, [proximityReveal, onPointerMove, updateBtnCenter]);
 
   // When proximityReveal is off the button is always visible;
   // when it's on, visibility is driven by nearness or open state.
