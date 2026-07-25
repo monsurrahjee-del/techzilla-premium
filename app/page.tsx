@@ -153,6 +153,9 @@ export default function Home() {
       if (portfolioNowActive !== portfolioActiveRef.current) {
         portfolioActiveRef.current = portfolioNowActive;
         startTransition(() => setPortfolioActive(portfolioNowActive));
+        window.dispatchEvent(
+          new CustomEvent("portfolio-section-active", { detail: { active: portfolioNowActive } })
+        );
       }
 
       /* ── Vapor trigger reset ──────────────────────────────────────────── */

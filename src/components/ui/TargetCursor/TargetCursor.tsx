@@ -281,25 +281,39 @@ const TargetCursor = ({
 
     window.addEventListener('mouseover', enterHandler as EventListener, { passive: true });
 
-    // ── Chess page: restore OS cursor while Chess is active ───────────────
-    const CHESS_STYLE_ID = 'chess-cursor-override';
-    const onChessMode = (e: Event) => {
-      const chessActive = (e as CustomEvent<{ active: boolean }>).detail.active;
-      if (chessActive) {
-        // globals.css has `* { cursor: none }` — override with !important
-        if (!document.getElementById(CHESS_STYLE_ID)) {
-          const s = document.createElement('style');
-          s.id = CHESS_STYLE_ID;
-          s.textContent = '*, html, body { cursor: default !important; }';
-          document.head.appendChild(s);
-        }
-        if (cursorRef.current) cursorRef.current.style.visibility = 'hidden';
-      } else {
-        document.getElementById(CHESS_STYLE_ID)?.remove();
-        if (cursorRef.current) cursorRef.current.style.visibility = 'visible';
+    // ── OS cursor override: Chess + Portfolio pages ────────────────────────
+    // globals.css has `* { cursor: none }` so we need !important to win.
+    const OS_STYLE_ID = 'tz-cursor-os-override';
+    let chessIsActive     = false;
+    let portfolioIsActive = false;
+
+    const applyOsCursor = () => {
+      if (!document.getElementById(OS_STYLE_ID)) {
+        const s = document.createElement('style');
+        s.id = OS_STYLE_ID;
+        s.textContent = '*, html, body { cursor: default !important; }';
+        document.head.appendChild(s);
       }
+      if (cursorRef.current) cursorRef.current.style.visibility = 'hidden';
     };
-    window.addEventListener('chess-reveal-mode', onChessMode);
+    const removeOsCursor = () => {
+      // Only restore the custom cursor when no section needs the OS override.
+      if (chessIsActive || portfolioIsActive) return;
+      document.getElementById(OS_STYLE_ID)?.remove();
+      if (cursorRef.current) cursorRef.current.style.visibility = 'visible';
+    };
+
+    const onChessMode = (e: Event) => {
+      chessIsActive = (e as CustomEvent<{ active: boolean }>).detail.active;
+      chessIsActive ? applyOsCursor() : removeOsCursor();
+    };
+    const onPortfolioActive = (e: Event) => {
+      portfolioIsActive = (e as CustomEvent<{ active: boolean }>).detail.active;
+      portfolioIsActive ? applyOsCursor() : removeOsCursor();
+    };
+
+    window.addEventListener('chess-reveal-mode',       onChessMode);
+    window.addEventListener('portfolio-section-active', onPortfolioActive);
 
     // ── Cleanup ────────────────────────────────────────────────────────────
     return () => {
@@ -314,8 +328,9 @@ const TargetCursor = ({
       window.removeEventListener('scroll', scrollHandler);
       window.removeEventListener('mousedown', mouseDownHandler);
       window.removeEventListener('mouseup', mouseUpHandler);
-      window.removeEventListener('chess-reveal-mode', onChessMode);
-      document.getElementById(CHESS_STYLE_ID)?.remove();
+      window.removeEventListener('chess-reveal-mode',       onChessMode);
+      window.removeEventListener('portfolio-section-active', onPortfolioActive);
+      document.getElementById(OS_STYLE_ID)?.remove();
 
       if (activeTarget) {
         cleanupTarget(activeTarget);
