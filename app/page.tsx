@@ -51,6 +51,9 @@ export default function Home() {
   // Chess reveal
   const chessActiveRef = useRef(false);
 
+  // Chess active — while Chess is visible, pause Portfolio Three.js
+  const [chessUiActive, setChessUiActive] = useState(false);
+
   // Craft active — while Craft is visible, pause Portfolio Three.js and Chess canvas
   const [craftActive, setCraftActive] = useState(false);
 
@@ -259,6 +262,12 @@ export default function Home() {
     };
     window.addEventListener("craft-section-nav-exit", onCraftNavExit);
 
+    /* Chess active — pause Portfolio Three.js while Chess is showing */
+    const onChessMode = (e: Event) => {
+      setChessUiActive((e as CustomEvent<{ active: boolean }>).detail.active);
+    };
+    window.addEventListener("chess-reveal-mode", onChessMode);
+
     /* Craft active — pause Portfolio Three.js + Chess canvas while Craft is showing */
     const onCraftActivate = () => setCraftActive(true);
     const onCraftDismissOrExit = () => setCraftActive(false);
@@ -295,6 +304,7 @@ export default function Home() {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("chess-reveal-dismissed", onChessDismissed);
       window.removeEventListener("chess-reveal-complete",  onChessComplete);
+      window.removeEventListener("chess-reveal-mode",      onChessMode);
       window.removeEventListener("craft-section-nav-exit", onCraftNavExit);
       window.removeEventListener("craft-section-activate", onCraftActivate);
       window.removeEventListener("craft-section-dismiss",  onCraftDismissOrExit);
@@ -495,7 +505,7 @@ export default function Home() {
           <Services active={vaporDone} />
         </div>
         <div ref={portfolioRef} className={styles.portfolioLayer}>
-          <Portfolio active={portfolioActive && !craftActive} />
+          <Portfolio active={portfolioActive && !chessUiActive && !craftActive} />
         </div>
       </div>
 
