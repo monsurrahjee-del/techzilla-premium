@@ -118,10 +118,21 @@ export default function SectionNav({
     window.addEventListener("pointermove", onPointerMove,   { passive: true });
     window.addEventListener("resize",      updateBtnCenter, { passive: true });
     window.addEventListener("scroll",      updateBtnCenter, { passive: true, capture: true });
+
+    // Chess panel starts at translateY(100%) so the cached button centre is
+    // below the viewport at mount time. Refresh after the 700 ms slide-in.
+    const onChessMode = (e: Event) => {
+      if ((e as CustomEvent<{ active: boolean }>).detail.active) {
+        setTimeout(updateBtnCenter, 750);
+      }
+    };
+    window.addEventListener("chess-reveal-mode", onChessMode);
+
     return () => {
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("resize",      updateBtnCenter);
-      window.removeEventListener("scroll",      updateBtnCenter, { capture: true } as any);
+      window.removeEventListener("pointermove",    onPointerMove);
+      window.removeEventListener("resize",         updateBtnCenter);
+      window.removeEventListener("scroll",         updateBtnCenter, { capture: true } as any);
+      window.removeEventListener("chess-reveal-mode", onChessMode);
     };
   }, [proximityReveal, onPointerMove, updateBtnCenter]);
 
