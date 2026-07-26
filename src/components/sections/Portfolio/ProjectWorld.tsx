@@ -107,6 +107,13 @@ const THEMES: Record<Theme, ThemeColors> = {
   },
 } as const;
 
+// ── Module-level position persistence — survives navigating away and back ─────
+// These values are written when Scene unmounts and read when it mounts again.
+let _lastPos:         { x: number; z: number } = { x: RECORDED_PATH[0].x, z: RECORDED_PATH[0].z };
+let _lastOrient:      number                   = 0;
+let _lastWaypointIdx: number                   = 0;
+let _hasCarPosition:  boolean                  = false;
+
 // ── City + House GLB ──────────────────────────────────────────────────────────
 function CityModel() {
   const { scene: cityScene  } = useGLTF("/models/city.glb");
@@ -345,27 +352,36 @@ interface SceneProps {
   autopilotTarget:  number | null;  // station index to stop at; null = idle/manual
   autopilotTourId:  number;         // increments each time "Start Tour" is pressed
   autopilotRewindId: number;        // increments each time "Prev" is pressed
+  autopilotPaused:  boolean;        // true = freeze car in auto mode
   isManual:         boolean;
   rccgUnlocked:     boolean;          // false until Zennyola (station n-2) is visited
 }
 
 function Scene({
   onNearProject, onAtBoundary, onAutoArrived,
-  theme, carColors, autopilotTarget, autopilotTourId, autopilotRewindId, isManual, rccgUnlocked,
+  theme, carColors, autopilotTarget, autopilotTourId, autopilotRewindId, autopilotPaused, isManual, rccgUnlocked,
 }: SceneProps) {
   const t = THEMES[theme];
 
   const carRef       = useRef<THREE.Group>(null!);
-  const posRef       = useRef({ x: RECORDED_PATH[0].x, z: RECORDED_PATH[0].z });
-  const carOrientRef = useRef(0);
+
+  // ── Initialise from saved position if available ───────────────────────────
+  const initPos = _hasCarPosition ? { ..._lastPos } : { x: RECORDED_PATH[0].x, z: RECORDED_PATH[0].z };
+  const initOrient = _hasCarPosition ? _lastOrient : 0;
+  const initWpIdx  = _hasCarPosition ? _lastWaypointIdx : 0;
+
+  const posRef       = useRef(initPos);
+  const carOrientRef = useRef(initOrient);
   const speedRef     = useRef(0);
   const wheelOrRef   = useRef(0);
   const keysRef      = useRef({ up: false, down: false, left: false, right: false });
   const camPosRef    = useRef(new THREE.Vector3(
-    RECORDED_PATH[0].x, ROAD_Y + 8, RECORDED_PATH[0].z + 16,
+    initPos.x + Math.sin(initOrient) * 14,
+    ROAD_Y + 8,
+    initPos.z + Math.cos(initOrient) * 14,
   ));
   const camLookRef   = useRef(new THREE.Vector3(
-    RECORDED_PATH[0].x, ROAD_Y + 0.4, RECORDED_PATH[0].z,
+    initPos.x, ROAD_Y + 0.4, initPos.z,
   ));
   const curProjRef   = useRef<number | null>(null);
   const curCloseRef  = useRef<number | null>(null);
@@ -374,13 +390,32 @@ function Scene({
   const isReversingRef = useRef(false);   // true while driving backwards (Prev pressed)
 
   // Waypoint index along RECORDED_PATH — persists across station-to-station drives
-  const waypointIdx = useRef(0);
+  const waypointIdx = useRef(initWpIdx);
+
+  // Track whether this is the first mount of the scene to avoid resetting
+  // position on the initial autopilotTourId effect (tourId = 0 on first mount).
+  const isFirstMount = useRef(true);
 
   const [nearIdx,  setNearIdx]  = useState<number | null>(null);
   const [closeIdx, setCloseIdx] = useState<number | null>(null);
 
+  // ── Save position to module-level vars when the Scene unmounts ────────────
+  useEffect(() => {
+    return () => {
+      _lastPos         = { ...posRef.current };
+      _lastOrient      = carOrientRef.current;
+      _lastWaypointIdx = waypointIdx.current;
+      _hasCarPosition  = true;
+    };
+  }, []);
+
   // Fresh tour start: teleport car to path start and reset waypoint index
   useEffect(() => {
+    // Skip the very first run (mount) so we don't blow away a restored position
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
     if (autopilotTarget === null) return;
     posRef.current      = { x: RECORDED_PATH[0].x, z: RECORDED_PATH[0].z };
     waypointIdx.current = 0;
@@ -463,7 +498,7 @@ function Scene({
 
     // ── Autopilot: follow RECORDED_PATH, stop at target station ──────────────
     let autopilotMoved = false;
-    if (!isManual && autopilotTarget !== null) {
+    if (!isManual && autopilotTarget !== null && !autopilotPaused) {
       const AUTO_SPEED = 22;
 
       if (!arrivedRef.current) {
@@ -578,8 +613,11 @@ function Scene({
       }
 
       autopilotMoved = true;
-    } else if (!isManual && autopilotTarget === null) {
-      keys.up = false; keys.down = false; keys.left = false; keys.right = false;
+    } else if (!isManual && (autopilotTarget === null || autopilotPaused)) {
+      // Auto mode but idle or braked — hold still
+      speedRef.current   = Math.max(0, speedRef.current - dt * DECEL * 2);
+      wheelOrRef.current = THREE.MathUtils.lerp(wheelOrRef.current, 0, Math.min(dt * 4, 1));
+      autopilotMoved = true;
     }
 
     if (!autopilotMoved) {
@@ -753,13 +791,14 @@ interface ProjectWorldProps {
   autopilotTarget:   number | null;
   autopilotTourId:   number;
   autopilotRewindId: number;
+  autopilotPaused:   boolean;
   isManual:          boolean;
   rccgUnlocked:      boolean;
 }
 
 export default function ProjectWorld({
   onNearProject, onAtBoundary, onAutoArrived,
-  theme, carColors, autopilotTarget, autopilotTourId, autopilotRewindId, isManual, rccgUnlocked,
+  theme, carColors, autopilotTarget, autopilotTourId, autopilotRewindId, autopilotPaused, isManual, rccgUnlocked,
 }: ProjectWorldProps) {
   const bg = THEMES[theme].bg;
   return (
@@ -785,6 +824,7 @@ export default function ProjectWorld({
         autopilotTarget={autopilotTarget}
         autopilotTourId={autopilotTourId}
         autopilotRewindId={autopilotRewindId}
+        autopilotPaused={autopilotPaused}
         isManual={isManual}
         rccgUnlocked={rccgUnlocked}
       />

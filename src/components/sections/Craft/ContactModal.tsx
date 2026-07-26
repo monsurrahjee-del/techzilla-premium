@@ -12,7 +12,7 @@ interface ContactModalProps {
 const CONTACT_INFO = [
   { icon: MailIcon,    label: "Email",         value: "hello@techzilla.dev"     },
   { icon: MapPinIcon,  label: "Location",      value: "Remote / Worldwide"      },
-  { icon: ClockIcon,   label: "Response Time", value: "Within 1 business day"   },
+  { icon: ClockIcon,   label: "Response Time", value: "As soon as possible"     },
 ];
 
 export default function ContactModal({ onClose }: ContactModalProps) {
@@ -21,13 +21,30 @@ export default function ContactModal({ onClose }: ContactModalProps) {
   const [message, setMessage] = useState("");
   const [sent,    setSent]    = useState(false);
   const [sending, setSending] = useState(false);
+  const [error,   setError]   = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSending(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    setSending(false);
-    setSent(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, message }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to send");
+      }
+
+      setSent(true);
+    } catch {
+      setError("Something went wrong. Please try again or email us directly.");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -60,8 +77,7 @@ export default function ContactModal({ onClose }: ContactModalProps) {
               <h1 className={styles.ccTitle}>Contact With Us</h1>
               <p className={styles.ccDesc}>
                 If you have any questions regarding our Services or need help,
-                please fill out the form here. We do our best to respond within
-                1 business day.
+                please fill out the form here. We respond as soon as possible.
               </p>
               <div className={styles.ccInfoGrid}>
                 {CONTACT_INFO.map((info, i) => (
@@ -84,7 +100,7 @@ export default function ContactModal({ onClose }: ContactModalProps) {
             {sent ? (
               <div className={styles.successMsg}>
                 <strong>Message received 🎉</strong>
-                We&apos;ll get back to you shortly. Looking forward to creating
+                We&apos;ll get back to you as soon as possible. Looking forward to creating
                 something extraordinary together.
               </div>
             ) : (
@@ -123,6 +139,11 @@ export default function ContactModal({ onClose }: ContactModalProps) {
                     required
                   />
                 </div>
+                {error && (
+                  <p style={{ color: "#f12b30", fontSize: "0.78rem", margin: "0 0 8px" }}>
+                    {error}
+                  </p>
+                )}
                 <button
                   type="submit"
                   className={styles.submitBtn}

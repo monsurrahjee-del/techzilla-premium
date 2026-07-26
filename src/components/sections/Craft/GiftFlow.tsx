@@ -316,10 +316,23 @@ export default function GiftFlow({ onClose }: GiftFlowProps) {
   // Always start at index 0 — the Joker card
   const [charIndex, setCharIndex] = useState(0);
 
-  const handleUnlock = (e: React.FormEvent) => {
+  const handleUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (businessName.trim().length < 2) return;
     setStep("card");
+
+    // Fire-and-forget: notify techzilla.web@gmail.com about the new gift card
+    const char = CHARACTERS[0]; // Joker is default on reveal
+    fetch("/api/gift", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        businessName: businessName.trim(),
+        discountCode,
+        characterName: char.name,
+        characterLabel: char.label,
+      }),
+    }).catch(() => {/* silent — notification is non-critical */});
   };
 
   return (

@@ -16,6 +16,16 @@ const ProjectWorld = dynamic(() => import("./ProjectWorld"), { ssr: false });
 // ── Module-level flag: survives SPA navigation re-mounts ────────────────────
 let _portfolioMoved = false;
 
+// ── Module-level session persistence — survives navigating away and back ─────
+type ExploreMode = "preloading" | "modal" | "auto" | "manual";
+type AutoPhase   = "idle" | "driving" | "arrived";
+
+let _savedMode:           ExploreMode | null = null;
+let _savedAutoTargetIdx:  number             = 0;
+let _savedAutoPhase:      AutoPhase          = "idle";
+let _savedRccgUnlocked:   boolean            = false;
+let _savedColorsHidden:   boolean            = false;
+
 // ── Car colour palettes ──────────────────────────────────────────────────────
 const BODY_COLORS = [
   { label: "Orange",   hex: "#ff4400" },
@@ -40,8 +50,6 @@ const GLASS_COLORS = [
 ];
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type AutoPhase  = "idle" | "driving" | "arrived";
-type ExploreMode = "preloading" | "modal" | "auto" | "manual";
 
 interface PortfolioProps {
   active?: boolean;
@@ -51,7 +59,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
   const [nearIdx,      setNearIdx]      = useState<number | null>(null);
   const [mounted,      setMounted]      = useState(false);
   const [hintHidden,   setHintHidden]   = useState(_portfolioMoved);
-  const [colorsHidden, setColorsHidden] = useState(false);
+  const [colorsHidden, setColorsHidden] = useState(_savedColorsHidden);
   const [theme,        setTheme]        = useState<Theme>("dark");
   const [dpadState,    setDpadState]    = useState({ up: false, down: false, left: false, right: false });
 
@@ -60,9 +68,10 @@ export default function Portfolio({ active = false }: PortfolioProps) {
   const [preloadPct, setPreloadPct] = useState(0);
 
   // ── Autopilot ─────────────────────────────────────────────────────────────
-  const [autoTargetIdx,   setAutoTargetIdx]   = useState(0);
+  const [autoTargetIdx,   setAutoTargetIdx]   = useState(_savedAutoTargetIdx);
   const [autopilotTarget, setAutopilotTarget] = useState<number | null>(null);
-  const [autoPhase,       setAutoPhase]       = useState<AutoPhase>("idle");
+  const [autoPhase,       setAutoPhase]       = useState<AutoPhase>(_savedAutoPhase === "driving" ? "arrived" : _savedAutoPhase);
+  const [autopilotPaused, setAutopilotPaused] = useState(false);
 
   // Car colours
   const [bodyIdx,  setBodyIdx]  = useState(3);
@@ -77,7 +86,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
   const [rewindId, setRewindId] = useState(0);
 
   // ── RCCG unlock — becomes true once car visits Zennyola (station UNLOCK_IDX) ─
-  const [rccgUnlocked, setRccgUnlocked] = useState(false);
+  const [rccgUnlocked, setRccgUnlocked] = useState(_savedRccgUnlocked);
 
   const carColors: CarColors = {
     body:         BODY_COLORS[bodyIdx].hex,
@@ -105,11 +114,41 @@ export default function Portfolio({ active = false }: PortfolioProps) {
       const pct = Math.min(100, ((ts - start) / DURATION) * 100);
       setPreloadPct(pct);
       if (pct < 100) { raf = requestAnimationFrame(tick); }
-      else            { setMode("modal"); }
+      else {
+        // If we have a saved mode from a previous visit, restore it directly
+        // instead of showing the mode-selection modal again.
+        if (_savedMode !== null && _savedMode !== "modal" && _savedMode !== "preloading") {
+          setMode(_savedMode);
+          // For auto: restore to arrived state (car already at last position)
+          if (_savedMode === "auto") {
+            setAutoPhase(_savedAutoPhase === "driving" ? "arrived" : _savedAutoPhase);
+            setAutoTargetIdx(_savedAutoTargetIdx);
+            setRccgUnlocked(_savedRccgUnlocked);
+            setColorsHidden(_savedColorsHidden);
+          }
+          if (_savedMode === "manual") {
+            setColorsHidden(_savedColorsHidden);
+            if (_portfolioMoved) setHintHidden(true);
+          }
+        } else {
+          setMode("modal");
+        }
+      }
     };
     let raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, mode]);
+
+  // ── Persist mode/phase to module-level vars whenever they change ──────────
+  useEffect(() => {
+    if (mode === "preloading" || mode === "modal") return;
+    _savedMode          = mode;
+    _savedAutoTargetIdx = autoTargetIdx;
+    _savedAutoPhase     = autoPhase;
+    _savedRccgUnlocked  = rccgUnlocked;
+    _savedColorsHidden  = colorsHidden;
+  }, [mode, autoTargetIdx, autoPhase, rccgUnlocked, colorsHidden]);
 
   // ── Mode selection ────────────────────────────────────────────────────────
   const selectAuto = () => {
@@ -117,6 +156,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
     setAutoPhase("idle");
     setAutoTargetIdx(0);
     setAutopilotTarget(null);
+    setAutopilotPaused(false);
     setHintHidden(true);
     setColorsHidden(false); // keep colour panel visible until Start Tour is clicked
   };
@@ -131,6 +171,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
     setMode("manual");
     setAutopilotTarget(null);
     setAutoPhase("idle");
+    setAutopilotPaused(false);
     setColorsHidden(false);
   };
 
@@ -140,11 +181,13 @@ export default function Portfolio({ active = false }: PortfolioProps) {
     setAutoTargetIdx(target);
     setAutopilotTarget(target);
     setAutoPhase("driving");
+    setAutopilotPaused(false);
   }, []);
 
   const handleStartTour = () => {
     setRccgUnlocked(false); // re-lock RCCG at every tour start
     setColorsHidden(true);  // hide colour panel once the tour begins
+    setAutopilotPaused(false);
     setTourId(id => id + 1);
     driveToStation(0);
   };
@@ -169,6 +212,19 @@ export default function Portfolio({ active = false }: PortfolioProps) {
     const prev = (autoTargetIdx - 1 + STATIONS.length) % STATIONS.length;
     setRewindId(id => id + 1);   // signal Scene to rewind waypointIdx before driving
     driveToStation(prev);
+  };
+
+  // ── Brake / resume (auto mode only) ───────────────────────────────────────
+  const handleBrake = () => {
+    setAutopilotPaused(true);
+    setAutoPhase("arrived"); // treat current position as a stop
+  };
+
+  const handleResume = () => {
+    // Resume driving toward the current target
+    setAutopilotPaused(false);
+    setAutopilotTarget(autoTargetIdx);
+    setAutoPhase("driving");
   };
 
   const handleAutoArrived = useCallback(() => {
@@ -229,6 +285,13 @@ export default function Portfolio({ active = false }: PortfolioProps) {
   const isManual        = mode === "manual";
   const tourStarted     = autoPhase !== "idle";
 
+  // Whether the color panel should be visible
+  const showColorPanel  = (isManual || (mode === "auto" && !tourStarted)) && !colorsHidden;
+
+  // Brake button: visible in auto when tour started and car is driving (colors hidden)
+  const showBrake  = mode === "auto" && tourStarted && autoPhase === "driving"  && !autopilotPaused;
+  const showResume = mode === "auto" && tourStarted && autopilotPaused;
+
   return (
     <section className={`${styles.section} ${isDark ? styles.dark : styles.light}`}>
       {/* topOffset pushes hamburger below the day/night toggle (top:22px + ~42px height) */}
@@ -251,6 +314,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
             autopilotTarget={autopilotTarget}
             autopilotTourId={tourId}
             autopilotRewindId={rewindId}
+            autopilotPaused={autopilotPaused}
             isManual={isManual}
             rccgUnlocked={rccgUnlocked}
           />
@@ -331,8 +395,8 @@ export default function Portfolio({ active = false }: PortfolioProps) {
       </button>
 
       {/* ── Car colour picker — manual mode, OR auto mode before tour starts ── */}
-      {(isManual || (mode === "auto" && !tourStarted)) && (
-        <div className={`${styles.colorPanel} ${isDark ? styles.colorPanelDark : styles.colorPanelLight} ${colorsHidden ? styles.hidden : ""}`}>
+      {showColorPanel && (
+        <div className={`${styles.colorPanel} ${isDark ? styles.colorPanelDark : styles.colorPanelLight}`}>
           <div className={styles.colorRow}>
             <span className={`${styles.colorLabel} ${isDark ? styles.colorLabelDark : styles.colorLabelLight}`}>Body</span>
             <div className={styles.swatches}>
@@ -473,7 +537,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
               <button
                 className={styles.arrowBtn}
                 onClick={handlePrev}
-                disabled={autoPhase === "driving"}
+                disabled={autoPhase === "driving" && !autopilotPaused}
                 aria-label="Previous project"
                 title="Previous project"
               >
@@ -483,17 +547,53 @@ export default function Portfolio({ active = false }: PortfolioProps) {
               <button
                 className={styles.arrowBtn}
                 onClick={handleNext}
-                disabled={autoPhase === "driving"}
+                disabled={autoPhase === "driving" && !autopilotPaused}
                 aria-label="Next project"
                 title="Next project"
               >
-                {autoPhase === "driving" ? (
+                {autoPhase === "driving" && !autopilotPaused ? (
                   <span className={styles.drivingDot} />
                 ) : "→"}
               </button>
             </div>
           )}
         </div>
+      )}
+
+      {/* ── Brake button — auto mode, tour started, car is moving ── */}
+      {showBrake && (
+        <button
+          className={`${styles.brakeBtn} ${isDark ? styles.brakeBtnDark : styles.brakeBtnLight}`}
+          onClick={handleBrake}
+          aria-label="Brake — stop the car"
+          title="Brake"
+        >
+          {/* Brake disc icon */}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <circle cx="12" cy="12" r="4" />
+            <line x1="12" y1="2"  x2="12" y2="8" />
+            <line x1="12" y1="16" x2="12" y2="22" />
+            <line x1="2"  y1="12" x2="8"  y2="12" />
+            <line x1="16" y1="12" x2="22" y2="12" />
+          </svg>
+          Brake
+        </button>
+      )}
+
+      {/* ── Resume button — auto mode, paused ── */}
+      {showResume && (
+        <button
+          className={`${styles.brakeBtn} ${styles.resumeBtn} ${isDark ? styles.brakeBtnDark : styles.brakeBtnLight}`}
+          onClick={handleResume}
+          aria-label="Resume driving"
+          title="Resume"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5,3 19,12 5,21" />
+          </svg>
+          Resume
+        </button>
       )}
 
       {/* ── Mode toggle pill ── */}

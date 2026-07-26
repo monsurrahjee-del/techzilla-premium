@@ -823,6 +823,82 @@
   color: rgba(20,20,60,0.88);
 }
 
+/* ── Brake / Resume button ────────────────────────────────────────────────── */
+.brakeBtn {
+  position: absolute;
+  bottom: 82px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 18px;
+  height: 38px;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  font-family: "Geist", system-ui, sans-serif;
+  font-size: 0.80rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.14s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  will-change: transform;
+}
+.brakeBtn:hover  { transform: translateX(-50%) translateY(-2px); }
+.brakeBtn:active { transform: translateX(-50%) scale(0.96); }
+
+.resumeBtn {
+  /* slight visual difference so user knows this is "resume not brake" */
+  padding: 0 20px;
+}
+
+.brakeBtnDark {
+  background: rgba(220, 50, 50, 0.18);
+  color: rgba(255, 120, 120, 0.95);
+  box-shadow: 0 0 0 1px rgba(220,50,50,0.35), 0 4px 18px rgba(180,0,0,0.25);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.brakeBtnDark:hover {
+  background: rgba(220, 50, 50, 0.30);
+  color: #ff9090;
+  box-shadow: 0 0 0 1px rgba(220,50,50,0.5), 0 6px 22px rgba(180,0,0,0.35);
+}
+/* resume variant in dark mode — green tint */
+.resumeBtn.brakeBtnDark {
+  background: rgba(40, 180, 90, 0.18);
+  color: rgba(80, 220, 130, 0.95);
+  box-shadow: 0 0 0 1px rgba(40,180,90,0.35), 0 4px 18px rgba(0,130,50,0.2);
+}
+.resumeBtn.brakeBtnDark:hover {
+  background: rgba(40, 180, 90, 0.28);
+  color: #60e090;
+}
+
+.brakeBtnLight {
+  background: rgba(200, 30, 30, 0.12);
+  color: rgba(180, 20, 20, 0.90);
+  box-shadow: 0 0 0 1px rgba(200,30,30,0.28), 0 4px 14px rgba(150,0,0,0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.brakeBtnLight:hover {
+  background: rgba(200, 30, 30, 0.22);
+  box-shadow: 0 0 0 1px rgba(200,30,30,0.42), 0 6px 18px rgba(150,0,0,0.22);
+}
+/* resume variant in light mode — green tint */
+.resumeBtn.brakeBtnLight {
+  background: rgba(20, 150, 70, 0.12);
+  color: rgba(10, 130, 60, 0.9);
+  box-shadow: 0 0 0 1px rgba(20,150,70,0.28), 0 4px 14px rgba(0,100,40,0.12);
+}
+.resumeBtn.brakeBtnLight:hover {
+  background: rgba(20, 150, 70, 0.22);
+}
+
 /* ── Responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .header { padding: 18px 18px 0; }
