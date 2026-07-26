@@ -16,14 +16,30 @@ export default function HeroButtons() {
       transition={{ duration: 0.8, delay: 0.78, ease: [0.22, 1, 0.36, 1] }}
     >
       <Magnetic>
-        <a href="#contact" className={`${styles.primary} cursor-target`}>
+        <a
+          href="#contact"
+          className={`${styles.primary} cursor-target`}
+          onClick={(e) => {
+            e.preventDefault();
+            window.dispatchEvent(new CustomEvent("craft-section-activate"));
+          }}
+        >
           Start A Project
           <span>&#8599;</span>
         </a>
       </Magnetic>
 
       <Magnetic>
-        <a href="#projects" className={`${styles.secondary} cursor-target`}>
+        <a
+          href="#work"
+          className={`${styles.secondary} cursor-target`}
+          onClick={(e) => {
+            e.preventDefault();
+            const max = document.documentElement.scrollHeight - window.innerHeight;
+            window.dispatchEvent(new CustomEvent("section-nav-navigate"));
+            window.scrollTo({ top: max });
+          }}
+        >
           View Our Work
         </a>
       </Magnetic>
