@@ -355,11 +355,14 @@ interface SceneProps {
   autopilotPaused:  boolean;        // true = freeze car in auto mode
   isManual:         boolean;
   rccgUnlocked:     boolean;          // false until Zennyola (station n-2) is visited
+  isRecording:      boolean;          // true while user is recording a road path
+  onRecordPoint:    (x: number, z: number) => void;
 }
 
 function Scene({
   onNearProject, onAtBoundary, onAutoArrived,
   theme, carColors, autopilotTarget, autopilotTourId, autopilotRewindId, autopilotPaused, isManual, rccgUnlocked,
+  isRecording, onRecordPoint,
 }: SceneProps) {
   const t = THEMES[theme];
 
@@ -388,6 +391,14 @@ function Scene({
   const atBoundRef   = useRef(false);
   const arrivedRef   = useRef(false);
   const isReversingRef = useRef(false);   // true while driving backwards (Prev pressed)
+
+  // ── Path-recording refs (kept as refs to avoid stale closures in useFrame) ──
+  const isRecordingRef   = useRef(isRecording);
+  const onRecordPointRef = useRef(onRecordPoint);
+  const lastSampleRef    = useRef<{ x: number; z: number } | null>(null);
+  useEffect(() => { isRecordingRef.current   = isRecording;   }, [isRecording]);
+  useEffect(() => { onRecordPointRef.current = onRecordPoint; }, [onRecordPoint]);
+  useEffect(() => { if (!isRecording) lastSampleRef.current = null; }, [isRecording]);
 
   // Waypoint index along RECORDED_PATH — persists across station-to-station drives
   const waypointIdx = useRef(initWpIdx);
@@ -722,6 +733,23 @@ function Scene({
       }
     }
 
+    // ── Path recording (manual only, samples every ≥2 world-units) ──────────
+    if (isRecordingRef.current && isManual) {
+      const MIN_SQ = 4; // 2-unit minimum distance between samples
+      const last = lastSampleRef.current;
+      const cx = posRef.current.x, cz = posRef.current.z;
+      if (!last) {
+        lastSampleRef.current = { x: cx, z: cz };
+        onRecordPointRef.current(cx, cz);
+      } else {
+        const dx2 = cx - last.x, dz2 = cz - last.z;
+        if (dx2 * dx2 + dz2 * dz2 >= MIN_SQ) {
+          lastSampleRef.current = { x: cx, z: cz };
+          onRecordPointRef.current(cx, cz);
+        }
+      }
+    }
+
     // ── Colour-panel boundary ─────────────────────────────────────────────────
     const dx0 = posRef.current.x - RECORDED_PATH[0].x;
     const dz0 = posRef.current.z - RECORDED_PATH[0].z;
@@ -801,11 +829,14 @@ interface ProjectWorldProps {
   autopilotPaused:   boolean;
   isManual:          boolean;
   rccgUnlocked:      boolean;
+  isRecording:       boolean;
+  onRecordPoint:     (x: number, z: number) => void;
 }
 
 export default function ProjectWorld({
   onNearProject, onAtBoundary, onAutoArrived,
   theme, carColors, autopilotTarget, autopilotTourId, autopilotRewindId, autopilotPaused, isManual, rccgUnlocked,
+  isRecording, onRecordPoint,
 }: ProjectWorldProps) {
   const bg = THEMES[theme].bg;
   return (
@@ -834,6 +865,8 @@ export default function ProjectWorld({
         autopilotPaused={autopilotPaused}
         isManual={isManual}
         rccgUnlocked={rccgUnlocked}
+        isRecording={isRecording}
+        onRecordPoint={onRecordPoint}
       />
     </Canvas>
   );

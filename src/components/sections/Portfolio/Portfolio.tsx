@@ -182,6 +182,37 @@ export default function Portfolio({ active = false }: PortfolioProps) {
     setColorsHidden(false); // keep colour panel visible until Start Tour is clicked
   };
 
+  // ── Path recording ───────────────────────────────────────────────────────────
+  const [isRecording,  setIsRecording]  = useState(false);
+  const [recordedPath, setRecordedPath] = useState<{ x: number; z: number }[]>([]);
+  const recordBufRef = useRef<{ x: number; z: number }[]>([]);
+
+  const handleRecordPoint = useCallback((x: number, z: number) => {
+    recordBufRef.current.push({ x: parseFloat(x.toFixed(2)), z: parseFloat(z.toFixed(2)) });
+  }, []);
+
+  const handleToggleRecord = () => {
+    if (isRecording) {
+      setRecordedPath([...recordBufRef.current]);
+      setIsRecording(false);
+    } else {
+      recordBufRef.current = [];
+      setRecordedPath([]);
+      setIsRecording(true);
+    }
+  };
+
+  const handleDownloadPath = () => {
+    const json = JSON.stringify(recordedPath, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = "road-path.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const selectManual = () => {
     setMode("manual");
     setColorsHidden(false);
@@ -359,6 +390,8 @@ export default function Portfolio({ active = false }: PortfolioProps) {
             autopilotPaused={autopilotPaused}
             isManual={isManual}
             rccgUnlocked={rccgUnlocked}
+            isRecording={isRecording}
+            onRecordPoint={handleRecordPoint}
           />
         )}
       </div>
@@ -531,6 +564,28 @@ export default function Portfolio({ active = false }: PortfolioProps) {
           );
         })}
       </div>
+
+      {/* ── Record / Download controls (manual only) ── */}
+      {isManual && (
+        <div className={styles.recordControls}>
+          {!isRecording && recordedPath.length > 0 && (
+            <button
+              className={`${styles.downloadBtn} ${isDark ? styles.downloadBtnDark : styles.downloadBtnLight}`}
+              onClick={handleDownloadPath}
+              title={`Download ${recordedPath.length} recorded points as JSON`}
+            >
+              ⬇ Download Path
+            </button>
+          )}
+          <button
+            className={`${styles.recordBtn} ${isRecording ? styles.recordBtnActive : ""} ${isDark ? styles.recordBtnDark : styles.recordBtnLight}`}
+            onClick={handleToggleRecord}
+            title={isRecording ? "Stop recording" : "Record road path"}
+          >
+            {isRecording ? "⏹ Stop" : "⏺ Record"}
+          </button>
+        </div>
+      )}
 
       {/* ── Keyboard hint (manual only) ── */}
       {isManual && (
