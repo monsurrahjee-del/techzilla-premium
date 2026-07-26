@@ -189,13 +189,13 @@ function GiftCardDisplay({
           &#8592;
         </button>
 
-        <div style={{ position: "relative", maxWidth: 240, width: "100%" }}>
+        <div style={{ position: "relative", maxWidth: 200, width: "100%" }}>
           <PlayingCard
             componentId={`gift-card-${charIndex}`}
             textArray={["T", "Z"]}
             imageSrc={char.file}
             imageAlt={char.name}
-            componentWidth="240px"
+            componentWidth="200px"
             aspectRatio="9/16"
             imageHeightPercentage={55}
             verticalPadding="16px"
