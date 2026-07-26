@@ -11,13 +11,14 @@ export async function POST(req: Request) {
 
     const pass = process.env.GMAIL_APP_PASSWORD;
     if (!pass) {
-      // Log server-side but still return success so UX isn't broken
       console.error("[contact] GMAIL_APP_PASSWORD env var not set");
       return NextResponse.json({ success: true });
     }
 
     const transporter = nodemailer.createTransport({
-      service: "gmail",
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false, // STARTTLS — more reliable in serverless environments
       auth: {
         user: "techzilla.web@gmail.com",
         pass,
@@ -60,7 +61,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[contact] Failed to send email:", err);
-    return NextResponse.json({ error: "Failed to send" }, { status: 500 });
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("[contact] Failed to send email:", errMsg);
+    return NextResponse.json({ error: "Failed to send", detail: errMsg }, { status: 500 });
   }
 }

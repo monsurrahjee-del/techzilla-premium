@@ -13,7 +13,9 @@ export async function POST(req: Request) {
     }
 
     const transporter = nodemailer.createTransport({
-      service: "gmail",
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false, // STARTTLS — more reliable in serverless environments
       auth: {
         user: "techzilla.web@gmail.com",
         pass,
@@ -67,7 +69,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[gift] Failed to send notification:", err);
-    return NextResponse.json({ error: "Failed to send" }, { status: 500 });
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("[gift] Failed to send notification:", errMsg);
+    return NextResponse.json({ error: "Failed to send", detail: errMsg }, { status: 500 });
   }
 }
