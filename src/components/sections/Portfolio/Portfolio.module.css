@@ -812,22 +812,22 @@
 }
 
 .modeToggleLight {
-  background: rgba(20,20,60,0.08);
-  color: rgba(20,20,60,0.60);
-  box-shadow: 0 0 0 1px rgba(20,20,80,0.16), 0 2px 10px rgba(0,0,0,0.08);
+  background: #000;
+  color: rgba(255,255,255,0.80);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.18), 0 2px 10px rgba(0,0,0,0.18);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
 .modeToggleLight:hover {
-  background: rgba(20,20,60,0.15);
-  color: rgba(20,20,60,0.88);
+  background: #1a1a1a;
+  color: rgba(255,255,255,0.95);
 }
 
 /* ── Brake / Resume button ────────────────────────────────────────────────── */
 .brakeBtn {
   position: absolute;
   bottom: 82px;
-  right: 24px;
+  left: 24px;
   z-index: 20;
   display: flex;
   align-items: center;
@@ -878,24 +878,26 @@
 }
 
 .brakeBtnLight {
-  background: rgba(200, 30, 30, 0.12);
-  color: rgba(180, 20, 20, 0.90);
-  box-shadow: 0 0 0 1px rgba(200,30,30,0.28), 0 4px 14px rgba(150,0,0,0.15);
+  background: #000;
+  color: rgba(255, 120, 120, 0.95);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.2), 0 4px 14px rgba(0,0,0,0.18);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
 .brakeBtnLight:hover {
-  background: rgba(200, 30, 30, 0.22);
-  box-shadow: 0 0 0 1px rgba(200,30,30,0.42), 0 6px 18px rgba(150,0,0,0.22);
+  background: #1a1a1a;
+  color: #ff9090;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.28), 0 6px 18px rgba(0,0,0,0.22);
 }
-/* resume variant in light mode — green tint */
+/* resume variant in light mode — green tint, black background */
 .resumeBtn.brakeBtnLight {
-  background: rgba(20, 150, 70, 0.12);
-  color: rgba(10, 130, 60, 0.9);
-  box-shadow: 0 0 0 1px rgba(20,150,70,0.28), 0 4px 14px rgba(0,100,40,0.12);
+  background: #000;
+  color: rgba(80, 220, 130, 0.95);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.2), 0 4px 14px rgba(0,0,0,0.18);
 }
 .resumeBtn.brakeBtnLight:hover {
-  background: rgba(20, 150, 70, 0.22);
+  background: #1a1a1a;
+  color: #60e090;
 }
 
 /* ── Responsive ───────────────────────────────────────────────────────────── */
