@@ -593,6 +593,7 @@
 }
 
 .modeBtn {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -602,26 +603,39 @@
   border: 1.5px solid rgba(255,255,255,0.10);
   background: rgba(255,255,255,0.05);
   cursor: pointer;
-  /* Use only transform + opacity for GPU-composited transitions — avoids main-thread
-     painting and eliminates hover lag when a WebGL canvas is underneath. */
-  transition: transform 0.18s ease, opacity 0.15s ease;
+  /* Only transition GPU-composited properties to avoid paint lag over WebGL */
+  transition: transform 0.18s ease;
   text-align: center;
   will-change: transform;
-  transform: translateZ(0); /* promote to its own GPU layer from the start */
+  transform: translateZ(0);
   isolation: isolate;
 }
-.modeBtn:hover {
-  transform: translateY(-2px);
-  opacity: 0.9;
-}
-.modeBtn:active { transform: scale(0.97); }
 
-.modeBtnAuto:hover {
+/* Colored border glow rendered up-front on a composited layer.
+   Transitioning opacity instead of border-color/box-shadow avoids
+   main-thread painting and eliminates the hover lag entirely. */
+.modeBtn::after {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border-radius: 17px; /* 16px card radius + 1.5px border */
+  border: 1.5px solid transparent;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  pointer-events: none;
+  will-change: opacity;
+}
+
+.modeBtn:hover { transform: translateY(-2px); }
+.modeBtn:active { transform: scale(0.97); }
+.modeBtn:hover::after { opacity: 1; }
+
+.modeBtnAuto::after {
   border-color: rgba(100, 160, 255, 0.5);
   box-shadow: 0 0 0 1px rgba(100,160,255,0.2), 0 6px 24px rgba(80,120,255,0.15);
 }
 
-.modeBtnManual:hover {
+.modeBtnManual::after {
   border-color: rgba(180, 100, 255, 0.5);
   box-shadow: 0 0 0 1px rgba(180,100,255,0.2), 0 6px 24px rgba(160,80,255,0.15);
 }
