@@ -179,11 +179,11 @@ function GroundCircle({
         <meshBasicMaterial color={accent} transparent opacity={0.4} depthWrite={false} />
       </mesh>
 
-      {/* Glow light when near */}
-      {isNear && (
-        <pointLight position={[x, ROAD_Y + 4, z]} color={accent}
-          intensity={40} distance={28} decay={2} />
-      )}
+      {/* Glow light — always in scene so Three.js never recompiles shaders.
+          Intensity 0 when not near costs nothing; removing/adding a light
+          at runtime triggers a full shader recompile and drops a frame. */}
+      <pointLight position={[x, ROAD_Y + 4, z]} color={accent}
+        intensity={isNear ? 40 : 0} distance={28} decay={2} />
     </group>
   );
 }
