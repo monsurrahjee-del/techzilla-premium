@@ -249,10 +249,11 @@ export default function Portfolio({ active = false }: PortfolioProps) {
   };
 
   const handleAutoArrived = useCallback(() => {
-    // Defer via startTransition so the React re-render doesn't interrupt
-    // the Three.js frame that fired this callback
+    // Atomically set both autoPhase and nearIdx in the same transition so the
+    // project card appears instantly (no stale-state race between the two).
     startTransition(() => {
       setAutoPhase("arrived");
+      setNearIdx(autoTargetIdx);   // force-show the arrived station's card
       if (autoTargetIdx === UNLOCK_IDX) setRccgUnlocked(true);
     });
   }, [autoTargetIdx]);
@@ -277,8 +278,17 @@ export default function Portfolio({ active = false }: PortfolioProps) {
     if (at && !movedRef.current) setColorsHidden(false);
   }, [mode]);
 
+  const autoPhaseRef = useRef(autoPhase);
+  useEffect(() => { autoPhaseRef.current = autoPhase; }, [autoPhase]);
+
   const handleNear = useCallback((idx: number | null) => {
     nearIdxRef.current = idx;
+    // During auto-driving, suppress React state updates entirely.
+    // Passing near a station mid-drive must NOT show its project card, and the
+    // resulting re-render (which mounts a heavy card with image + CSS transition)
+    // drops a Three.js frame causing the visible pause/stutter.
+    // The project card is instead shown atomically in handleAutoArrived.
+    if (mode === "auto" && autoPhaseRef.current === "driving") return;
     // Defer the project-card re-render so it doesn't jank the Three.js frame
     startTransition(() => {
       setNearIdx(idx);
@@ -305,9 +315,16 @@ export default function Portfolio({ active = false }: PortfolioProps) {
     onPointerLeave: () => dpadRelease(key),
   });
 
-  const isDark          = theme === "dark";
-  const currentProject  = nearIdx !== null ? projects[nearIdx] : null;
-  const isManual        = mode === "manual";
+  const isDark      = theme === "dark";
+  const isManual    = mode === "manual";
+
+  // In auto mode: only show the project card after the car has actually arrived
+  // at the target station — never while passing near one mid-drive.
+  const currentProject = (() => {
+    if (nearIdx === null) return null;
+    if (mode === "auto" && (autoPhase !== "arrived" || nearIdx !== autoTargetIdx)) return null;
+    return projects[nearIdx];
+  })();
   const tourStarted     = autoPhase !== "idle";
 
   // Whether the color panel should be visible
