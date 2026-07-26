@@ -827,8 +827,7 @@
 .brakeBtn {
   position: absolute;
   bottom: 82px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 24px;
   z-index: 20;
   display: flex;
   align-items: center;
@@ -847,8 +846,8 @@
   -webkit-tap-highlight-color: transparent;
   will-change: transform;
 }
-.brakeBtn:hover  { transform: translateX(-50%) translateY(-2px); }
-.brakeBtn:active { transform: translateX(-50%) scale(0.96); }
+.brakeBtn:hover  { transform: translateY(-2px); }
+.brakeBtn:active { transform: scale(0.96); }
 
 .resumeBtn {
   /* slight visual difference so user knows this is "resume not brake" */
