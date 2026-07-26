@@ -502,21 +502,19 @@ const RECORDED_PATH: { x: number; z: number }[] = [
 // ── Road half-width — car must stay within this distance of RECORDED_PATH ─────
 // Extra clearance added because the manual recording may not perfectly track the
 // road centreline and the road is wider than the car.
-const ROAD_HALF_WIDTH    = 10;          // world units from nearest path point
+const ROAD_HALF_WIDTH    = 14;          // world units from nearest path point
 const ROAD_HALF_WIDTH_SQ = ROAD_HALF_WIDTH * ROAD_HALF_WIDTH;
 
-// Returns the nearest RECORDED_PATH index to (x, z), searching a window around
-// hintIdx for efficiency.  Also returns whether the position is on-road.
+// Scans the ENTIRE recorded path to find the true nearest point.
+// 2419 arithmetic ops per frame is negligible (no raycasting, no scene mesh).
+// A windowed search caused false blocks when the path looped near itself.
 function nearestPathPoint(
-  x: number, z: number, hintIdx: number,
+  x: number, z: number,
 ): { nearestIdx: number; onRoad: boolean } {
   const len = RECORDED_PATH.length;
-  const WINDOW = 200;
-  const start  = Math.max(0, hintIdx - WINDOW);
-  const end    = Math.min(len, hintIdx + WINDOW);
   let minSq = Infinity;
-  let nearestIdx = hintIdx;
-  for (let i = start; i < end; i++) {
+  let nearestIdx = 0;
+  for (let i = 0; i < len; i++) {
     const dx = x - RECORDED_PATH[i].x;
     const dz = z - RECORDED_PATH[i].z;
     const sq = dx * dx + dz * dz;
@@ -1133,9 +1131,7 @@ function Scene({
         x: clamp(newX, CITY_MIN_X, CITY_MAX_X),
         z: clamp(newZ, CITY_MIN_Z, CITY_MAX_Z),
       };
-      const { nearestIdx, onRoad } = nearestPathPoint(
-        clamped.x, clamped.z, nearestPathIdxRef.current,
-      );
+      const { nearestIdx, onRoad } = nearestPathPoint(clamped.x, clamped.z);
       nearestPathIdxRef.current = nearestIdx;
       if (onRoad) {
         posRef.current.x = clamped.x;
