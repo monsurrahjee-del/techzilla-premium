@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useMemo, Suspense } from "react";
+import { useRef, useEffect, useState, useMemo, Suspense, startTransition } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
@@ -398,6 +398,9 @@ function Scene({
 
   const [nearIdx,  setNearIdx]  = useState<number | null>(null);
   const [closeIdx, setCloseIdx] = useState<number | null>(null);
+  // Frame counter — proximity check runs every 2 frames (≈30 Hz) to avoid
+  // triggering React state updates every single Three.js frame (60 Hz).
+  const frameCountRef = useRef(0);
 
   // ── Save position to module-level vars when the Scene unmounts ────────────
   useEffect(() => {
@@ -691,28 +694,32 @@ function Scene({
     camLookRef.current.lerp(_lookTarget, alphaLook);
     state.camera.lookAt(camLookRef.current);
 
-    // ── Project proximity ─────────────────────────────────────────────────────
-    let nearest: number | null = null;
-    let nearestClose: number | null = null;
-    let minDist = Infinity;
-    let minClose = Infinity;
-    for (let i = 0; i < STATIONS.length; i++) {
-      // Skip the RCCG station (last) until it has been unlocked by visiting Zennyola
-      if (i === STATIONS.length - 1 && !rccgUnlocked) continue;
-      const dx   = posRef.current.x - STATIONS[i].x;
-      const dz   = posRef.current.z - STATIONS[i].z;
-      const dist = Math.sqrt(dx * dx + dz * dz);
-      if (dist < NEAR_DIST  && dist < minDist)  { minDist  = dist; nearest      = i; }
-      if (dist < CLOSE_DIST && dist < minClose) { minClose = dist; nearestClose = i; }
-    }
-    if (nearest !== curProjRef.current) {
-      curProjRef.current = nearest;
-      setNearIdx(nearest);
-      onNearProject(nearest);
-    }
-    if (nearestClose !== curCloseRef.current) {
-      curCloseRef.current = nearestClose;
-      setCloseIdx(nearestClose);
+    // ── Project proximity (runs every 2 frames ≈ 30 Hz) ──────────────────────
+    // Limiting to every other frame halves React state-update pressure from
+    // inside the Three.js render loop without any perceptible lag on card display.
+    frameCountRef.current++;
+    if (frameCountRef.current % 2 === 0) {
+      let nearest: number | null = null;
+      let nearestClose: number | null = null;
+      let minDist = Infinity;
+      let minClose = Infinity;
+      for (let i = 0; i < STATIONS.length; i++) {
+        if (i === STATIONS.length - 1 && !rccgUnlocked) continue;
+        const dx   = posRef.current.x - STATIONS[i].x;
+        const dz   = posRef.current.z - STATIONS[i].z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist < NEAR_DIST  && dist < minDist)  { minDist  = dist; nearest      = i; }
+        if (dist < CLOSE_DIST && dist < minClose) { minClose = dist; nearestClose = i; }
+      }
+      if (nearest !== curProjRef.current) {
+        curProjRef.current = nearest;
+        onNearProject(nearest);
+        startTransition(() => setNearIdx(nearest));
+      }
+      if (nearestClose !== curCloseRef.current) {
+        curCloseRef.current = nearestClose;
+        startTransition(() => setCloseIdx(nearestClose));
+      }
     }
 
     // ── Colour-panel boundary ─────────────────────────────────────────────────

@@ -612,8 +612,8 @@
 }
 
 /* Colored border glow rendered up-front on a composited layer.
-   Transitioning opacity instead of border-color/box-shadow avoids
-   main-thread painting and eliminates the hover lag entirely. */
+   transform:translateZ(0) forces immediate GPU layer creation at mount time
+   (not deferred until first hover). Transitioning only opacity — zero paint. */
 .modeBtn::after {
   content: '';
   position: absolute;
@@ -621,8 +621,9 @@
   border-radius: 17px; /* 16px card radius + 1.5px border */
   border: 1.5px solid transparent;
   opacity: 0;
-  transition: opacity 0.1s ease;
+  transition: opacity 0.05s linear;
   pointer-events: none;
+  transform: translateZ(0);
   will-change: opacity;
 }
 

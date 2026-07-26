@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, startTransition } from "react";
 import dynamic from "next/dynamic";
 import styles from "./Portfolio.module.css";
 import { projects } from "@/lib/projects";
@@ -97,8 +97,29 @@ export default function Portfolio({ active = false }: PortfolioProps) {
 
   const nearIdxRef = useRef<number | null>(null);
   const movedRef   = useRef(_portfolioMoved);
+  const sectionRef = useRef<HTMLElement>(null);
 
-  // ── Mount world as soon as section becomes active ─────────────────────────
+  // ── Pre-mount WebGL world when section approaches viewport ────────────────
+  // Fires ~300px before the section slides into view so Three.js initialises
+  // in the background, eliminating the scroll-in freeze.
+  useEffect(() => {
+    if (mounted) return;
+    const el = sectionRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setMounted(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "400px 0px 0px 0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [mounted]);
+
+  // Fallback: also mount when active fires (covers edge cases)
   useEffect(() => {
     if (active && !mounted) setMounted(true);
   }, [active, mounted]);
@@ -228,9 +249,12 @@ export default function Portfolio({ active = false }: PortfolioProps) {
   };
 
   const handleAutoArrived = useCallback(() => {
-    setAutoPhase("arrived");
-    // Auto mode: unlock RCCG only once the car actually stops at Zennyola
-    if (autoTargetIdx === UNLOCK_IDX) setRccgUnlocked(true);
+    // Defer via startTransition so the React re-render doesn't interrupt
+    // the Three.js frame that fired this callback
+    startTransition(() => {
+      setAutoPhase("arrived");
+      if (autoTargetIdx === UNLOCK_IDX) setRccgUnlocked(true);
+    });
   }, [autoTargetIdx]);
 
   // ── Hint: hide after first move (manual only) ─────────────────────────────
@@ -255,10 +279,11 @@ export default function Portfolio({ active = false }: PortfolioProps) {
 
   const handleNear = useCallback((idx: number | null) => {
     nearIdxRef.current = idx;
-    setNearIdx(idx);
-    // Manual mode only: unlock RCCG when car reaches Zennyola.
-    // Auto mode uses handleAutoArrived so it only fires after the car fully stops.
-    if (mode === 'manual' && idx === UNLOCK_IDX) setRccgUnlocked(true);
+    // Defer the project-card re-render so it doesn't jank the Three.js frame
+    startTransition(() => {
+      setNearIdx(idx);
+      if (mode === 'manual' && idx === UNLOCK_IDX) setRccgUnlocked(true);
+    });
   }, [mode]);
 
   // ── D-pad (manual only) ───────────────────────────────────────────────────
@@ -293,7 +318,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
   const showResume = mode === "auto" && tourStarted && autopilotPaused;
 
   return (
-    <section className={`${styles.section} ${isDark ? styles.dark : styles.light}`}>
+    <section ref={sectionRef} className={`${styles.section} ${isDark ? styles.dark : styles.light}`}>
       {/* topOffset pushes hamburger below the day/night toggle (top:22px + ~42px height) */}
       <SectionNav navItems={["About", "Service", "Contact"]} topOffset={74} proximityReveal />
 
