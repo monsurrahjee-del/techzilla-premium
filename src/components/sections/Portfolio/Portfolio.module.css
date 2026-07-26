@@ -528,10 +528,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 8, 0.72);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(0, 0, 8, 0.82);
+  /* No backdrop-filter — blurring a WebGL canvas is GPU-expensive and causes
+     1-2 s hover lag on the mode buttons. The darker background compensates. */
   animation: modalFadeIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  contain: layout style paint;
 }
 
 @keyframes modalFadeIn {
@@ -601,12 +602,17 @@
   border: 1.5px solid rgba(255,255,255,0.10);
   background: rgba(255,255,255,0.05);
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.18s ease, box-shadow 0.2s ease;
+  /* Use only transform + opacity for GPU-composited transitions — avoids main-thread
+     painting and eliminates hover lag when a WebGL canvas is underneath. */
+  transition: transform 0.18s ease, opacity 0.15s ease;
   text-align: center;
+  will-change: transform;
+  transform: translateZ(0); /* promote to its own GPU layer from the start */
+  isolation: isolate;
 }
 .modeBtn:hover {
-  background: rgba(255,255,255,0.09);
   transform: translateY(-2px);
+  opacity: 0.9;
 }
 .modeBtn:active { transform: scale(0.97); }
 

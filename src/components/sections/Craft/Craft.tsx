@@ -164,7 +164,7 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
         <div className={styles.bottomBar}>
           {/* Left */}
           <div className={styles.bottomLeft}>
-            <a href="mailto:hello@techzilla.dev" className="cursor-target">hello@techzilla.dev</a>
+            <a href="mailto:Techzilla.web@gmail.com" className="cursor-target">hello@techzilla.dev</a>
             <span>TECHZILLA &copy; 2026</span>
           </div>
 
