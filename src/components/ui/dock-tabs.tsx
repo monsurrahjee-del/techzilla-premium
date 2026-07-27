@@ -14,6 +14,7 @@ interface ServiceDockProps {
   items: DockServiceItem[];
   activeIndex: number;
   onSelect: (index: number) => void;
+  compact?: boolean;
 }
 
 function DockIcon({
@@ -21,11 +22,13 @@ function DockIcon({
   mouseX,
   isActive,
   onClick,
+  compact = false,
 }: {
   item: DockServiceItem;
   mouseX: ReturnType<typeof useMotionValue<number>>;
   isActive: boolean;
   onClick: () => void;
+  compact?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -34,7 +37,9 @@ function DockIcon({
     return val - bounds.x - bounds.width / 2;
   });
 
-  const sizeSync = useTransform(distance, [-150, 0, 150], [44, 68, 44]);
+  const restSize = compact ? 32 : 44;
+  const peakSize = compact ? 46 : 68;
+  const sizeSync = useTransform(distance, [-150, 0, 150], [restSize, peakSize, restSize]);
   const size = useSpring(sizeSync, { mass: 0.1, stiffness: 150, damping: 12 });
 
   const [isHovered, setIsHovered] = useState(false);
@@ -124,14 +129,14 @@ function DockIcon({
   );
 }
 
-export function ServiceDock({ items, activeIndex, onSelect }: ServiceDockProps) {
+export function ServiceDock({ items, activeIndex, onSelect, compact = false }: ServiceDockProps) {
   const mouseX = useMotionValue(Infinity);
 
   return (
     <motion.div
       onMouseMove={(e) => mouseX.set(e.pageX)}
       onMouseLeave={() => mouseX.set(Infinity)}
-      className="flex items-end gap-3 rounded-2xl px-4 pb-3 pt-2"
+      className={`flex items-end rounded-2xl ${compact ? "gap-2 px-3 pb-2 pt-1.5" : "gap-3 px-4 pb-3 pt-2"}`}
       style={{
         background: "rgba(10, 8, 18, 0.65)",
         backdropFilter: "blur(16px)",
@@ -149,6 +154,7 @@ export function ServiceDock({ items, activeIndex, onSelect }: ServiceDockProps) 
           mouseX={mouseX}
           isActive={activeIndex === index}
           onClick={() => onSelect(index)}
+          compact={compact}
         />
       ))}
     </motion.div>

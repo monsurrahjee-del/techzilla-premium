@@ -330,7 +330,7 @@ export default function Services({ active = false }: { active?: boolean }) {
         animate={{ opacity: active ? 1 : 0, y: active ? 0 : -14 }}
         transition={{ duration: 0.45, delay: 0.1 }}
       >
-        <ServiceDock items={DOCK_ITEMS} activeIndex={activeIndex} onSelect={setActiveIndex} />
+        <ServiceDock items={DOCK_ITEMS} activeIndex={activeIndex} onSelect={setActiveIndex} compact={isMobile} />
       </motion.div>
 
       {/* Counter — Bricolage Grotesque, not mono */}
