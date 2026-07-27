@@ -240,6 +240,14 @@
     opacity: 0.6;
   }
 
+  /* X (close) button: force white on black overlay for light-variant sections */
+  .toggle[data-variant="light"][aria-label="Close navigation"] {
+    color: #ffffff;
+  }
+  .toggle[data-variant="light"][aria-label="Close navigation"]:hover {
+    color: #ffffff;
+  }
+
   /* Backdrop not needed — the overlay already fills the whole screen */
   .backdrop { display: none; }
 }
