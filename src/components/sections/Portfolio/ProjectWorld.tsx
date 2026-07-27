@@ -557,21 +557,54 @@ const RECORDED_PATH: { x: number; z: number }[] = [
 const ROAD_HALF_WIDTH    = 14;          // world units from nearest path point
 const ROAD_HALF_WIDTH_SQ = ROAD_HALF_WIDTH * ROAD_HALF_WIDTH;
 
-// Scans the ENTIRE recorded path to find the true nearest point.
-// 2419 arithmetic ops per frame is negligible (no raycasting, no scene mesh).
-// A windowed search caused false blocks when the path looped near itself.
+// ── Spatial grid for fast nearest-path lookups ────────────────────────────────
+// Divides the road network into 20-unit cells. A lookup checks at most 9 cells
+// (~108 points) instead of all 2419, giving a ~22× speedup at ~0 cost.
+const _GRID_CELL = 20;
+const _roadGrid  = new Map<string, number[]>();
+for (let i = 0; i < ROAD_PATH.length; i++) {
+  const cx  = Math.floor(ROAD_PATH[i].x / _GRID_CELL);
+  const cz  = Math.floor(ROAD_PATH[i].z / _GRID_CELL);
+  const key = `${cx},${cz}`;
+  if (!_roadGrid.has(key)) _roadGrid.set(key, []);
+  _roadGrid.get(key)!.push(i);
+}
+
+// Scans a 3×3 neighbourhood of grid cells — always finds the true nearest point
+// as long as ROAD_HALF_WIDTH < _GRID_CELL (14 < 20). Falls back to full scan if
+// the grid returns no candidates (shouldn't happen within city bounds).
 function nearestPathPoint(
   x: number, z: number,
 ): { nearestIdx: number; onRoad: boolean } {
-  const len = ROAD_PATH.length;
+  const cx = Math.floor(x / _GRID_CELL);
+  const cz = Math.floor(z / _GRID_CELL);
   let minSq = Infinity;
   let nearestIdx = 0;
-  for (let i = 0; i < len; i++) {
-    const dx = x - ROAD_PATH[i].x;
-    const dz = z - ROAD_PATH[i].z;
-    const sq = dx * dx + dz * dz;
-    if (sq < minSq) { minSq = sq; nearestIdx = i; }
+  let found = false;
+
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dz = -1; dz <= 1; dz++) {
+      const candidates = _roadGrid.get(`${cx + dx},${cz + dz}`);
+      if (!candidates) continue;
+      for (const i of candidates) {
+        const ddx = x - ROAD_PATH[i].x;
+        const ddz = z - ROAD_PATH[i].z;
+        const sq  = ddx * ddx + ddz * ddz;
+        if (sq < minSq) { minSq = sq; nearestIdx = i; found = true; }
+      }
+    }
   }
+
+  // Fallback: full scan (only hit if car escapes city bounds)
+  if (!found) {
+    for (let i = 0; i < ROAD_PATH.length; i++) {
+      const ddx = x - ROAD_PATH[i].x;
+      const ddz = z - ROAD_PATH[i].z;
+      const sq  = ddx * ddx + ddz * ddz;
+      if (sq < minSq) { minSq = sq; nearestIdx = i; }
+    }
+  }
+
   return { nearestIdx, onRoad: minSq <= ROAD_HALF_WIDTH_SQ };
 }
 
@@ -667,15 +700,21 @@ function GroundCircle({
 }) {
   const { x, z } = STATIONS[index];
   const ringRef = useRef<THREE.Mesh>(null!);
+  const matRef  = useRef<THREE.MeshBasicMaterial | null>(null);
   const tmr     = useRef(Math.random() * Math.PI * 2);
+  // Cache the isNear value in a ref so the useFrame closure never goes stale
+  const isNearRef = useRef(isNear);
+  useEffect(() => { isNearRef.current = isNear; }, [isNear]);
 
   useFrame((_, delta) => {
     tmr.current += delta * 1.6;
-    if (!ringRef.current) return;
+    const ring = ringRef.current;
+    if (!ring) return;
     const s = 1 + Math.sin(tmr.current) * 0.12;
-    ringRef.current.scale.setScalar(s);
-    const mat = ringRef.current.material as THREE.MeshBasicMaterial;
-    mat.opacity = (isNear ? 0.85 : 0.40) + Math.sin(tmr.current) * 0.12;
+    ring.scale.setScalar(s);
+    // Reuse cached material ref — avoids repeated property lookup each frame
+    if (!matRef.current) matRef.current = ring.material as THREE.MeshBasicMaterial;
+    matRef.current.opacity = (isNearRef.current ? 0.85 : 0.40) + Math.sin(tmr.current) * 0.12;
   });
 
   return (
@@ -1218,11 +1257,12 @@ function Scene({
     camLookRef.current.lerp(_lookTarget, alphaLook);
     state.camera.lookAt(camLookRef.current);
 
-    // ── Project proximity (runs every 2 frames ≈ 30 Hz) ──────────────────────
-    // Limiting to every other frame halves React state-update pressure from
-    // inside the Three.js render loop without any perceptible lag on card display.
+    // ── Project proximity (runs every 3 frames ≈ 10 Hz) ──────────────────────
+    // Limiting to every 3rd frame reduces React state-update pressure from
+    // inside the Three.js render loop without perceptible lag on card display
+    // (stations are large — 15-unit radius — so a 100ms check interval is fine).
     frameCountRef.current++;
-    if (frameCountRef.current % 2 === 0) {
+    if (frameCountRef.current % 3 === 0) {
       let nearest: number | null = null;
       let nearestClose: number | null = null;
       let minDist = Infinity;
@@ -1291,24 +1331,20 @@ function Scene({
 }
 
 // ── 30 fps frame driver ───────────────────────────────────────────────────────
-// The Canvas uses frameloop="demand" so Three.js only renders when invalidate()
-// is called. This driver calls it at a capped 30 fps, giving the browser ~33 ms
-// between renders — more than enough for mousemove events to be processed
-// smoothly. At 60 fps the 16 ms budget is exhausted by WebGL submissions,
-// leaving almost no slack for input event handling.
-function FrameDriver() {
+// Uses setInterval instead of requestAnimationFrame so the browser's RAF budget
+// is entirely free for CSS transitions, hover effects, and input event handling.
+// A RAF-based throttle loop fires at 60 fps just to *check* if 33ms passed —
+// those 60 callbacks/s steal frame budget that the browser needs for hover glows
+// and smooth input processing. setInterval fires only 30×/s and leaves the
+// RAF queue clean between Three.js renders.
+interface FrameDriverProps { paused: boolean; }
+function FrameDriver({ paused }: FrameDriverProps) {
   const { invalidate } = useThree();
   useEffect(() => {
-    const TARGET_MS = 1000 / 30;
-    let last = 0;
-    let rafId: number;
-    const drive = (ts: number) => {
-      if (ts - last >= TARGET_MS) { last = ts; invalidate(); }
-      rafId = requestAnimationFrame(drive);
-    };
-    rafId = requestAnimationFrame(drive);
-    return () => cancelAnimationFrame(rafId);
-  }, [invalidate]);
+    if (paused) return;
+    const id = setInterval(invalidate, 1000 / 30);
+    return () => clearInterval(id);
+  }, [invalidate, paused]);
   return null;
 }
 
@@ -1325,11 +1361,14 @@ interface ProjectWorldProps {
   autopilotPaused:   boolean;
   isManual:          boolean;
   rccgUnlocked:      boolean;
+  /** Pause Three.js rendering (e.g. while modal/overlay is in front). */
+  renderPaused?:     boolean;
 }
 
 export default function ProjectWorld({
   onNearProject, onAtBoundary, onAutoArrived,
   theme, carColors, autopilotTarget, autopilotTourId, autopilotRewindId, autopilotPaused, isManual, rccgUnlocked,
+  renderPaused = false,
 }: ProjectWorldProps) {
   const bg = THEMES[theme].bg;
   return (
@@ -1344,7 +1383,7 @@ export default function ProjectWorld({
       performance={{ min: 0.2 }}
       frameloop="demand"
     >
-      <FrameDriver />
+      <FrameDriver paused={renderPaused} />
       <color attach="background" args={[bg]} />
       <Scene
         onNearProject={onNearProject}

@@ -359,6 +359,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
             autopilotPaused={autopilotPaused}
             isManual={isManual}
             rccgUnlocked={rccgUnlocked}
+            renderPaused={mode === "modal" || mode === "preloading"}
           />
         )}
       </div>

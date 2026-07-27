@@ -613,7 +613,8 @@
 
 /* Colored border glow rendered up-front on a composited layer.
    transform:translateZ(0) forces immediate GPU layer creation at mount time
-   (not deferred until first hover). Transitioning only opacity — zero paint. */
+   (not deferred until first hover). No transition — opacity is toggled
+   instantly so hover feels synchronous even under WebGL frame pressure. */
 .modeBtn::after {
   content: '';
   position: absolute;
@@ -621,7 +622,10 @@
   border-radius: 17px; /* 16px card radius + 1.5px border */
   border: 1.5px solid transparent;
   opacity: 0;
-  transition: opacity 0.05s linear;
+  /* No transition: the FrameDriver is paused while the modal is visible so
+     the GPU is idle, but an explicit 0s transition guarantees instant paint
+     regardless of frame timing. */
+  transition: none;
   pointer-events: none;
   transform: translateZ(0);
   will-change: opacity;
