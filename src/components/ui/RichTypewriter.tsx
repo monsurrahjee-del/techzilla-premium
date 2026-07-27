@@ -6,7 +6,10 @@ import styles from "./RichTypewriter.module.css";
 export type RichSegment =
   | { type: "plain"; text: string }
   | { type: "highlight"; text: string }
-  | { type: "link"; text: string; href: string };
+  | { type: "link"; text: string; href: string }
+  /** Zero-width segment — renders as display:none on desktop,
+   *  display:block on mobile (≤640px), forcing a line break. */
+  | { type: "mobileBr" };
 
 interface RichTypewriterProps {
   segments: RichSegment[];
@@ -30,6 +33,13 @@ function RichContent({
     <>
       {segments.map((seg, i) => {
         if (remaining <= 0) return null;
+
+        // Zero-width segment: no chars to consume — render immediately when reached.
+        // display:none on desktop, display:block on mobile → forces a line break.
+        if (seg.type === "mobileBr") {
+          return <span key={i} className={styles.mobileBr} aria-hidden="true" />;
+        }
+
         const visible = Math.min(remaining, seg.text.length);
         remaining -= visible;
         const text = seg.text.slice(0, visible);
@@ -81,7 +91,8 @@ export default function RichTypewriter({
   onComplete,
   cursorCharacter = "|",
 }: RichTypewriterProps) {
-  const totalChars = segments.reduce((n, s) => n + s.text.length, 0);
+  // mobileBr segments have no text — guard with "text" in s
+  const totalChars = segments.reduce((n, s) => n + ("text" in s ? s.text.length : 0), 0);
 
   const [charCount, setCharCount] = useState(0);
   const [done, setDone] = useState(false);

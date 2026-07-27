@@ -29,6 +29,18 @@
     0 0 40px rgba(82, 39, 255, 0.3);
 }
 
+/* ── Mobile-only line-break helper ── */
+/* Hidden on desktop/tablet — becomes block on mobile to force a new line */
+.mobileBr {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .mobileBr {
+    display: block;
+  }
+}
+
 /* ── Blinking cursor ── */
 .cursor {
   display: inline-block;

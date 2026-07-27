@@ -26,14 +26,17 @@ function useClock(spanRef: React.RefObject<HTMLSpanElement | null>) {
 }
 
 // ── Rich text segments for the sub paragraph ──────────────────────────────────
-// "\n" in a plain segment becomes <br /> — three deliberate lines (PC):
-//  1 — We're building Techzilla Premium™, and have previously helped,
+// "\n" in a plain segment becomes <br /> — three deliberate lines (desktop):
+//  1 — We're building Techzilla Premium™, and have previously helped
 //  2 — built amazing projects including Party Place & Rentals, YCTMFB,
 //  3 — OGUNCCIMA, YCT, RCCG, Maser Global Travels, and MaleteHostels.
+// On mobile a "mobileBr" segment forces a 4th line:
+//  3 — OGUNCCIMA, YCT, RCCG, Maser Global Travels,
+//  4 — and MaleteHostels.
 const SUB_SEGMENTS: RichSegment[] = [
   { type: "plain",     text: "We\u2019re building " },
   { type: "highlight", text: "Techzilla Premium\u2122" },
-  { type: "plain",     text: ", and have previously helped,\n" },
+  { type: "plain",     text: ", and have previously helped\n" },
   { type: "plain",     text: "built amazing projects including " },
   { type: "link",      text: "Party Place \u0026 Rentals", href: "https://partyplaceandrentals.com/" },
   { type: "plain",     text: ", " },
@@ -46,7 +49,9 @@ const SUB_SEGMENTS: RichSegment[] = [
   { type: "link",      text: "RCCG",                 href: "https://rccglivingwordforney.org/" },
   { type: "plain",     text: ", " },
   { type: "link",      text: "Maser Global Travels", href: "https://maser-global-travels.vercel.app/" },
-  { type: "plain",     text: ", and " },
+  { type: "plain",     text: "," },
+  { type: "mobileBr" },
+  { type: "plain",     text: " and " },
   { type: "link",      text: "MaleteHostels",        href: "https://malete-hostels.vercel.app/" },
   { type: "plain",     text: "." },
 ];
