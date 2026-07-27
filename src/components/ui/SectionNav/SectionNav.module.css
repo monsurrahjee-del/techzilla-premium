@@ -166,45 +166,69 @@
 @media (max-width: 640px) {
   .toggle { right: 14px; }
 
-  /* Stack the three regions vertically so everything fits */
+  /* ── Full-screen overlay — mirrors the hero mobile menu exactly ── */
   .navBar {
+    position: fixed;
+    inset: 0;
     flex-direction: column;
-    align-items: flex-start;
+    justify-content: flex-start;
+    align-items: stretch;
     gap: 0;
-    padding: 20px 6vw 20px;
+    padding: 0;
+    border-bottom: none;
+    background: #000000;
   }
 
-  /* Logo row — full width, bottom border as divider */
+  /* TECHZILLA logo row at the top */
   .navLeft {
-    width: 100%;
-    padding-bottom: 14px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 28px 5vw 20px;
+    flex-shrink: 0;
   }
 
-  /* Nav links — un-hide (display:none from the ≤900px rule) and stack */
+  /* Keep logo white even in light-variant sections */
+  .navBar[data-variant="light"] .navLogo {
+    color: #ffffff;
+  }
+
+  /* Big stacked nav links — same size as hero */
   .navCenter {
     display: flex;
+    flex: 1;
     flex-direction: column;
+    justify-content: center;
     align-items: flex-start;
-    gap: 0;
-    width: 100%;
-    padding: 6px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    gap: 2px;
+    padding: 0 5vw;
   }
 
   .navLink {
+    font-size: clamp(2rem, 10.5vw, 3.8rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #ffffff;
+    line-height: 1.05;
+    padding: 4px 0;
     width: 100%;
-    padding: 10px 0;
-    font-size: 13px;
-    letter-spacing: 0.16em;
+    text-align: left;
   }
 
-  /* Right controls — wrap so THEME / SOUND / clock never overflow */
+  .navLink:hover { color: #ffffff; opacity: 0.6; }
+
+  /* Bottom bar — THEME / SOUND / clock */
   .navRight {
-    display: flex;
+    flex-shrink: 0;
     flex-wrap: wrap;
-    gap: 14px 20px;
-    width: 100%;
-    padding-top: 14px;
+    align-items: center;
+    gap: 18px;
+    padding: 14px 5vw 28px;
+    border-top: 1px solid rgba(255, 255, 255, 0.09);
+    color: rgba(255, 255, 255, 0.5);
   }
+
+  .navBar[data-variant="light"] .navToggle {
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  /* Backdrop not needed — the overlay already fills the whole screen */
+  .backdrop { display: none; }
 }
