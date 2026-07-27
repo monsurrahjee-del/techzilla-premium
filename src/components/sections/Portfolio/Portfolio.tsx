@@ -95,6 +95,14 @@ export default function Portfolio({ active = false }: PortfolioProps) {
     glassOpacity: GLASS_COLORS[glassIdx].opacity,
   };
 
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 767);
+    check();
+    window.addEventListener("resize", check, { passive: true });
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   const nearIdxRef = useRef<number | null>(null);
   const movedRef   = useRef(_portfolioMoved);
   const sectionRef = useRef<HTMLElement>(null);
@@ -381,8 +389,14 @@ export default function Portfolio({ active = false }: PortfolioProps) {
       {mode === "modal" && (
         <div className={styles.modalBackdrop}>
           <div className={`${styles.modal} ${isDark ? styles.modalDark : styles.modalLight}`}>
-            <h3 className={styles.modalTitle}>How do you want to explore?</h3>
-            <p className={styles.modalSub}>Choose how to navigate through our projects</p>
+            <h3 className={styles.modalTitle}>
+              {isMobile ? "Explore Our Projects" : "How do you want to explore?"}
+            </h3>
+            <p className={styles.modalSub}>
+              {isMobile
+                ? "The car drives itself to each project. Tap Start Tour, then use the arrows to move between stops."
+                : "Choose how to navigate through our projects"}
+            </p>
             <div className={styles.modalOptions}>
               <button
                 className={`${styles.modeBtn} ${styles.modeBtnAuto}`}
@@ -396,18 +410,20 @@ export default function Portfolio({ active = false }: PortfolioProps) {
                   The car drives itself to each project. Just click <em>Start Tour</em> and use the arrows.
                 </span>
               </button>
-              <button
-                className={`${styles.modeBtn} ${styles.modeBtnManual}`}
-                onClick={selectManual}
-                onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.setProperty("--glow-op", "1")}
-                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.setProperty("--glow-op", "0.0001")}
-              >
-                <span className={styles.modeBtnIcon}>🕹️</span>
-                <span className={styles.modeBtnLabel}>Manual</span>
-                <span className={styles.modeBtnDesc}>
-                  You drive the car yourself using arrow keys or the on-screen D-pad.
-                </span>
-              </button>
+              {!isMobile && (
+                <button
+                  className={`${styles.modeBtn} ${styles.modeBtnManual}`}
+                  onClick={selectManual}
+                  onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.setProperty("--glow-op", "1")}
+                  onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.setProperty("--glow-op", "0.0001")}
+                >
+                  <span className={styles.modeBtnIcon}>🕹️</span>
+                  <span className={styles.modeBtnLabel}>Manual</span>
+                  <span className={styles.modeBtnDesc}>
+                    You drive the car yourself using arrow keys or the on-screen D-pad.
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -650,7 +666,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
       )}
 
       {/* ── Mode toggle pill ── */}
-      {mode === "auto" && (
+      {mode === "auto" && !isMobile && (
         <button
           className={`${styles.modeToggle} ${isDark ? styles.modeToggleDark : styles.modeToggleLight}`}
           onClick={switchToManual}
