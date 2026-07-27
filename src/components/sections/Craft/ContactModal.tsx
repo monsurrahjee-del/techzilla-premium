@@ -50,7 +50,7 @@ export default function ContactModal({ onClose }: ContactModalProps) {
   return (
     <AnimatePresence>
       <motion.div
-        className={styles.modalOverlay}
+        className={`${styles.modalOverlay} ${styles.contactOverlay}`}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
