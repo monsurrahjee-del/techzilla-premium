@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useMemo, Suspense, startTransition } from "react";
+import { useRef, useEffect, useMemo, Suspense } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
@@ -561,11 +561,13 @@ const ROAD_HALF_WIDTH_SQ = ROAD_HALF_WIDTH * ROAD_HALF_WIDTH;
 // Divides the road network into 20-unit cells. A lookup checks at most 9 cells
 // (~108 points) instead of all 2419, giving a ~22× speedup at ~0 cost.
 const _GRID_CELL = 20;
-const _roadGrid  = new Map<string, number[]>();
+// Integer key: (cx + 100) * 1000 + (cz + 100) — collision-free for the city bounds.
+// Avoids creating 9 new strings per frame in the 3×3 grid scan.
+const _roadGrid  = new Map<number, number[]>();
 for (let i = 0; i < ROAD_PATH.length; i++) {
   const cx  = Math.floor(ROAD_PATH[i].x / _GRID_CELL);
   const cz  = Math.floor(ROAD_PATH[i].z / _GRID_CELL);
-  const key = `${cx},${cz}`;
+  const key = (cx + 100) * 1000 + (cz + 100);
   if (!_roadGrid.has(key)) _roadGrid.set(key, []);
   _roadGrid.get(key)!.push(i);
 }
@@ -584,7 +586,7 @@ function nearestPathPoint(
 
   for (let dx = -1; dx <= 1; dx++) {
     for (let dz = -1; dz <= 1; dz++) {
-      const candidates = _roadGrid.get(`${cx + dx},${cz + dz}`);
+      const candidates = _roadGrid.get((cx + dx + 100) * 1000 + (cz + dz + 100));
       if (!candidates) continue;
       for (const i of candidates) {
         const ddx = x - ROAD_PATH[i].x;
@@ -687,30 +689,43 @@ function CityModel() {
 // A single shared loop cuts that to 1 dispatch per frame and lets the JS
 // engine optimise the inner for-loop — no per-station hook overhead at all.
 interface GroundCirclesProps {
-  nearIdx:      number | null;
+  // Pass the ref directly so useFrame reads curProjRef.current without a React
+  // re-render every time the nearest station changes (saves one Scene reconcile
+  // + all child reconciles per station crossing).
+  curProjRef:   { current: number | null };
   rccgUnlocked: boolean;
 }
-function GroundCircles({ nearIdx, rccgUnlocked }: GroundCirclesProps) {
-  const count    = projects.length;
-  const ringRefs = useRef<(THREE.Mesh | null)[]>(Array(count).fill(null));
-  const matRefs  = useRef<(THREE.MeshBasicMaterial | null)[]>(Array(count).fill(null));
-  const tmrs     = useRef<number[]>(projects.map(() => Math.random() * Math.PI * 2));
-  // Keep nearIdx in a ref so the useFrame closure never reads a stale value
-  const nearIdxRef = useRef(nearIdx);
-  useEffect(() => { nearIdxRef.current = nearIdx; }, [nearIdx]);
+function GroundCircles({ curProjRef, rccgUnlocked }: GroundCirclesProps) {
+  const count       = projects.length;
+  const ringRefs    = useRef<(THREE.Mesh | null)[]>(Array(count).fill(null));
+  const matRefs     = useRef<(THREE.MeshBasicMaterial | null)[]>(Array(count).fill(null));
+  // Refs for imperatively-controlled filled circles and point lights, so their
+  // opacity/intensity can be updated in useFrame without triggering re-renders.
+  const fillMatRefs = useRef<(THREE.MeshBasicMaterial | null)[]>(Array(count).fill(null));
+  const lightRefs   = useRef<(THREE.PointLight | null)[]>(Array(count).fill(null));
+  const tmrs        = useRef<number[]>(projects.map(() => Math.random() * Math.PI * 2));
 
   useFrame((_, delta) => {
-    const dt = delta * 1.6;
+    const dt      = delta * 1.6;
+    const nearIdx = curProjRef.current;
     for (let i = 0; i < count; i++) {
       const ring = ringRefs.current[i];
       if (!ring) continue;
       tmrs.current[i] += dt;
-      const t = tmrs.current[i];
-      const s = 1 + Math.sin(t) * 0.12;
+      const t    = tmrs.current[i];
+      const sinT = Math.sin(t); // computed once; reused for scale, ring opacity, fill opacity
+      const s    = 1 + sinT * 0.12;
       ring.scale.setScalar(s);
+      // Ring material
       if (!matRefs.current[i]) matRefs.current[i] = ring.material as THREE.MeshBasicMaterial;
       const mat = matRefs.current[i];
-      if (mat) mat.opacity = (nearIdxRef.current === i ? 0.85 : 0.40) + Math.sin(t) * 0.12;
+      if (mat) mat.opacity = (nearIdx === i ? 0.85 : 0.40) + sinT * 0.12;
+      // Filled circle material — imperative so JSX never re-renders on nearIdx change
+      const fillMat = fillMatRefs.current[i];
+      if (fillMat) fillMat.opacity = nearIdx === i ? 0.50 : 0.18;
+      // Point light intensity — imperative, same reason
+      const light = lightRefs.current[i];
+      if (light) light.intensity = nearIdx === i ? 40 : 0;
     }
   });
 
@@ -719,14 +734,14 @@ function GroundCircles({ nearIdx, rccgUnlocked }: GroundCirclesProps) {
       {projects.map((p, i) => {
         if (i === count - 1 && !rccgUnlocked) return null;
         const { x, z } = STATIONS[i];
-        const isNear = nearIdx === i;
         return (
           <group key={i}>
-            {/* Filled circle */}
+            {/* Filled circle — opacity controlled imperatively in useFrame */}
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x, ROAD_Y + 0.01, z]}>
               <circleGeometry args={[3.0, 24]} />
-              <meshBasicMaterial color={p.accent} transparent
-                opacity={isNear ? 0.50 : 0.18} depthWrite={false} />
+              <meshBasicMaterial
+                ref={(el: THREE.MeshBasicMaterial | null) => { fillMatRefs.current[i] = el; }}
+                color={p.accent} transparent opacity={0.18} depthWrite={false} />
             </mesh>
             {/* Pulsing outer ring */}
             <mesh
@@ -738,10 +753,12 @@ function GroundCircles({ nearIdx, rccgUnlocked }: GroundCirclesProps) {
               <meshBasicMaterial color={p.accent} transparent opacity={0.4} depthWrite={false} />
             </mesh>
             {/* Glow light — always in scene so Three.js never recompiles shaders.
-                Intensity 0 when not near costs nothing; removing/adding a light
-                at runtime triggers a full shader recompile and drops a frame. */}
-            <pointLight position={[x, ROAD_Y + 4, z]} color={p.accent}
-              intensity={isNear ? 40 : 0} distance={28} decay={2} />
+                Intensity controlled imperatively in useFrame; removing/adding a
+                light at runtime triggers a full shader recompile. */}
+            <pointLight
+              ref={(el: THREE.PointLight | null) => { lightRefs.current[i] = el; }}
+              position={[x, ROAD_Y + 4, z]} color={p.accent}
+              intensity={0} distance={28} decay={2} />
           </group>
         );
       })}
@@ -864,9 +881,11 @@ const STEER_SPD   = 1.8, MAX_STEER  = 0.55;
 const TURN_RAD    = 20,  MOV_SCALE  = 0.12;
 // Stop when the car centre is within this many units of the station centre.
 // Must be < circle radius (3.0) so the car visibly stops inside the ring.
-const ARRIVE_DIST   = 2.5;
-const NEAR_DIST     = 15;
-const CLOSE_DIST    = 30;
+const ARRIVE_DIST    = 2.5;
+const NEAR_DIST      = 15;
+const NEAR_DIST_SQ   = NEAR_DIST  * NEAR_DIST;
+const CLOSE_DIST     = 30;
+const CLOSE_DIST_SQ  = CLOSE_DIST * CLOSE_DIST;
 // Advance to the next waypoint once the car is this close to it.
 // Smaller = car hugs path more tightly = station positions are reliably hit.
 const WP_REACH_DIST = 1.5;
@@ -950,7 +969,6 @@ function Scene({
     initPos.x, ROAD_Y + 0.4, initPos.z,
   ));
   const curProjRef   = useRef<number | null>(null);
-  const curCloseRef  = useRef<number | null>(null);
   const atBoundRef   = useRef(false);
   const arrivedRef   = useRef(false);
   const isReversingRef = useRef(false);   // true while driving backwards (Prev pressed)
@@ -963,9 +981,7 @@ function Scene({
   // position on the initial autopilotTourId effect (tourId = 0 on first mount).
   const isFirstMount = useRef(true);
 
-  const [nearIdx,  setNearIdx]  = useState<number | null>(null);
-  const [closeIdx, setCloseIdx] = useState<number | null>(null);
-  // Frame counter — proximity check runs every 2 frames (≈30 Hz) to avoid
+  // Frame counter — proximity check runs every 5 frames (≈12 Hz) to avoid
   // triggering React state updates every single Three.js frame (60 Hz).
   const frameCountRef = useRef(0);
 
@@ -1267,40 +1283,43 @@ function Scene({
       camHeight,
       posRef.current.z + Math.cos(carOrientRef.current) * camDist,
     );
+    _lookTarget.set(posRef.current.x, ROAD_Y + 0.4, posRef.current.z);
+
     const alphaPos  = 1 - Math.exp(-10 * dt);
     const alphaLook = 1 - Math.exp(-12 * dt);
-    camPosRef.current.lerp(_camTarget, alphaPos);
-    state.camera.position.copy(camPosRef.current);
-    _lookTarget.set(posRef.current.x, ROAD_Y + 0.4, posRef.current.z);
-    camLookRef.current.lerp(_lookTarget, alphaLook);
-    state.camera.lookAt(camLookRef.current);
 
-    // ── Project proximity (runs every 3 frames ≈ 10 Hz) ──────────────────────
-    // Limiting to every 3rd frame reduces React state-update pressure from
-    // inside the Three.js render loop without perceptible lag on card display
-    // (stations are large — 15-unit radius — so a 100ms check interval is fine).
+    // Convergence guard: skip lerp when the camera is already within ε of the
+    // target. The exponential lerp never reaches exactly zero, so without this
+    // guard the camera makes sub-pixel jitter movements every frame when the
+    // car is stationary, causing the GPU to composite a new frame needlessly.
+    const CAM_EPS_SQ = 1e-6; // ~0.001 world-unit threshold, squared
+    if (camPosRef.current.distanceToSquared(_camTarget) > CAM_EPS_SQ) {
+      camPosRef.current.lerp(_camTarget, alphaPos);
+      state.camera.position.copy(camPosRef.current);
+    }
+    if (camLookRef.current.distanceToSquared(_lookTarget) > CAM_EPS_SQ) {
+      camLookRef.current.lerp(_lookTarget, alphaLook);
+      state.camera.lookAt(camLookRef.current);
+    }
+
+    // ── Project proximity (runs every 5 frames ≈ 12 Hz) ──────────────────────
+    // Squared distances avoid Math.sqrt on every station every frame.
+    // No React state is updated here — curProjRef is a plain ref that GroundCircles
+    // reads directly in its own useFrame, eliminating Scene re-renders entirely.
     frameCountRef.current++;
     if (frameCountRef.current % 5 === 0) {
       let nearest: number | null = null;
-      let nearestClose: number | null = null;
-      let minDist = Infinity;
-      let minClose = Infinity;
+      let minDistSq = Infinity;
       for (let i = 0; i < STATIONS.length; i++) {
         if (i === STATIONS.length - 1 && !rccgUnlocked) continue;
-        const dx   = posRef.current.x - STATIONS[i].x;
-        const dz   = posRef.current.z - STATIONS[i].z;
-        const dist = Math.sqrt(dx * dx + dz * dz);
-        if (dist < NEAR_DIST  && dist < minDist)  { minDist  = dist; nearest      = i; }
-        if (dist < CLOSE_DIST && dist < minClose) { minClose = dist; nearestClose = i; }
+        const dx     = posRef.current.x - STATIONS[i].x;
+        const dz     = posRef.current.z - STATIONS[i].z;
+        const distSq = dx * dx + dz * dz;
+        if (distSq < NEAR_DIST_SQ && distSq < minDistSq) { minDistSq = distSq; nearest = i; }
       }
       if (nearest !== curProjRef.current) {
         curProjRef.current = nearest;
         onNearProject(nearest);
-        startTransition(() => setNearIdx(nearest));
-      }
-      if (nearestClose !== curCloseRef.current) {
-        curCloseRef.current = nearestClose;
-        startTransition(() => setCloseIdx(nearestClose));
       }
     }
 
@@ -1326,7 +1345,7 @@ function Scene({
 
       <Suspense fallback={null}><CityModel /></Suspense>
 
-      <GroundCircles nearIdx={nearIdx} rccgUnlocked={rccgUnlocked} />
+      <GroundCircles curProjRef={curProjRef} rccgUnlocked={rccgUnlocked} />
 
       <Suspense fallback={null}>
         <Car carRef={carRef} colors={carColors} theme={theme} />
