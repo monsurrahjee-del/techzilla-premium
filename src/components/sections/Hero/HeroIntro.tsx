@@ -30,8 +30,9 @@ export default function HeroIntro() {
         transition={{ duration: 0.85, delay: 0.55, ease: [0.22, 1, 0.36, 1] }}
       >
         <span className={styles.bioHighlight}>
-          We&apos;re Techzilla — a software studio building scalable systems,
-          polished interfaces, and AI-powered tools. Fast code. Lasting products.
+          We&apos;re Techzilla — a software studio crafting scalable systems,
+          polished interfaces, and AI-powered tools for ambitious teams. We move
+          fast, write clean code, and ship things that last.
         </span>
       </motion.p>
     </div>
