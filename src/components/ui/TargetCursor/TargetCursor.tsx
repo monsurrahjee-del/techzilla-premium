@@ -281,11 +281,16 @@ const TargetCursor = ({
 
     window.addEventListener('mouseover', enterHandler as EventListener, { passive: true });
 
-    // ── OS cursor override: Chess + Portfolio pages ────────────────────────
+    // ── OS cursor override: Chess + Portfolio pages + Hero dark theme ─────────
     // globals.css has `* { cursor: none }` so we need !important to win.
+    // Hero dark theme (ThemeABuild) runs a 60fps rAF loop for the iridescent
+    // text effect. Running the TargetCursor on top of it competes for the
+    // compositor thread and makes the mouse feel sluggish — use the OS cursor
+    // for that theme instead.
     const OS_STYLE_ID = 'tz-cursor-os-override';
     let chessIsActive     = false;
     let portfolioIsActive = false;
+    let heroDarkIsActive  = false;
 
     const applyOsCursor = () => {
       if (!document.getElementById(OS_STYLE_ID)) {
@@ -298,7 +303,7 @@ const TargetCursor = ({
     };
     const removeOsCursor = () => {
       // Only restore the custom cursor when no section needs the OS override.
-      if (chessIsActive || portfolioIsActive) return;
+      if (chessIsActive || portfolioIsActive || heroDarkIsActive) return;
       document.getElementById(OS_STYLE_ID)?.remove();
       if (cursorRef.current) cursorRef.current.style.visibility = 'visible';
     };
@@ -311,9 +316,14 @@ const TargetCursor = ({
       portfolioIsActive = (e as CustomEvent<{ active: boolean }>).detail.active;
       portfolioIsActive ? applyOsCursor() : removeOsCursor();
     };
+    const onHeroThemeChange = (e: Event) => {
+      heroDarkIsActive = (e as CustomEvent<{ theme: string }>).detail.theme === 'dark';
+      heroDarkIsActive ? applyOsCursor() : removeOsCursor();
+    };
 
     window.addEventListener('chess-reveal-mode',       onChessMode);
     window.addEventListener('portfolio-section-active', onPortfolioActive);
+    window.addEventListener('hero-theme-change',        onHeroThemeChange);
 
     // ── Cleanup ────────────────────────────────────────────────────────────
     return () => {
@@ -330,6 +340,7 @@ const TargetCursor = ({
       window.removeEventListener('mouseup', mouseUpHandler);
       window.removeEventListener('chess-reveal-mode',       onChessMode);
       window.removeEventListener('portfolio-section-active', onPortfolioActive);
+      window.removeEventListener('hero-theme-change',        onHeroThemeChange);
       document.getElementById(OS_STYLE_ID)?.remove();
 
       if (activeTarget) {
