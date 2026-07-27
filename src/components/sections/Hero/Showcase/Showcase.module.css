@@ -802,20 +802,30 @@ z-index:8;
 
 }
 
-/* ── mobile: much shorter browser frame ── */
+/* ── mobile: proportional browser frame ── */
 @media (max-width: 768px) {
+  /* Use svh-based height so the frame scales with the phone's actual
+     visible viewport height — tall phones (iPhone 14, Pro Max, etc.)
+     get a taller showcase, filling more of the screen and matching
+     the proportional feel of iPhone SE. */
   .browser {
-    aspect-ratio: 16 / 6;
+    aspect-ratio: unset;
+    height: clamp(118px, 19svh, 190px);
     border-radius: 18px;
   }
   .frameViewport {
-    aspect-ratio: 16 / 6;
+    aspect-ratio: unset;
+    /* viewport height minus the header strip (~46px) */
+    height: calc(clamp(118px, 19svh, 190px) - 46px);
   }
   .frameHeader {
-    padding: 14px 16px;
+    padding: 12px 16px;
+    height: 46px;
+    flex-shrink: 0;
+    box-sizing: border-box;
   }
   .showcase {
-    margin: 10px auto 12px;
+    margin: 8px auto 10px;
     width: 100%;
   }
 }

@@ -697,5 +697,8 @@
   .socials a { font-size: 0.65rem; }
   .socialsRow2 a { font-size: 0.62rem; }
   .modal, .giftModal { padding: 28px 20px; }
-  .craftTitle { font-size: clamp(2rem, 10vw, 4rem); }
+  /* Tighter vw cap so wider phones (430px) don't render the title
+     noticeably larger than SE (375px).  clamp floor keeps it readable
+     on the narrowest devices. */
+  .craftTitle { font-size: clamp(2rem, 9vw, 3.2rem); }
 }

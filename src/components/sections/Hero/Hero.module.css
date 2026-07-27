@@ -2065,3 +2065,66 @@ font-size:clamp(72px,18vw,140px);
     bottom: 0 !important;
   }
 }
+
+/* ============================================================
+   UNIVERSAL MOBILE FIXES
+   Goal: every phone (360-430px wide, 640-950px tall) looks
+   identical to iPhone SE.  Touch nothing above 768px.
+   ============================================================ */
+
+@media (max-width: 768px) {
+  /* 1. Hero fills its absolute-positioned parent layer (heroLayer) at
+        exactly 100vh — removes the svh vs vh mismatch that could leave
+        a gap at the bottom on some phones or clip content on others. */
+  .hero {
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+
+  /* 2. Vertically center the two grid rows (headline + showcase block)
+        inside the available space.  On a short phone (SE) the content
+        already fills most of the screen; on a tall phone it stays
+        comfortably centred rather than bunching at the top. */
+  .heroContent {
+    align-content: center !important;
+    /* 0 top padding — centering handles vertical rhythm.
+       Bottom pad = space for metaBar + breathing room; grows slightly
+       on taller screens so it scales proportionally. */
+    padding-top: 0 !important;
+    padding-bottom: clamp(52px, 9svh, 96px) !important;
+    /* Gap between headline column and showcase/bio column — grows with
+       viewport height so tall phones don't feel cramped OR empty. */
+    gap: clamp(14px, 3.8svh, 44px) 0 !important;
+  }
+
+  /* 3. Headline font size: cap the vw coefficient so a 430-px phone
+        renders the same line-breaks as SE.  The three headline lines
+        ("WE BUILD" / "SOFTWARE" / "THAT SCALES.") must stay on one
+        line each across all phone widths. */
+  .heroHeadline {
+    font-size: clamp(1.9rem, 10vw, 2.65rem) !important;
+    margin-top: 0.3rem !important;
+  }
+
+  /* 4. Bio text: fix to rem so it reads the same on every phone width. */
+  .introBio {
+    font-size: 0.83rem !important;
+    line-height: 1.68 !important;
+    max-width: 100% !important;
+  }
+
+  /* 5. Mobile CTA buttons — uniform sizing across all phones. */
+  .mobileOnly .primary,
+  .mobileOnly .secondary {
+    height: 42px !important;
+    padding: 0 16px !important;
+    font-size: 11px !important;
+    letter-spacing: 0.04em !important;
+  }
+
+  /* 6. heroTagline is already hidden on mobile (display:none above).
+        Keep it hidden in case any earlier rule shows it. */
+  .heroTagline {
+    display: none !important;
+  }
+}
