@@ -724,7 +724,7 @@ function GroundCircles({ nearIdx, rccgUnlocked }: GroundCirclesProps) {
           <group key={i}>
             {/* Filled circle */}
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x, ROAD_Y + 0.01, z]}>
-              <circleGeometry args={[3.0, 40]} />
+              <circleGeometry args={[3.0, 24]} />
               <meshBasicMaterial color={p.accent} transparent
                 opacity={isNear ? 0.50 : 0.18} depthWrite={false} />
             </mesh>
@@ -734,7 +734,7 @@ function GroundCircles({ nearIdx, rccgUnlocked }: GroundCirclesProps) {
               rotation={[-Math.PI / 2, 0, 0]}
               position={[x, ROAD_Y + 0.02, z]}
             >
-              <ringGeometry args={[3.2, 4.2, 40]} />
+              <ringGeometry args={[3.2, 4.2, 24]} />
               <meshBasicMaterial color={p.accent} transparent opacity={0.4} depthWrite={false} />
             </mesh>
             {/* Glow light — always in scene so Three.js never recompiles shaders.
@@ -1381,9 +1381,8 @@ export default function ProjectWorld({
         fov: 62, near: 0.5, far: 800,
       }}
       style={{ width: "100%", height: "100%" }}
-      gl={{ antialias: false, alpha: false, powerPreference: "high-performance" }}
-      dpr={[0.4, 0.8]}
-      performance={{ min: 0.2 }}
+      gl={{ antialias: false, alpha: false, stencil: false, powerPreference: "high-performance" }}
+      dpr={[0.6, 0.9]}
       frameloop="demand"
     >
       <FrameDriver paused={renderPaused} />

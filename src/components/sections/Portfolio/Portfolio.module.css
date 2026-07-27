@@ -601,28 +601,36 @@
   will-change: transform;
   transform: translateZ(0);
   isolation: isolate;
+  contain: layout style;
 }
 
 /* Colored border glow rendered on a GPU-composited layer.
-   opacity: 0.0001 (not 0) keeps the layer warm in the compositor at all times —
+   opacity: 0.001 (not 0) keeps the layer warm in the compositor at all times —
    opacity: 0 allows the browser to drop the layer until first hover, causing a
-   1-2 frame "warm-up" delay. 0.0001 is invisible to the eye but keeps the
+   1-2 frame "warm-up" delay. 0.001 is invisible to the eye but keeps the
    layer active so hover response is truly instant.
    The JS onMouseEnter/onMouseLeave sets --glow-op via inline style, bypassing
-   CSS :hover evaluation (which runs after JS tasks) for a synchronous response. */
+   CSS :hover evaluation (which runs after JS tasks) for a synchronous response.
+   Child spans carry pointer-events:none so mouse events land on the button
+   directly, never on a child first, guaranteeing zero-delay on first hover. */
 .modeBtn::after {
   content: '';
   position: absolute;
   inset: -1.5px;
   border-radius: 17px; /* 16px card radius + 1.5px border */
   border: 1.5px solid transparent;
-  opacity: var(--glow-op, 0.0001);
+  opacity: var(--glow-op, 0.001);
   transition: none;
   pointer-events: none;
-  transform: translateZ(0);
+  transform: translate3d(0, 0, 0);
   will-change: opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
+/* CSS :hover fallback — fires in the same style-calc pass as any child hover,
+   ensuring the glow always appears even if the JS path is slow. */
+.modeBtn:hover::after { opacity: 1; }
 .modeBtn:hover { transform: translateY(-2px); }
 .modeBtn:active { transform: scale(0.97); }
 
@@ -634,6 +642,17 @@
 .modeBtnManual::after {
   border-color: rgba(180, 100, 255, 0.5);
   box-shadow: 0 0 0 1px rgba(180,100,255,0.2), 0 6px 24px rgba(160,80,255,0.15);
+}
+
+/* ── Disable pointer-events on all button children so every mouse event
+   lands on the button element itself, not on a child first.
+   Without this, moving the cursor over the icon/text caused a mouseenter
+   on the child → brief delay before the button's mouseenter fired → the
+   JS handler set --glow-op too late, producing the visible glow lag. ── */
+.modeBtnIcon,
+.modeBtnLabel,
+.modeBtnDesc {
+  pointer-events: none;
 }
 
 .modeBtnIcon {
