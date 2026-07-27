@@ -809,17 +809,17 @@ z-index:8;
      get a taller showcase, filling more of the screen and matching
      the proportional feel of iPhone SE. */
   .browser {
+    /* .browser is not rendered by ShowcaseFrame — left here for safety only */
     aspect-ratio: unset;
-    /* Floor 132px keeps SE (svh≈629px → 22svh≈138px) at least as tall as
-       the original aspect-ratio:16/6 (~127px).  Tall phones scale up
-       proportionally: iPhone 14 (~800px svh) → ~176px, Pro Max → ~198px. */
-    height: clamp(132px, 22svh, 198px);
     border-radius: 18px;
   }
   .frameViewport {
+    /* Apply svh height directly to the viewport content area (no header
+       subtraction).  Original aspect-ratio:16/6 on SE (337px wide) gave
+       ~127px; floor of 130px restores that.  Tall phones scale up so the
+       showcase proportionally fills more of the taller screen. */
     aspect-ratio: unset;
-    /* viewport height minus the header strip (46px) */
-    height: calc(clamp(132px, 22svh, 198px) - 46px);
+    height: clamp(130px, 22svh, 200px);
   }
   .frameHeader {
     padding: 12px 16px;
