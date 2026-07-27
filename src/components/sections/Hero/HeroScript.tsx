@@ -117,6 +117,17 @@ interface HeroScriptProps {
 export default function HeroScript({ theme }: HeroScriptProps) {
   const loaded = useLoaded();
 
+  // When the theme leaves "light", signal BuildFluid3D to stop its render loop
+  // immediately — before AnimatePresence finishes the 0.9 s exit animation.
+  // Without this, the expensive Three.js FBO double-pass keeps running on the
+  // GPU for nearly a full second after the user can no longer see it, competing
+  // with SplashCursor's fluid sim and making the cursor feel sluggish.
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("build-fluid-3d-active", { detail: { active: theme === "light" } })
+    );
+  }, [theme]);
+
   return (
     <div className={styles.scriptLayer} aria-hidden="true">
       <AnimatePresence mode="wait">

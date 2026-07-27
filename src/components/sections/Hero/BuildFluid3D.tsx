@@ -33,6 +33,20 @@ if (typeof window !== "undefined") {
   );
 }
 
+// Render-active flag — set to false via "build-fluid-3d-active" event when the
+// hero theme switches away from light. This stops the expensive FBO loop
+// immediately (before AnimatePresence finishes its 0.9 s exit animation) so
+// the compositor thread isn't starved by GPU work the user can't even see.
+// Starts true: the canvas only mounts when theme === "light".
+let _shouldRender = true;
+if (typeof window !== "undefined") {
+  window.addEventListener(
+    "build-fluid-3d-active",
+    (e) => { _shouldRender = (e as CustomEvent<{ active: boolean }>).detail.active; },
+    { passive: true }
+  );
+}
+
 // ─── Background scene rendered to FBO ──────────────────────────────────────
 // What's in this scene gets refracted through the glass text — the coloured
 // lights give the letters their deep blue + iridescent glow when viewed
@@ -61,6 +75,10 @@ function BuildMesh() {
   const groupRef = useRef<any>(null!);
   const buffer = useFBO();
   const bgScene = useRef<any>(null);
+  // Tracks the last time a full render was performed — used to throttle to
+  // ~30 fps so the expensive FBO double-pass doesn't saturate the GPU while
+  // SplashCursor's fluid sim is also running.
+  const lastRenderTime = useRef(0);
 
   // When the hero section becomes active again, kick-start the render loop.
   // With frameloop="demand" the loop stops as soon as useFrame stops calling
@@ -68,12 +86,20 @@ function BuildMesh() {
   const { invalidate } = useThree();
   useEffect(() => {
     const handler = (e: Event) => {
-      if ((e as CustomEvent<{ heroActive: boolean }>).detail.heroActive) {
-        invalidate();
-      }
+      const { heroActive } = (e as CustomEvent<{ heroActive: boolean }>).detail;
+      if (heroActive && _shouldRender) invalidate();
     };
-    window.addEventListener("hero-section-active", handler, { passive: true });
-    return () => window.removeEventListener("hero-section-active", handler);
+    // Re-kick the loop when the theme switches back to light while the canvas
+    // is already mounted (e.g. user toggles light → dark → light rapidly).
+    const onBuildActive = (e: Event) => {
+      if ((e as CustomEvent<{ active: boolean }>).detail.active) invalidate();
+    };
+    window.addEventListener("hero-section-active",  handler,       { passive: true });
+    window.addEventListener("build-fluid-3d-active", onBuildActive, { passive: true });
+    return () => {
+      window.removeEventListener("hero-section-active",  handler);
+      window.removeEventListener("build-fluid-3d-active", onBuildActive);
+    };
   }, [invalidate]);
 
   // Lazily create the scene once on the client
@@ -86,12 +112,23 @@ function BuildMesh() {
   useFrame(({ gl, camera, clock, invalidate }) => {
     if (!groupRef.current || !bgScene.current) return;
 
-    // When the hero section is not active, skip all rendering work.
-    // This stops the expensive FBO pass (bg → glass refraction) from
-    // running while the user is looking at About / Services / Portfolio.
-    // `invalidate` is NOT called, so with frameloop="demand" no further
-    // frames are scheduled until the hero becomes active again.
-    if (!_heroActive) return;
+    // Stop all rendering when:
+    //   _heroActive=false → hero scrolled out of view
+    //   _shouldRender=false → theme switched away from light; the AnimatePresence
+    //     exit animation keeps this Canvas mounted for ~0.9 s after the theme
+    //     changes, so we must stop here rather than waiting for unmount.
+    if (!_heroActive || !_shouldRender) return;
+
+    // Throttle to ~30 fps — halves the GPU load vs 60 fps while keeping the
+    // glass animation visually smooth.  The FBO double-pass (background scene →
+    // glass refraction) is expensive; 30 fps is imperceptible on this effect.
+    const elapsed = clock.getElapsedTime();
+    const FRAME_BUDGET = 1 / 30;
+    if (elapsed - lastRenderTime.current < FRAME_BUDGET) {
+      invalidate(); // keep the loop scheduled, skip heavy work this tick
+      return;
+    }
+    lastRenderTime.current = elapsed;
 
     // Weighted mouse follow — stiffness makes it feel physical, not linear
     groupRef.current.rotation.y +=
@@ -179,7 +216,7 @@ export default function BuildFluid3D() {
         toneMapping: ACESFilmicToneMapping,
         toneMappingExposure: 1.4,
       }}
-      dpr={[1, 1.5]}
+      dpr={1}
       style={{ background: "transparent", width: "100%", height: "100%" }}
     >
       <Suspense fallback={null}>
