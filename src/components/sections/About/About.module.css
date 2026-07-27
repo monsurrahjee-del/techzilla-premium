@@ -336,15 +336,21 @@
 
 /* ============================================================
    NARROW PHONES (≤390px — iPhone SE, older Androids)
-   Drop .sub font size so every one of the 4 line-groups
-   fits on a single physical line instead of wrapping mid-group.
+   The font size is fine — keeping it the same as iPhone 14 Pro.
+   The wrapping was caused purely by the narrower column:
+     iPhone 14 Pro (393px) at 5vw padding → column ≈ 354px  ← perfect
+     iPhone SE   (375px) at 5vw padding → column ≈ 337px  ← 17px short
+   Fix: tighten horizontal padding to 3vw so the column widens
+   to ≈352px, effectively the same as iPhone 14 Pro.
    Touch nothing above 640px.
    ============================================================ */
 @media (max-width: 390px) {
-  /* At ~10px, a 63-char line ≈ 327px — fits the ~338px column. */
-  .sub {
-    font-size: clamp(0.6rem, 2.7vw, 0.72rem);
-    letter-spacing: -0.025em;
-    line-height: 1.6;
+  .rightCol {
+    padding-left: 3vw;
+    padding-right: 3vw;
+  }
+  .bottomBar {
+    padding-left: 3vw;
+    padding-right: 3vw;
   }
 }
