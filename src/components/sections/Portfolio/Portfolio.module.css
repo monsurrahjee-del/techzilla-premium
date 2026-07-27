@@ -1040,7 +1040,7 @@
 }
 
 /* ── Responsive ───────────────────────────────────────────────────────────── */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .header { padding: 18px 18px 0; }
   .themeToggle { top: 14px; right: 16px; padding: 7px 12px 7px 10px; }
   .projectCard {

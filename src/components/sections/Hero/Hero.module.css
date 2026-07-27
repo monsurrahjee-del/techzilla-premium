@@ -1443,7 +1443,7 @@ font-size:clamp(72px,18vw,140px);
   pointer-events: none;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .scriptWord {
     -webkit-text-stroke-width: 1px;
   }
@@ -1599,7 +1599,7 @@ font-size:clamp(72px,18vw,140px);
 }
 
 /* Mobile landscape / large phone */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .hero {
     min-height: 100dvh;
   }
@@ -1664,7 +1664,7 @@ font-size:clamp(72px,18vw,140px);
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .heroContent {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto;
@@ -1850,7 +1850,7 @@ font-size:clamp(72px,18vw,140px);
    (these override the earlier breakpoint rules via cascade)
    ============================================================ */
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   /* Show hamburger, hide desktop nav items */
   .navCenter,
   .navRight {
@@ -1904,7 +1904,7 @@ font-size:clamp(72px,18vw,140px);
    MOBILE CONTENT REFINEMENTS (second pass)
    ============================================================ */
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   /* Hide tagline on mobile */
   .heroTagline {
     display: none;
@@ -1965,7 +1965,7 @@ font-size:clamp(72px,18vw,140px);
 .desktopOnly { display: block; }
 .mobileOnly  { display: none; }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   /* Show mobile buttons (after bio), hide desktop buttons */
   .desktopOnly { display: none !important; }
   .mobileOnly  { display: block; order: 3; }
@@ -2054,7 +2054,7 @@ font-size:clamp(72px,18vw,140px);
    MOBILE — buttons, footer tweaks
    ============================================================ */
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   /* Pull the CTA buttons a bit higher */
   .mobileOnly .buttons {
     margin-top: 6px !important;
@@ -2072,7 +2072,7 @@ font-size:clamp(72px,18vw,140px);
    identical to iPhone SE.  Touch nothing above 768px.
    ============================================================ */
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   /* 1. Hero fills its absolute-positioned parent layer (heroLayer) at
         exactly 100vh — removes the svh vs vh mismatch that could leave
         a gap at the bottom on some phones or clip content on others. */
