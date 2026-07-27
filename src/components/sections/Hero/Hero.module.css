@@ -2097,12 +2097,11 @@ font-size:clamp(72px,18vw,140px);
     gap: clamp(14px, 3.8svh, 44px) 0 !important;
   }
 
-  /* 3. Headline font size: cap the vw coefficient so a 430-px phone
-        renders the same line-breaks as SE.  The three headline lines
-        ("WE BUILD" / "SOFTWARE" / "THAT SCALES.") must stay on one
-        line each across all phone widths. */
+  /* 3. Headline font size: restore to match the original feel on SE
+        (~2.81rem) while letting it scale proportionally on wider phones.
+        The previous cap of 10vw/2.65rem made SE smaller than original. */
   .heroHeadline {
-    font-size: clamp(1.9rem, 10vw, 2.65rem) !important;
+    font-size: clamp(2.5rem, 12vw, 3.8rem) !important;
     margin-top: 0.3rem !important;
   }
 
