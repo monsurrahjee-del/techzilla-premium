@@ -231,20 +231,6 @@
 }
 .socialsRow2 a:hover { color: rgba(0,0,0,1); }
 
-.socialsRow3 {
-  display: flex;
-  gap: 20px;
-}
-.socialsRow3 a {
-  color: rgba(0,0,0,0.70);
-  text-decoration: none;
-  font-size: 0.98rem;
-  letter-spacing: 0.09em;
-  transition: color 0.2s;
-  font-weight: 500;
-}
-.socialsRow3 a:hover { color: rgba(0,0,0,1); }
-
 .globeIcon {
   width: 20px;
   height: 20px;
@@ -705,12 +691,27 @@
 
 /* ─── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .bottomBar { padding: 0 16px 16px; gap: 8px; font-size: 0.7rem; }
-  .bottomLeft a { font-size: 0.7rem; }
+  /* Grid: email top-left aligns with first social row; GIFT bottom-left */
+  .bottomBar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "left  right"
+      "center right";
+    align-items: start;
+    padding: 0 16px 16px;
+    column-gap: 12px;
+    row-gap: 4px;
+    font-size: 0.7rem;
+  }
+  .bottomLeft   { grid-area: left;   align-self: start; }
+  .bottomCenter { grid-area: center; align-self: end; }
+  .bottomRight  { grid-area: right;  align-self: start; }
+
+  .bottomLeft a    { font-size: 0.7rem; }
   .bottomLeft span { font-size: 0.65rem; }
-  .socials a { font-size: 0.65rem; }
-  .socialsRow2 a { font-size: 0.62rem; }
-  .socialsRow3 a { font-size: 0.62rem; }
+  .socials a       { font-size: 0.65rem; }
+  .socialsRow2 a   { font-size: 0.62rem; }
   .modal, .giftModal { padding: 28px 20px; }
   .craftTitle { font-size: clamp(2rem, 9vw, 3.2rem); }
 }

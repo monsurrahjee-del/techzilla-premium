@@ -183,13 +183,11 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
             <div className={styles.socials}>
               <a href="https://twitter.com/techzilla"  target="_blank" rel="noopener noreferrer" className="cursor-target">TWITTER/X</a>
               <a href="https://figma.com/@techzilla"   target="_blank" rel="noopener noreferrer" className="cursor-target">FIGMA</a>
+              <a href="https://github.com/techzilla"   target="_blank" rel="noopener noreferrer" className="cursor-target">GITHUB</a>
             </div>
             <div className={styles.socialsRow2}>
-              <a href="https://github.com/techzilla"   target="_blank" rel="noopener noreferrer" className="cursor-target">GITHUB</a>
-              <a href="https://tiktok.com/@techzilla"  target="_blank" rel="noopener noreferrer" className="cursor-target">TIKTOK</a>
-            </div>
-            <div className={styles.socialsRow3}>
-              <a href="https://facebook.com/techzilla" target="_blank" rel="noopener noreferrer" className="cursor-target">FACEBOOK</a>
+              <a href="https://tiktok.com/@techzilla"    target="_blank" rel="noopener noreferrer" className="cursor-target">TIKTOK</a>
+              <a href="https://facebook.com/techzilla"   target="_blank" rel="noopener noreferrer" className="cursor-target">FACEBOOK</a>
             </div>
             <div className={styles.globeIcon}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
