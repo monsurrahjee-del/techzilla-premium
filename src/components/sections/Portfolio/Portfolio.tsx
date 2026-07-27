@@ -61,10 +61,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
   const [hintHidden,   setHintHidden]   = useState(_portfolioMoved);
   const [colorsHidden, setColorsHidden] = useState(_savedColorsHidden);
   const [theme,        setTheme]        = useState<Theme>("dark");
-  // D-pad pressed state tracked in a ref — toggling CSS classes directly on the
-  // DOM node avoids a React re-render of Portfolio (and the cascading re-render
-  // into ProjectWorld) on every touch event.
-  const dpadBtnRefs = useRef<Record<string, HTMLButtonElement | null>>({ up: null, down: null, left: null, right: null });
+  const [dpadState,    setDpadState]    = useState({ up: false, down: false, left: false, right: false });
 
   // ── Mode state ────────────────────────────────────────────────────────────
   const [mode,       setMode]       = useState<ExploreMode>("preloading");
@@ -310,10 +307,9 @@ export default function Portfolio({ active = false }: PortfolioProps) {
       setTimeout(() => setColorsHidden(true),  400);
     }
   };
-  const dpadPress   = (key: string) => { dpadBtnRefs.current[key]?.classList.add(styles.pressed); fireCarKey(key, true); };
-  const dpadRelease = (key: string) => { dpadBtnRefs.current[key]?.classList.remove(styles.pressed); fireCarKey(key, false); };
+  const dpadPress   = (key: string) => { setDpadState(s => ({ ...s, [key]: true  })); fireCarKey(key, true); };
+  const dpadRelease = (key: string) => { setDpadState(s => ({ ...s, [key]: false })); fireCarKey(key, false); };
   const makeDpad    = (key: string) => ({
-    ref:            (el: HTMLButtonElement | null) => { dpadBtnRefs.current[key] = el; },
     onPointerDown:  (e: React.PointerEvent) => { e.currentTarget.setPointerCapture(e.pointerId); dpadPress(key); },
     onPointerUp:    () => dpadRelease(key),
     onPointerLeave: () => dpadRelease(key),
@@ -566,12 +562,12 @@ export default function Portfolio({ active = false }: PortfolioProps) {
       {isManual && (
         <div className={styles.dpad}>
           <div className={styles.dpadRow}>
-            <button className={styles.dpadBtn} {...makeDpad("up")}    aria-label="Forward">▲</button>
+            <button className={`${styles.dpadBtn} ${dpadState.up    ? styles.pressed : ""}`} {...makeDpad("up")}    aria-label="Forward">▲</button>
           </div>
           <div className={styles.dpadRow}>
-            <button className={styles.dpadBtn} {...makeDpad("left")}  aria-label="Left">◀</button>
-            <button className={styles.dpadBtn} {...makeDpad("down")}  aria-label="Reverse">▼</button>
-            <button className={styles.dpadBtn} {...makeDpad("right")} aria-label="Right">▶</button>
+            <button className={`${styles.dpadBtn} ${dpadState.left  ? styles.pressed : ""}`} {...makeDpad("left")}  aria-label="Left">◀</button>
+            <button className={`${styles.dpadBtn} ${dpadState.down  ? styles.pressed : ""}`} {...makeDpad("down")}  aria-label="Reverse">▼</button>
+            <button className={`${styles.dpadBtn} ${dpadState.right ? styles.pressed : ""}`} {...makeDpad("right")} aria-label="Right">▶</button>
           </div>
         </div>
       )}
