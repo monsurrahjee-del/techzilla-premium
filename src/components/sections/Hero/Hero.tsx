@@ -35,6 +35,15 @@ export default function Hero() {
   useClickSound(sound);
   useParallax(headingRef, 5);
 
+  // Broadcast theme changes so HeroSplash can pause its WebGL fluid sim while
+  // BuildFluid3D (Theme B) is active — two heavy WebGL loops at once saturate
+  // the GPU and make the cursor feel sluggish.
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("hero-theme-change", { detail: { theme } })
+    );
+  }, [theme]);
+
   useEffect(() => {
     if (!heroRef.current || !contentRef.current) return;
     const tl = gsap.timeline({

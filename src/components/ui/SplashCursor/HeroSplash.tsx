@@ -1,12 +1,18 @@
 "use client";
 
 /**
- * HeroSplash — ties SplashCursor visibility + pause state to scroll position.
+ * HeroSplash — ties SplashCursor visibility + pause state to scroll position
+ * AND to the hero's active theme.
  *
- * page.tsx dispatches a "hero-section-active" CustomEvent from driveFrame()
- * on every section-change edge:
- *   { detail: { heroActive: true  } }  → Hero is primary  → show + run sim
- *   { detail: { heroActive: false } }  → About/Services   → hide + pause sim
+ * page.tsx dispatches "hero-section-active" on every section-change edge.
+ * Hero.tsx dispatches "hero-theme-change" on every theme toggle.
+ *
+ * Rules:
+ *   heroActive=false          → hide + pause (hero scrolled away)
+ *   heroActive=true, theme=light → hide + pause (BuildFluid3D is running;
+ *                                  two concurrent WebGL loops saturate the GPU
+ *                                  and make the cursor feel heavy)
+ *   heroActive=true, theme=dark  → show + run (only the fluid sim runs)
  *
  * Key design decisions:
  * - opacity / hidden is controlled via SplashCursor's OWN position:fixed div,
@@ -16,22 +22,41 @@
  *   never discarded by the browser (blank-canvas-on-resume bug).
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import SplashCursor from "./index";
 
 export default function HeroSplash() {
-  const [hidden, setHidden] = useState(false);
-  const [paused, setPaused] = useState(false);
+  // Default: hero starts active, theme starts "light" → begin paused so the
+  // fluid sim doesn't compete with BuildFluid3D on the very first frame.
+  const [hidden, setHidden] = useState(true);
+  const [paused, setPaused] = useState(true);
+
+  const heroActiveRef  = useRef(true);
+  const themeIsLightRef = useRef(true); // Hero default theme is "light"
 
   useEffect(() => {
+    const update = () => {
+      const shouldPause = !heroActiveRef.current || themeIsLightRef.current;
+      setHidden(shouldPause);
+      setPaused(shouldPause);
+    };
+
     const onHeroSection = (e: Event) => {
-      const { heroActive } = (e as CustomEvent<{ heroActive: boolean }>).detail;
-      setHidden(!heroActive);
-      setPaused(!heroActive);
+      heroActiveRef.current = (e as CustomEvent<{ heroActive: boolean }>).detail.heroActive;
+      update();
+    };
+    const onThemeChange = (e: Event) => {
+      themeIsLightRef.current =
+        (e as CustomEvent<{ theme: string }>).detail.theme === "light";
+      update();
     };
 
     window.addEventListener("hero-section-active", onHeroSection);
-    return () => window.removeEventListener("hero-section-active", onHeroSection);
+    window.addEventListener("hero-theme-change",   onThemeChange);
+    return () => {
+      window.removeEventListener("hero-section-active", onHeroSection);
+      window.removeEventListener("hero-theme-change",   onThemeChange);
+    };
   }, []);
 
   return (

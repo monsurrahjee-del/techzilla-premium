@@ -73,7 +73,11 @@ function BgScene({ scene }: { scene: any }) {
 // ─── The 3-D "build" mesh ───────────────────────────────────────────────────
 function BuildMesh() {
   const groupRef = useRef<any>(null!);
-  const buffer = useFBO();
+  // Fixed small FBO resolution for the background refraction scene.
+  // Default useFBO() renders at the full canvas size (can be 1000px+).
+  // A 256×256 background is imperceptible through glass — the refraction
+  // blur masks any low-res artefacts — and cuts the FBO pass cost by ~90%.
+  const buffer = useFBO(256, 256, { depthBuffer: false });
   const bgScene = useRef<any>(null);
   // Tracks the last time a full render was performed — used to throttle to
   // ~30 fps so the expensive FBO double-pass doesn't saturate the GPU while
