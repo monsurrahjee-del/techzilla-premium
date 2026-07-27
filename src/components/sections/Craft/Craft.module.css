@@ -691,14 +691,38 @@
 
 /* ─── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .bottomBar { padding: 0 16px 16px; gap: 8px; font-size: 0.7rem; }
-  .bottomLeft a { font-size: 0.7rem; }
+  /* Bottom bar: socials get their own top row; email + GIFT share the bottom */
+  .bottomBar {
+    flex-wrap: wrap;
+    align-items: flex-end;
+    padding: 12px 16px 18px;
+    gap: 10px 0;
+    font-size: 0.7rem;
+  }
+
+  /* Socials — full-width top strip, links wrap freely */
+  .bottomRight {
+    width: 100%;
+    order: -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 4px 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.10);
+  }
+  .socials    { flex-wrap: wrap; gap: 4px 14px; }
+  .socialsRow2 { flex-wrap: wrap; gap: 4px 14px; }
+  .socials a, .socialsRow2 a { font-size: 0.65rem; }
+  .globeIcon  { display: none; }
+
+  /* Left info and GIFT share the bottom row */
+  .bottomLeft  { flex: 1; min-width: 0; padding-top: 4px; padding-bottom: 4px; }
+  .bottomCenter { flex-shrink: 0; padding-bottom: 4px; }
+  .bottomLeft a    { font-size: 0.72rem; }
   .bottomLeft span { font-size: 0.65rem; }
-  .socials a { font-size: 0.65rem; }
-  .socialsRow2 a { font-size: 0.62rem; }
+
   .modal, .giftModal { padding: 28px 20px; }
-  /* Tighter vw cap so wider phones (430px) don't render the title
-     noticeably larger than SE (375px).  clamp floor keeps it readable
-     on the narrowest devices. */
   .craftTitle { font-size: clamp(2rem, 9vw, 3.2rem); }
 }

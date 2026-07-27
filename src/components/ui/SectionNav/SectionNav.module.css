@@ -229,6 +229,17 @@
     color: rgba(255, 255, 255, 0.5);
   }
 
+  /* Light-variant sections (e.g. Craft): force nav content white on the
+     black mobile overlay — the desktop dark-text rules have higher
+     specificity and would otherwise make text invisible on black. */
+  .navBar[data-variant="light"] .navLink {
+    color: #ffffff;
+  }
+  .navBar[data-variant="light"] .navLink:hover {
+    color: #ffffff;
+    opacity: 0.6;
+  }
+
   /* Backdrop not needed — the overlay already fills the whole screen */
   .backdrop { display: none; }
 }
