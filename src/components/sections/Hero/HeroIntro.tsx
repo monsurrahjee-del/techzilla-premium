@@ -22,15 +22,17 @@ export default function HeroIntro() {
         that last.
       </motion.p>
 
-      {/* Mobile — shorter text with backdrop for readability */}
+      {/* Mobile — shorter text, each line gets its own highlight strip */}
       <motion.p
         className={`${styles.introBio} ${styles.bioMobile}`}
         initial={{ opacity: 0, y: 22 }}
         animate={loaded ? { opacity: 1, y: 0 } : { opacity: 0, y: 22 }}
         transition={{ duration: 0.85, delay: 0.55, ease: [0.22, 1, 0.36, 1] }}
       >
-        We&apos;re Techzilla — a software studio building scalable systems,
-        polished interfaces, and AI-powered tools. Fast code. Lasting products.
+        <span className={styles.bioHighlight}>
+          We&apos;re Techzilla — a software studio building scalable systems,
+          polished interfaces, and AI-powered tools. Fast code. Lasting products.
+        </span>
       </motion.p>
     </div>
   );

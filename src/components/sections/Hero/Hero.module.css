@@ -2062,16 +2062,26 @@ font-size:clamp(72px,18vw,140px);
   .bioDesktop { display: none !important; }
   .bioMobile  {
     display: block !important;
-    background: rgba(0, 0, 0, 0.72);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: 10px;
-    padding: 13px 16px;
+    background: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: none !important;
+    padding: 0 !important;
     max-width: 100%;
     color: rgba(255, 255, 255, 0.96);
     font-size: clamp(0.84rem, 3.6vw, 1rem);
-    line-height: 1.68;
+    line-height: 2.0;
+  }
+
+  /* Per-line highlight — inline span with box-decoration-break:clone
+     gives each wrapped line its own tight background strip             */
+  .bioHighlight {
+    display: inline;
+    background: rgba(0, 0, 0, 0.68);
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    border-radius: 3px;
+    padding: 2px 7px;
   }
 
   /* Pull the CTA buttons a bit higher */
