@@ -691,22 +691,41 @@
 
 /* ─── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  /* Grid: email top-left aligns with first social row; GIFT bottom-left */
+  /* Keep the footer split left / centre / right on mobile. */
   .bottomBar {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr auto 1fr;
     grid-template-areas:
-      "left  right"
-      "center right";
-    align-items: start;
+      "left center right";
+    align-items: end;
     padding: 0 16px 16px;
     column-gap: 12px;
-    row-gap: 4px;
     font-size: 0.7rem;
   }
-  .bottomLeft   { grid-area: left;   align-self: start; }
-  .bottomCenter { grid-area: center; align-self: end; }
-  .bottomRight  { grid-area: right;  align-self: start; }
+  .bottomLeft   { grid-area: left; }
+  .bottomCenter { grid-area: center; }
+  .bottomRight  {
+    grid-area: right;
+    display: grid;
+    grid-template-columns: max-content max-content;
+    grid-template-rows: repeat(4, auto);
+    column-gap: 20px;
+    row-gap: 5px;
+    align-items: center;
+    justify-items: end;
+  }
+
+  /* Mobile-only order: Twitter/X + Figma, GitHub + TikTok, Facebook. */
+  .socials,
+  .socialsRow2 {
+    display: contents;
+  }
+  .socials a:nth-child(1) { grid-column: 1; grid-row: 1; }
+  .socials a:nth-child(2) { grid-column: 2; grid-row: 1; }
+  .socials a:nth-child(3) { grid-column: 1; grid-row: 2; }
+  .socialsRow2 a:nth-child(1) { grid-column: 2; grid-row: 2; }
+  .socialsRow2 a:nth-child(2) { grid-column: 2; grid-row: 3; }
+  .globeIcon { grid-column: 2; grid-row: 4; }
 
   .bottomLeft a    { font-size: 0.7rem; }
   .bottomLeft span { font-size: 0.65rem; }
