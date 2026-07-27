@@ -2071,7 +2071,12 @@ font-size:clamp(72px,18vw,140px);
     color: #ffffff;
     font-size: clamp(0.84rem, 3.6vw, 1rem);
     line-height: 1.95;
-    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+    text-align: justify;
+    text-align-last: center;
+    text-justify: inter-word;
+    text-shadow:
+      0 0 12px rgba(255, 255, 255, 0.55),
+      0 1px 6px rgba(0, 0, 0, 0.7);
   }
 
   .bioHighlight {
