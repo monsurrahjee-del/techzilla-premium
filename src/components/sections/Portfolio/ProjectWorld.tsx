@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState, useMemo, Suspense, startTransition } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { projects } from "@/lib/projects";
@@ -919,11 +919,13 @@ interface SceneProps {
   autopilotPaused:  boolean;        // true = freeze car in auto mode
   isManual:         boolean;
   rccgUnlocked:     boolean;          // false until Zennyola (station n-2) is visited
+  renderPaused:     boolean;          // true = skip all updates (modal/preloader is covering canvas)
 }
 
 function Scene({
   onNearProject, onAtBoundary, onAutoArrived,
   theme, carColors, autopilotTarget, autopilotTourId, autopilotRewindId, autopilotPaused, isManual, rccgUnlocked,
+  renderPaused,
 }: SceneProps) {
   const t = THEMES[theme];
 
@@ -1061,6 +1063,11 @@ function Scene({
   }, [isManual]);
 
   useFrame((state, delta) => {
+    // When a modal or preloader covers the canvas, skip all state mutations.
+    // frameloop="always" still submits the exact same frame to the GPU, which
+    // is a trivial blit cost — but nothing moves and no React state changes fire.
+    if (renderPaused) return;
+
     const dt   = Math.min(delta, 0.05);
     const keys = keysRef.current;
 
@@ -1330,26 +1337,15 @@ function Scene({
   );
 }
 
-// ── 60 fps frame driver ───────────────────────────────────────────────────────
-// Uses requestAnimationFrame so Three.js renders are synchronised with the
-// browser's vsync. This eliminates the micro-stutters that setInterval caused
-// (setInterval fires at arbitrary points in the frame, missing vsync alignment).
-// The scene is cheap (DPR 0.4–0.8, no shadows) so 60 fps is fine.
-interface FrameDriverProps { paused: boolean; }
-function FrameDriver({ paused }: FrameDriverProps) {
-  const { invalidate } = useThree();
-  useEffect(() => {
-    if (paused) return;
-    let rafId: number;
-    const tick = () => {
-      invalidate();
-      rafId = requestAnimationFrame(tick);
-    };
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, [invalidate, paused]);
-  return null;
-}
+// ── No FrameDriver needed ─────────────────────────────────────────────────────
+// frameloop="always" on the Canvas gives R3F a single unified RAF loop that
+// runs every vsync. The old FrameDriver + frameloop="demand" pattern created
+// two independent RAF loops (FrameDriver's own + R3F's internal one). When
+// those loops slipped out of phase, R3F missed vsync intervals and produced
+// irregular frame delivery (the "lurchy buildings" feel). With frameloop="always"
+// there is exactly one RAF → one render per vsync, with no race conditions.
+// Render-pausing (when a modal covers the canvas) is handled by renderPaused
+// inside Scene's useFrame early-return instead.
 
 // ── Exported component ────────────────────────────────────────────────────────
 interface ProjectWorldProps {
@@ -1382,10 +1378,9 @@ export default function ProjectWorld({
       }}
       style={{ width: "100%", height: "100%" }}
       gl={{ antialias: false, alpha: false, stencil: false, powerPreference: "high-performance" }}
-      dpr={[0.6, 0.9]}
-      frameloop="demand"
+      dpr={0.75}
+      frameloop="always"
     >
-      <FrameDriver paused={renderPaused} />
       <color attach="background" args={[bg]} />
       <Scene
         onNearProject={onNearProject}
@@ -1399,6 +1394,7 @@ export default function ProjectWorld({
         autopilotPaused={autopilotPaused}
         isManual={isManual}
         rccgUnlocked={rccgUnlocked}
+        renderPaused={renderPaused}
       />
     </Canvas>
   );
