@@ -681,63 +681,71 @@ function CityModel() {
   );
 }
 
-// ── Ground circle ─────────────────────────────────────────────────────────────
-// Html elements from @react-three/drei are intentionally NOT used here.
-// Each Html element forces a DOM style update (CSS transform) on every single
-// R3F frame — 7 stations × 60 fps = 420 synchronous DOM mutations per second.
-// Those mutations run on the main thread between RAF callbacks, which starves
-// the mousemove event queue and makes the cursor feel extremely sluggish.
-// Station names already appear in the project info card (right side panel)
-// when the car is near, so the floating labels are redundant.
-function GroundCircle({
-  index,
-  accent,
-  isNear,
-}: {
-  index:   number;
-  accent:  string;
-  isNear:  boolean;
-}) {
-  const { x, z } = STATIONS[index];
-  const ringRef = useRef<THREE.Mesh>(null!);
-  const matRef  = useRef<THREE.MeshBasicMaterial | null>(null);
-  const tmr     = useRef(Math.random() * Math.PI * 2);
-  // Cache the isNear value in a ref so the useFrame closure never goes stale
-  const isNearRef = useRef(isNear);
-  useEffect(() => { isNearRef.current = isNear; }, [isNear]);
+// ── Ground circles (all stations in a single shared useFrame) ────────────────
+// Previously each station was a separate GroundCircle component with its own
+// useFrame hook. 7 hooks × 60 fps = 420 R3F hook dispatch cycles/s.
+// A single shared loop cuts that to 1 dispatch per frame and lets the JS
+// engine optimise the inner for-loop — no per-station hook overhead at all.
+interface GroundCirclesProps {
+  nearIdx:      number | null;
+  rccgUnlocked: boolean;
+}
+function GroundCircles({ nearIdx, rccgUnlocked }: GroundCirclesProps) {
+  const count    = projects.length;
+  const ringRefs = useRef<(THREE.Mesh | null)[]>(Array(count).fill(null));
+  const matRefs  = useRef<(THREE.MeshBasicMaterial | null)[]>(Array(count).fill(null));
+  const tmrs     = useRef<number[]>(projects.map(() => Math.random() * Math.PI * 2));
+  // Keep nearIdx in a ref so the useFrame closure never reads a stale value
+  const nearIdxRef = useRef(nearIdx);
+  useEffect(() => { nearIdxRef.current = nearIdx; }, [nearIdx]);
 
   useFrame((_, delta) => {
-    tmr.current += delta * 1.6;
-    const ring = ringRef.current;
-    if (!ring) return;
-    const s = 1 + Math.sin(tmr.current) * 0.12;
-    ring.scale.setScalar(s);
-    // Reuse cached material ref — avoids repeated property lookup each frame
-    if (!matRef.current) matRef.current = ring.material as THREE.MeshBasicMaterial;
-    matRef.current.opacity = (isNearRef.current ? 0.85 : 0.40) + Math.sin(tmr.current) * 0.12;
+    const dt = delta * 1.6;
+    for (let i = 0; i < count; i++) {
+      const ring = ringRefs.current[i];
+      if (!ring) continue;
+      tmrs.current[i] += dt;
+      const t = tmrs.current[i];
+      const s = 1 + Math.sin(t) * 0.12;
+      ring.scale.setScalar(s);
+      if (!matRefs.current[i]) matRefs.current[i] = ring.material as THREE.MeshBasicMaterial;
+      const mat = matRefs.current[i];
+      if (mat) mat.opacity = (nearIdxRef.current === i ? 0.85 : 0.40) + Math.sin(t) * 0.12;
+    }
   });
 
   return (
-    <group>
-      {/* Filled circle */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x, ROAD_Y + 0.01, z]}>
-        <circleGeometry args={[3.0, 40]} />
-        <meshBasicMaterial color={accent} transparent
-          opacity={isNear ? 0.50 : 0.18} depthWrite={false} />
-      </mesh>
-
-      {/* Pulsing outer ring */}
-      <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[x, ROAD_Y + 0.02, z]}>
-        <ringGeometry args={[3.2, 4.2, 40]} />
-        <meshBasicMaterial color={accent} transparent opacity={0.4} depthWrite={false} />
-      </mesh>
-
-      {/* Glow light — always in scene so Three.js never recompiles shaders.
-          Intensity 0 when not near costs nothing; removing/adding a light
-          at runtime triggers a full shader recompile and drops a frame. */}
-      <pointLight position={[x, ROAD_Y + 4, z]} color={accent}
-        intensity={isNear ? 40 : 0} distance={28} decay={2} />
-    </group>
+    <>
+      {projects.map((p, i) => {
+        if (i === count - 1 && !rccgUnlocked) return null;
+        const { x, z } = STATIONS[i];
+        const isNear = nearIdx === i;
+        return (
+          <group key={i}>
+            {/* Filled circle */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x, ROAD_Y + 0.01, z]}>
+              <circleGeometry args={[3.0, 40]} />
+              <meshBasicMaterial color={p.accent} transparent
+                opacity={isNear ? 0.50 : 0.18} depthWrite={false} />
+            </mesh>
+            {/* Pulsing outer ring */}
+            <mesh
+              ref={el => { ringRefs.current[i] = el; }}
+              rotation={[-Math.PI / 2, 0, 0]}
+              position={[x, ROAD_Y + 0.02, z]}
+            >
+              <ringGeometry args={[3.2, 4.2, 40]} />
+              <meshBasicMaterial color={p.accent} transparent opacity={0.4} depthWrite={false} />
+            </mesh>
+            {/* Glow light — always in scene so Three.js never recompiles shaders.
+                Intensity 0 when not near costs nothing; removing/adding a light
+                at runtime triggers a full shader recompile and drops a frame. */}
+            <pointLight position={[x, ROAD_Y + 4, z]} color={p.accent}
+              intensity={isNear ? 40 : 0} distance={28} decay={2} />
+          </group>
+        );
+      })}
+    </>
   );
 }
 
@@ -784,9 +792,12 @@ function Car({ carRef, colors, theme }: {
   }, [carScene, carRef]);
 
   useEffect(() => {
-    const bodyMat  = new THREE.MeshStandardMaterial({ color: new THREE.Color(colors.body),  metalness: 0.9, roughness: 0.2 });
-    const rimMat   = new THREE.MeshStandardMaterial({ color: new THREE.Color(colors.rim),   metalness: 1.0, roughness: 0.15 });
-    const glassMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(colors.glass), transparent: true, opacity: colors.glassOpacity, metalness: 0.9, roughness: 0.05 });
+    // MeshPhongMaterial is ~2-3× cheaper than PBR (MeshStandardMaterial) in
+    // fragment-shader cost. For a stylised city scene with baked AO and fake
+    // shadow the visual difference is negligible; the frame-time saving is real.
+    const bodyMat  = new THREE.MeshPhongMaterial({ color: new THREE.Color(colors.body),  shininess: 120, specular: new THREE.Color(0x888888) });
+    const rimMat   = new THREE.MeshPhongMaterial({ color: new THREE.Color(colors.rim),   shininess: 200, specular: new THREE.Color(0xaaaaaa) });
+    const glassMat = new THREE.MeshPhongMaterial({ color: new THREE.Color(colors.glass), transparent: true, opacity: colors.glassOpacity, shininess: 300, specular: new THREE.Color(0xffffff) });
 
     const bodyPart  = carScene.getObjectByName("body")  as THREE.Mesh | undefined;
     const glassPart = carScene.getObjectByName("glass") as THREE.Mesh | undefined;
@@ -1262,7 +1273,7 @@ function Scene({
     // inside the Three.js render loop without perceptible lag on card display
     // (stations are large — 15-unit radius — so a 100ms check interval is fine).
     frameCountRef.current++;
-    if (frameCountRef.current % 3 === 0) {
+    if (frameCountRef.current % 5 === 0) {
       let nearest: number | null = null;
       let nearestClose: number | null = null;
       let minDist = Infinity;
@@ -1308,18 +1319,7 @@ function Scene({
 
       <Suspense fallback={null}><CityModel /></Suspense>
 
-      {projects.map((p, i) => {
-        // Hide the RCCG ground circle until unlocked
-        if (i === projects.length - 1 && !rccgUnlocked) return null;
-        return (
-          <GroundCircle
-            key={i}
-            index={i}
-            accent={p.accent}
-            isNear={nearIdx === i}
-          />
-        );
-      })}
+      <GroundCircles nearIdx={nearIdx} rccgUnlocked={rccgUnlocked} />
 
       <Suspense fallback={null}>
         <Car carRef={carRef} colors={carColors} theme={theme} />
