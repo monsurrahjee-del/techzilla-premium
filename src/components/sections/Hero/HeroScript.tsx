@@ -39,14 +39,27 @@ function ThemeABuild() {
     if (!stage || !word) return;
 
     let lx = 0, ly = 0;
-    const LERP = 0.12; // raised from 0.055 — text tracks cursor more snappily
+    const LERP = 0.12;
+    // Throttle DOM writes to ~30 fps. The 5 CSS custom-property setProperty
+    // calls each trigger a style-recalculation cascade; at 60 fps that keeps
+    // the main thread permanently busy and competes with SplashCursor's WebGL
+    // loop. 30 fps is imperceptible on a smooth sheen / iridescent effect.
+    const FRAME_BUDGET = 1000 / 30;
+    let lastFrameTime = 0;
     let raf = 0;
     // Start running; pause when hero scrolls out of view.
     let heroActive = true;
 
-    const tick = () => {
+    const tick = (now: number) => {
+      if (heroActive) raf = requestAnimationFrame(tick);
+
+      // LERP runs every rAF so the interpolation stays time-accurate even
+      // when we skip a DOM-write frame.
       lx += (_m.x - lx) * LERP;
       ly += (_m.y - ly) * LERP;
+
+      if (now - lastFrameTime < FRAME_BUDGET) return;
+      lastFrameTime = now;
 
       stage.style.transform =
         `translate3d(${_m.x * 96}px,${_m.y * 60}px,0)` +
@@ -60,8 +73,6 @@ function ThemeABuild() {
       word.style.setProperty("--irid-angle", `${90 + lx * 90}deg`);
       word.style.setProperty("--spec-x",     `${28 + gx * 0.44}%`);
       word.style.setProperty("--spec-y",     `${18 + gy * 0.44}%`);
-
-      if (heroActive) raf = requestAnimationFrame(tick);
     };
 
     // Gate on the same "hero-section-active" event used by WaterRipple and

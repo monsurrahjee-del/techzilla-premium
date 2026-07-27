@@ -604,7 +604,10 @@ export default function SplashCursor({
       const min = Math.round(resolution); const max = Math.round(resolution * ar);
       return gl.drawingBufferWidth > gl.drawingBufferHeight ? { width: max, height: min } : { width: min, height: max };
     }
-    function scaleByPixelRatio(input: number) { return Math.floor(input * (window.devicePixelRatio || 1)); }
+    // Cap DPR at 1 — the fluid sim is an artistic effect, not UI chrome.
+    // At DPR 2 the canvas was rendering at ~2× the pixel count with no visible
+    // quality gain through the translucent overlay, doubling GPU fill cost.
+    function scaleByPixelRatio(input: number) { return Math.floor(input * Math.min(window.devicePixelRatio || 1, 1)); }
     function hashCode(s: string) {
       let hash = 0;
       for (let i = 0; i < s.length; i++) { hash = (hash << 5) - hash + s.charCodeAt(i); hash |= 0; }
