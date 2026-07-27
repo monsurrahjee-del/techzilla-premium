@@ -1149,6 +1149,10 @@ font-size:clamp(72px,18vw,140px);
   max-width: 38ch;
 }
 
+/* Desktop shows full text, hides mobile short version */
+.bioDesktop { display: block; }
+.bioMobile  { display: none; }
+
 /* ---- big bold headline ---- */
 
 .headline {
@@ -2046,5 +2050,34 @@ font-size:clamp(72px,18vw,140px);
 @media (max-width: 480px) {
   .mobileMenuLink {
     font-size: clamp(1.6rem, 9vw, 2.6rem) !important;
+  }
+}
+
+/* ============================================================
+   MOBILE — bio text, buttons, footer tweaks
+   ============================================================ */
+
+@media (max-width: 768px) {
+  /* Switch to shorter mobile bio with a frosted background for legibility */
+  .bioDesktop { display: none !important; }
+  .bioMobile  {
+    display: block !important;
+    background: rgba(0, 0, 0, 0.40);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 10px;
+    padding: 11px 14px;
+    max-width: 100%;
+    color: rgba(255, 255, 255, 0.88);
+  }
+
+  /* Pull the CTA buttons a bit higher */
+  .mobileOnly .buttons {
+    margin-top: 6px !important;
+  }
+
+  /* Push the metaBar footer slightly lower (closer to true bottom edge) */
+  .metaBar {
+    bottom: 0 !important;
   }
 }
