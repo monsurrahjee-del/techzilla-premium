@@ -48,10 +48,9 @@ function ThemeABuild() {
       lx += (_m.x - lx) * LERP;
       ly += (_m.y - ly) * LERP;
 
-      stage.style.transform =
-        `translate3d(${_m.x * 96}px,${_m.y * 60}px,0)` +
-        ` rotateX(${-ly * 18}deg)` +
-        ` rotateY(${lx * 28}deg)`;
+      // stage.style.transform intentionally removed — mouse-driven translate3d
+      // + rotateX/rotateY was causing the text to physically chase the cursor,
+      // which the user reported as unwanted movement.
 
       const gx = (lx + 0.5) * 100;
       const gy = (ly + 0.5) * 100;

@@ -27,40 +27,19 @@ import { useEffect, useRef, useState } from "react";
 import SplashCursor from "./index";
 
 export default function HeroSplash() {
-  // Default: hero starts active, theme starts "light" → fluid sim runs fine
-  // alongside BuildFluid3D in light mode (they coexist without lag).
-  // Dark mode (ThemeABuild) is the expensive one — pause the fluid sim there.
+  // Pause only when the hero scrolls out of view — active in both themes.
   const [hidden, setHidden] = useState(false);
   const [paused, setPaused] = useState(false);
 
-  const heroActiveRef   = useRef(true);
-  const themeIsLightRef = useRef(true); // Hero default theme is "light"
-
   useEffect(() => {
-    const update = () => {
-      // Pause when hero scrolled away OR when dark theme is active (ThemeABuild
-      // runs a concurrent WebGL loop that saturates the GPU compositor).
-      const shouldPause = !heroActiveRef.current || !themeIsLightRef.current;
-      setHidden(shouldPause);
-      setPaused(shouldPause);
-    };
-
     const onHeroSection = (e: Event) => {
-      heroActiveRef.current = (e as CustomEvent<{ heroActive: boolean }>).detail.heroActive;
-      update();
-    };
-    const onThemeChange = (e: Event) => {
-      themeIsLightRef.current =
-        (e as CustomEvent<{ theme: string }>).detail.theme === "light";
-      update();
+      const { heroActive } = (e as CustomEvent<{ heroActive: boolean }>).detail;
+      setHidden(!heroActive);
+      setPaused(!heroActive);
     };
 
     window.addEventListener("hero-section-active", onHeroSection);
-    window.addEventListener("hero-theme-change",   onThemeChange);
-    return () => {
-      window.removeEventListener("hero-section-active", onHeroSection);
-      window.removeEventListener("hero-theme-change",   onThemeChange);
-    };
+    return () => window.removeEventListener("hero-section-active", onHeroSection);
   }, []);
 
   return (
