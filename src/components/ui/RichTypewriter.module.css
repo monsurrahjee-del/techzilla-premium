@@ -30,14 +30,15 @@
 }
 
 /* ── Mobile-only line-break helper ── */
-/* Hidden on desktop/tablet — becomes block on mobile to force a new line */
+/* Hidden (no break) on desktop/tablet.
+   On mobile the <br> is restored to inline so it fires as a real line break. */
 .mobileBr {
   display: none;
 }
 
 @media (max-width: 640px) {
   .mobileBr {
-    display: block;
+    display: inline;
   }
 }
 

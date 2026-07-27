@@ -35,9 +35,10 @@ function RichContent({
         if (remaining <= 0) return null;
 
         // Zero-width segment: no chars to consume — render immediately when reached.
-        // display:none on desktop, display:block on mobile → forces a line break.
+        // Uses a real <br> so iOS Safari handles the forced line break reliably.
+        // display:none on desktop, display:inline (visible) on mobile.
         if (seg.type === "mobileBr") {
-          return <span key={i} className={styles.mobileBr} aria-hidden="true" />;
+          return <br key={i} className={styles.mobileBr} aria-hidden="true" />;
         }
 
         const visible = Math.min(remaining, seg.text.length);

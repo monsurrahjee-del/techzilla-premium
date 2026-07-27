@@ -333,3 +333,18 @@
   .bottomBar { padding: 0 5vw; }
   .btmCoords { display: none; }
 }
+
+/* ============================================================
+   NARROW PHONES (≤390px — iPhone SE, older Androids)
+   Drop .sub font size so every one of the 4 line-groups
+   fits on a single physical line instead of wrapping mid-group.
+   Touch nothing above 640px.
+   ============================================================ */
+@media (max-width: 390px) {
+  /* At ~10px, a 63-char line ≈ 327px — fits the ~338px column. */
+  .sub {
+    font-size: clamp(0.6rem, 2.7vw, 0.72rem);
+    letter-spacing: -0.025em;
+    line-height: 1.6;
+  }
+}
