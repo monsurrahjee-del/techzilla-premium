@@ -1149,9 +1149,6 @@ font-size:clamp(72px,18vw,140px);
   max-width: 38ch;
 }
 
-/* Desktop shows full text, hides mobile short version */
-.bioDesktop { display: block; }
-.bioMobile  { display: none; }
 
 /* ---- big bold headline ---- */
 
@@ -2054,35 +2051,10 @@ font-size:clamp(72px,18vw,140px);
 }
 
 /* ============================================================
-   MOBILE — bio text, buttons, footer tweaks
+   MOBILE — buttons, footer tweaks
    ============================================================ */
 
 @media (max-width: 768px) {
-  /* Switch to shorter mobile bio with a frosted background for legibility */
-  .bioDesktop { display: none !important; }
-  .bioMobile  {
-    display: block !important;
-    background: none !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    border: none !important;
-    padding: 0 !important;
-    max-width: 100%;
-    color: #ffffff;
-    font-size: clamp(0.84rem, 3.6vw, 1rem);
-    line-height: 1.95;
-    text-align: justify;
-    text-align-last: center;
-    text-justify: inter-word;
-    text-shadow:
-      0 0 12px rgba(255, 255, 255, 0.55),
-      0 1px 6px rgba(0, 0, 0, 0.7);
-  }
-
-  .bioHighlight {
-    display: inline;
-  }
-
   /* Pull the CTA buttons a bit higher */
   .mobileOnly .buttons {
     margin-top: 6px !important;
