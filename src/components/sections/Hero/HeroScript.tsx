@@ -40,31 +40,38 @@ function ThemeABuild() {
 
     let lx = 0, ly = 0;
     const LERP = 0.12;
-    // Throttle DOM writes to ~30 fps. The 5 CSS custom-property setProperty
-    // calls each trigger a style-recalculation cascade; at 60 fps that keeps
-    // the main thread permanently busy and competes with SplashCursor's WebGL
-    // loop. 30 fps is imperceptible on a smooth sheen / iridescent effect.
-    const FRAME_BUDGET = 1000 / 30;
-    let lastFrameTime = 0;
+
+    // CSS-var writes throttle: gloss/iridescent update at ~20 fps.
+    // Each setProperty call invalidates background-clip:text layers that
+    // require software rasterization; keeping them at 20 fps cuts that work
+    // to a third vs 60 fps while remaining imperceptible on a slow sheen.
+    // The stage transform still writes every rAF tick for full 60 fps motion.
+    const VAR_BUDGET = 1000 / 20;
+    let lastVarTime  = 0;
+    // Only write CSS vars when the mouse has actually moved since last write.
+    let lastMx = _m.x, lastMy = _m.y;
+
     let raf = 0;
-    // Start running; pause when hero scrolls out of view.
     let heroActive = true;
 
     const tick = (now: number) => {
       if (heroActive) raf = requestAnimationFrame(tick);
 
-      // LERP runs every rAF so the interpolation stays time-accurate even
-      // when we skip a DOM-write frame.
       lx += (_m.x - lx) * LERP;
       ly += (_m.y - ly) * LERP;
 
-      if (now - lastFrameTime < FRAME_BUDGET) return;
-      lastFrameTime = now;
-
+      // Transform runs at full 60 fps — GPU-composited, effectively free.
       stage.style.transform =
         `translate3d(${_m.x * 96}px,${_m.y * 60}px,0)` +
         ` rotateX(${-ly * 18}deg)` +
         ` rotateY(${lx * 28}deg)`;
+
+      // CSS vars: only when mouse moved AND enough time has elapsed.
+      const mouseMoved = _m.x !== lastMx || _m.y !== lastMy;
+      if (!mouseMoved || now - lastVarTime < VAR_BUDGET) return;
+      lastVarTime = now;
+      lastMx = _m.x;
+      lastMy = _m.y;
 
       const gx = (lx + 0.5) * 100;
       const gy = (ly + 0.5) * 100;
@@ -102,7 +109,7 @@ function ThemeABuild() {
   return (
     <div
       ref={stageRef}
-      style={{ willChange: "transform", transformStyle: "preserve-3d" }}
+      style={{ willChange: "transform" }}
     >
       <motion.span
         ref={wordRef}
