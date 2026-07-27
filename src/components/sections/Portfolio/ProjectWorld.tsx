@@ -1330,20 +1330,23 @@ function Scene({
   );
 }
 
-// ── 30 fps frame driver ───────────────────────────────────────────────────────
-// Uses setInterval instead of requestAnimationFrame so the browser's RAF budget
-// is entirely free for CSS transitions, hover effects, and input event handling.
-// A RAF-based throttle loop fires at 60 fps just to *check* if 33ms passed —
-// those 60 callbacks/s steal frame budget that the browser needs for hover glows
-// and smooth input processing. setInterval fires only 30×/s and leaves the
-// RAF queue clean between Three.js renders.
+// ── 60 fps frame driver ───────────────────────────────────────────────────────
+// Uses requestAnimationFrame so Three.js renders are synchronised with the
+// browser's vsync. This eliminates the micro-stutters that setInterval caused
+// (setInterval fires at arbitrary points in the frame, missing vsync alignment).
+// The scene is cheap (DPR 0.4–0.8, no shadows) so 60 fps is fine.
 interface FrameDriverProps { paused: boolean; }
 function FrameDriver({ paused }: FrameDriverProps) {
   const { invalidate } = useThree();
   useEffect(() => {
     if (paused) return;
-    const id = setInterval(invalidate, 1000 / 30);
-    return () => clearInterval(id);
+    let rafId: number;
+    const tick = () => {
+      invalidate();
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
   }, [invalidate, paused]);
   return null;
 }

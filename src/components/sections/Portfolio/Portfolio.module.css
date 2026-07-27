@@ -611,20 +611,20 @@
   isolation: isolate;
 }
 
-/* Colored border glow rendered up-front on a composited layer.
-   transform:translateZ(0) forces immediate GPU layer creation at mount time
-   (not deferred until first hover). No transition — opacity is toggled
-   instantly so hover feels synchronous even under WebGL frame pressure. */
+/* Colored border glow rendered on a GPU-composited layer.
+   opacity: 0.0001 (not 0) keeps the layer warm in the compositor at all times —
+   opacity: 0 allows the browser to drop the layer until first hover, causing a
+   1-2 frame "warm-up" delay. 0.0001 is invisible to the eye but keeps the
+   layer active so hover response is truly instant.
+   The JS onMouseEnter/onMouseLeave sets --glow-op via inline style, bypassing
+   CSS :hover evaluation (which runs after JS tasks) for a synchronous response. */
 .modeBtn::after {
   content: '';
   position: absolute;
   inset: -1.5px;
   border-radius: 17px; /* 16px card radius + 1.5px border */
   border: 1.5px solid transparent;
-  opacity: 0;
-  /* No transition: the FrameDriver is paused while the modal is visible so
-     the GPU is idle, but an explicit 0s transition guarantees instant paint
-     regardless of frame timing. */
+  opacity: var(--glow-op, 0.0001);
   transition: none;
   pointer-events: none;
   transform: translateZ(0);
@@ -633,7 +633,6 @@
 
 .modeBtn:hover { transform: translateY(-2px); }
 .modeBtn:active { transform: scale(0.97); }
-.modeBtn:hover::after { opacity: 1; }
 
 .modeBtnAuto::after {
   border-color: rgba(100, 160, 255, 0.5);

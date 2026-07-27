@@ -384,14 +384,24 @@ export default function Portfolio({ active = false }: PortfolioProps) {
             <h3 className={styles.modalTitle}>How do you want to explore?</h3>
             <p className={styles.modalSub}>Choose how to navigate through our projects</p>
             <div className={styles.modalOptions}>
-              <button className={`${styles.modeBtn} ${styles.modeBtnAuto}`} onClick={selectAuto}>
+              <button
+                className={`${styles.modeBtn} ${styles.modeBtnAuto}`}
+                onClick={selectAuto}
+                onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.setProperty("--glow-op", "1")}
+                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.setProperty("--glow-op", "0.0001")}
+              >
                 <span className={styles.modeBtnIcon}>🤖</span>
                 <span className={styles.modeBtnLabel}>Automatic</span>
                 <span className={styles.modeBtnDesc}>
                   The car drives itself to each project. Just click <em>Start Tour</em> and use the arrows.
                 </span>
               </button>
-              <button className={`${styles.modeBtn} ${styles.modeBtnManual}`} onClick={selectManual}>
+              <button
+                className={`${styles.modeBtn} ${styles.modeBtnManual}`}
+                onClick={selectManual}
+                onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.setProperty("--glow-op", "1")}
+                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.setProperty("--glow-op", "0.0001")}
+              >
                 <span className={styles.modeBtnIcon}>🕹️</span>
                 <span className={styles.modeBtnLabel}>Manual</span>
                 <span className={styles.modeBtnDesc}>
