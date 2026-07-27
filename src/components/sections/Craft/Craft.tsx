@@ -173,8 +173,25 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
             <button
               className={`${styles.giftBtn} cursor-target`}
               onClick={() => setShowGift(true)}
+              aria-label="Open gift"
             >
-              GIFT
+              <span className={styles.giftLabel}>GIFT</span>
+              <svg
+                className={styles.giftIcon}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M20 12v8a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-8" />
+                <path d="M2 7h20v5H2z" />
+                <path d="M12 7v14" />
+                <path d="M12 7H7.5a2.5 2.5 0 1 1 2.5-2.5C10 6 12 7 12 7Z" />
+                <path d="M12 7h4.5A2.5 2.5 0 1 0 14 4.5C14 6 12 7 12 7Z" />
+              </svg>
             </button>
           </div>
 

@@ -193,6 +193,7 @@
   color: #000;
   box-shadow: 0 0 18px rgba(0,0,0,0.12);
 }
+.giftIcon { display: none; }
 
 .bottomRight {
   display: flex;
@@ -707,10 +708,29 @@
     grid-area: left;
     align-self: start;
     min-width: 0;
+    padding-bottom: 34px;
   }
   .bottomCenter {
-    grid-area: center;
+    grid-area: left;
     align-self: end;
+    justify-self: start;
+    padding: 0;
+  }
+  .giftBtn {
+    width: 20px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+  .giftLabel { display: none; }
+  .giftIcon {
+    display: block;
+    width: 16px;
+    height: 16px;
   }
   .bottomRight  {
     grid-area: right;
