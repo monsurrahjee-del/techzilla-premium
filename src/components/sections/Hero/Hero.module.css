@@ -2127,3 +2127,15 @@ font-size:clamp(72px,18vw,140px);
     display: none !important;
   }
 }
+
+/* ============================================================
+   IPHONE SE (≤390px) — headline size reduction
+   MUST stay at the very end so it overrides all !important
+   rules above.  Touch nothing above 767px.
+   ============================================================ */
+
+@media (max-width: 390px) {
+  .heroHeadline {
+    font-size: clamp(1.65rem, 8.8vw, 2.4rem) !important;
+  }
+}

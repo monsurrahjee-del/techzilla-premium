@@ -230,3 +230,25 @@ transform:translate(0,0);
 }
 
 }
+/* ============================================================
+   MOBILE — preloader fixes (≤767px, touch nothing above)
+   ============================================================ */
+
+@media (max-width: 767px) {
+  /* Prevent "TECHZILLA INC." from overflowing on narrow screens.
+     At 2rem + 0.35em letter-spacing the text is ~420px wide — wider
+     than an iPhone SE (375px).  Shrink the font and tighten spacing
+     so the logo always fits within the viewport. */
+  .loader h1 {
+    font-size: clamp(1.1rem, 5.2vw, 1.6rem);
+  }
+  .logo {
+    letter-spacing: 0.18em;
+  }
+
+  /* Progress bar — slightly narrower top margin on short screens */
+  .progressWrapper {
+    width: min(320px, 82vw);
+    margin-top: 36px;
+  }
+}
