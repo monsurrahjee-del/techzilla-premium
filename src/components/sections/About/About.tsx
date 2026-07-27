@@ -137,7 +137,7 @@ export default function About({ active = false }: AboutProps) {
       </div>
       <div className={styles.terminalLayer}>
         <FaultyTerminal
-          pause={false}
+          pause={paused}
           scale={1.4}
           gridMul={[2, 1]}
           digitSize={1.2}

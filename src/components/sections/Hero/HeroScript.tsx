@@ -40,7 +40,9 @@ function ThemeABuild() {
 
     let lx = 0, ly = 0;
     const LERP = 0.055;
-    let raf: number;
+    let raf = 0;
+    // Start running; pause when hero scrolls out of view.
+    let heroActive = true;
 
     const tick = () => {
       lx += (_m.x - lx) * LERP;
@@ -59,11 +61,31 @@ function ThemeABuild() {
       word.style.setProperty("--spec-x",     `${28 + gx * 0.44}%`);
       word.style.setProperty("--spec-y",     `${18 + gy * 0.44}%`);
 
-      raf = requestAnimationFrame(tick);
+      if (heroActive) raf = requestAnimationFrame(tick);
     };
 
+    // Gate on the same "hero-section-active" event used by WaterRipple and
+    // HeroSplash. When Hero scrolls away (heroActive=false) the 60fps DOM-
+    // update loop is cancelled so it no longer competes with the Portfolio
+    // Three.js canvas and CSS repaints.
+    const onHeroSection = (e: Event) => {
+      const { heroActive: nowActive } = (e as CustomEvent<{ heroActive: boolean }>).detail;
+      if (nowActive && !heroActive) {
+        heroActive = true;
+        raf = requestAnimationFrame(tick);
+      } else if (!nowActive && heroActive) {
+        heroActive = false;
+        cancelAnimationFrame(raf);
+        raf = 0;
+      }
+    };
+
+    window.addEventListener("hero-section-active", onHeroSection);
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("hero-section-active", onHeroSection);
+    };
   }, []);
 
   return (
