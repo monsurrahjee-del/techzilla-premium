@@ -407,7 +407,9 @@ export default function Portfolio({ active = false }: PortfolioProps) {
                 <span className={styles.modeBtnIcon}>🤖</span>
                 <span className={styles.modeBtnLabel}>Automatic</span>
                 <span className={styles.modeBtnDesc}>
-                  The car drives itself to each project. Just click <em>Start Tour</em> and use the arrows.
+                  {isMobile
+                    ? "Tap here to begin the experience"
+                    : <>The car drives itself to each project. Just click <em>Start Tour</em> and use the arrows.</>}
                 </span>
               </button>
               {!isMobile && (
