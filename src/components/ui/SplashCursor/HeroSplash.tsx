@@ -8,11 +8,12 @@
  * Hero.tsx dispatches "hero-theme-change" on every theme toggle.
  *
  * Rules:
- *   heroActive=false          → hide + pause (hero scrolled away)
- *   heroActive=true, theme=light → hide + pause (BuildFluid3D is running;
- *                                  two concurrent WebGL loops saturate the GPU
- *                                  and make the cursor feel heavy)
- *   heroActive=true, theme=dark  → show + run (only the fluid sim runs)
+ *   heroActive=false           → hide + pause (hero scrolled away)
+ *   heroActive=true, theme=dark  → hide + pause (ThemeABuild runs a concurrent
+ *                                  WebGL loop that saturates the GPU compositor
+ *                                  and makes the cursor feel heavy)
+ *   heroActive=true, theme=light → show + run (BuildFluid3D is throttled + low
+ *                                  DPR, so coexistence is fine)
  *
  * Key design decisions:
  * - opacity / hidden is controlled via SplashCursor's OWN position:fixed div,
@@ -26,17 +27,20 @@ import { useEffect, useRef, useState } from "react";
 import SplashCursor from "./index";
 
 export default function HeroSplash() {
-  // Default: hero starts active, theme starts "light" → begin paused so the
-  // fluid sim doesn't compete with BuildFluid3D on the very first frame.
-  const [hidden, setHidden] = useState(true);
-  const [paused, setPaused] = useState(true);
+  // Default: hero starts active, theme starts "light" → fluid sim runs fine
+  // alongside BuildFluid3D in light mode (they coexist without lag).
+  // Dark mode (ThemeABuild) is the expensive one — pause the fluid sim there.
+  const [hidden, setHidden] = useState(false);
+  const [paused, setPaused] = useState(false);
 
-  const heroActiveRef  = useRef(true);
+  const heroActiveRef   = useRef(true);
   const themeIsLightRef = useRef(true); // Hero default theme is "light"
 
   useEffect(() => {
     const update = () => {
-      const shouldPause = !heroActiveRef.current || themeIsLightRef.current;
+      // Pause when hero scrolled away OR when dark theme is active (ThemeABuild
+      // runs a concurrent WebGL loop that saturates the GPU compositor).
+      const shouldPause = !heroActiveRef.current || !themeIsLightRef.current;
       setHidden(shouldPause);
       setPaused(shouldPause);
     };
