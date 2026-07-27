@@ -638,7 +638,9 @@ export default function SplashCursor({
     function handleTouchEnd(e: TouchEvent) { const pointer = pointers[0]; for (let i = 0; i < e.changedTouches.length; i++) updatePointerUpData(pointer); }
 
     window.addEventListener('mousedown', handleMouseDown);
-    window.addEventListener('mousemove', handleMouseMove);
+    // passive: true lets the browser move the cursor immediately without
+    // waiting for this handler to finish — eliminates compositor-thread lag.
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
     window.addEventListener('touchstart', handleTouchStart);
     window.addEventListener('touchmove', handleTouchMove, false);
     window.addEventListener('touchend', handleTouchEnd);

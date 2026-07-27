@@ -39,7 +39,7 @@ function ThemeABuild() {
     if (!stage || !word) return;
 
     let lx = 0, ly = 0;
-    const LERP = 0.055;
+    const LERP = 0.12; // raised from 0.055 — text tracks cursor more snappily
     let raf = 0;
     // Start running; pause when hero scrolls out of view.
     let heroActive = true;
@@ -48,9 +48,10 @@ function ThemeABuild() {
       lx += (_m.x - lx) * LERP;
       ly += (_m.y - ly) * LERP;
 
-      // stage.style.transform intentionally removed — mouse-driven translate3d
-      // + rotateX/rotateY was causing the text to physically chase the cursor,
-      // which the user reported as unwanted movement.
+      stage.style.transform =
+        `translate3d(${_m.x * 96}px,${_m.y * 60}px,0)` +
+        ` rotateX(${-ly * 18}deg)` +
+        ` rotateY(${lx * 28}deg)`;
 
       const gx = (lx + 0.5) * 100;
       const gy = (ly + 0.5) * 100;
