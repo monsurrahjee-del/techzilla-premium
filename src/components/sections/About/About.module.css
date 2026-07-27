@@ -320,14 +320,17 @@
     gap: clamp(14px, 2.5svh, 28px);
   }
 
-  /* Headline: lock to rem so different phone widths render the same size */
+  /* Headline: 5.95vw evaluates to exactly 1.6rem at 430 px (iPhone 14 Pro Max),
+     then scales down proportionally on narrower phones so the line-break
+     rhythm stays consistent across all mobile widths. */
   .headline {
-    font-size: clamp(1.6rem, 5.8vw, 2.2rem);
+    font-size: clamp(1.2rem, 5.95vw, 2.2rem);
   }
 
-  /* Sub text: same principle */
+  /* Sub text: 3.35vw = 0.9rem at 430 px, proportionally smaller on
+     narrower phones so the paragraph wrapping matches the headline. */
   .sub {
-    font-size: clamp(0.9rem, 3.2vw, 1.4rem);
+    font-size: clamp(0.72rem, 3.35vw, 1.4rem);
   }
 
   .bottomBar { padding: 0 5vw; }
