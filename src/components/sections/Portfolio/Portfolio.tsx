@@ -394,7 +394,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
             </h3>
             <p className={styles.modalSub}>
               {isMobile
-                ? "The car drives itself to each project. Tap Start Tour, then use the arrows to move between stops."
+                ? "The car drives itself to each project. Tap Start Tour, then use the arrows to move between projects."
                 : "Choose how to navigate through our projects"}
             </p>
             <div className={styles.modalOptions}>

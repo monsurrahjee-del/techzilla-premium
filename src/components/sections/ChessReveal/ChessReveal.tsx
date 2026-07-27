@@ -267,6 +267,9 @@ function drawPhrases(
   progress: number,
 ) {
   if (progress <= 0) return;
+  // On mobile the phrases are positioned for a desktop side-by-side layout and
+  // would overlap the centred circle — hide them entirely on narrow screens.
+  if (W < 768) return;
   const fs = Math.round(clamp(W * 0.018, 12, 22));
   ctx.save();
   ctx.font = `300 ${fs}px 'Inter','Helvetica Neue',sans-serif`;

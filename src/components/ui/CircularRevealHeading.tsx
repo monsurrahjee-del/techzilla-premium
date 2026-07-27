@@ -27,7 +27,7 @@ const sizeConfig = {
         textStyle: 'font-medium'
     },
     md: {
-        container: 'h-[400px] w-[400px]',
+        container: 'h-[min(400px,90vw)] w-[min(400px,90vw)]',
         fontSize: 'text-sm',
         tracking: 'tracking-[0.3em]',
         radius: 160,
