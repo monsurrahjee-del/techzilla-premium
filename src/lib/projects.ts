@@ -10,8 +10,8 @@ export interface Project {
   scrollMult?: number;
   /** Maximum tilt angle in degrees for the 3D perspective effect */
   tiltMax?: number;
-  /** Transition entrance easing — varies per project to avoid robotic uniformity */
-  enterEase?: [number, number, number, number];
+  /** Transition entrance easing — GSAP ease string, varies per project to avoid robotic uniformity */
+  enterEase?: string;
   /** How long the reading pause at the top is (seconds) */
   pauseTop?: number;
   /** Glass tint — applied to the browser chrome to give each project a unique atmosphere */
@@ -29,7 +29,7 @@ export const projects: Project[] = [
     glow: "rgba(255,122,0,0.35)",
     scrollMult: 0.85,
     tiltMax: 16,
-    enterEase: [0.34, 1.56, 0.64, 1],
+    enterEase: "back.out(1.4)",
     pauseTop: 1.8,
     glassTint: "rgba(40,18,6,0.12)",
   },
@@ -44,7 +44,7 @@ export const projects: Project[] = [
     glow: "rgba(0,201,255,0.35)",
     scrollMult: 1.1,
     tiltMax: 20,
-    enterEase: [0.22, 1, 0.36, 1],
+    enterEase: "power3.out",
     pauseTop: 1.2,
     glassTint: "rgba(0,40,60,0.10)",
   },
@@ -59,7 +59,7 @@ export const projects: Project[] = [
     glow: "rgba(77,124,254,0.35)",
     scrollMult: 0.95,
     tiltMax: 14,
-    enterEase: [0.25, 0.46, 0.45, 0.94],
+    enterEase: "power2.out",
     pauseTop: 1.5,
     glassTint: "rgba(10,20,50,0.12)",
   },
@@ -74,7 +74,7 @@ export const projects: Project[] = [
     glow: "rgba(0,200,83,0.35)",
     scrollMult: 1.05,
     tiltMax: 18,
-    enterEase: [0.16, 1, 0.3, 1],
+    enterEase: "power4.out",
     pauseTop: 1.0,
     glassTint: "rgba(0,30,15,0.10)",
   },
@@ -89,7 +89,7 @@ export const projects: Project[] = [
     glow: "rgba(168,85,247,0.35)",
     scrollMult: 0.9,
     tiltMax: 22,
-    enterEase: [0.34, 1.45, 0.64, 1],
+    enterEase: "back.out(1.2)",
     pauseTop: 2.0,
     glassTint: "rgba(30,10,50,0.12)",
   },
@@ -104,7 +104,7 @@ export const projects: Project[] = [
     glow: "rgba(244,63,94,0.35)",
     scrollMult: 1.15,
     tiltMax: 17,
-    enterEase: [0.22, 1, 0.36, 1],
+    enterEase: "power3.out",
     pauseTop: 1.3,
     glassTint: "rgba(50,10,15,0.10)",
   },
@@ -119,7 +119,7 @@ export const projects: Project[] = [
     glow: "rgba(124,58,237,0.35)",
     scrollMult: 0.88,
     tiltMax: 15,
-    enterEase: [0.16, 1, 0.3, 1],
+    enterEase: "power4.out",
     pauseTop: 1.6,
     glassTint: "rgba(20,8,40,0.12)",
   },
