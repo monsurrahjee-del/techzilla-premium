@@ -973,3 +973,198 @@ z-index:8;
   color: rgba(255, 255, 255, 0.85);
   max-width: min(220px, 30vw) !important;
 }
+
+/* ============================================================
+   RIM LIGHTING — cursor-reactive frame edge highlight
+   --lx / --ly are set by Showcase.tsx onMove (-1 to +1)
+   ============================================================ */
+
+.rimLight {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 8;
+  /* Radial glow that follows cursor position via CSS vars */
+  background: radial-gradient(
+    ellipse 65% 75% at
+    calc(50% + var(--lx, 0) * 42%)
+    calc(50% + var(--ly, 0) * 42%),
+    rgba(180, 210, 255, 0.065) 0%,
+    rgba(120, 170, 255, 0.020) 45%,
+    transparent 68%
+  );
+  /* Edge highlight: shifts toward the light source side */
+  box-shadow:
+    /* Lit edge — side facing light source */
+    inset calc(var(--lx, 0) * -4px + 0.5px)
+          calc(var(--ly, 0) * -3px + 0.5px) 0
+          rgba(255, 255, 255, 0.18),
+    /* Shadow edge — opposite side */
+    inset calc(var(--lx, 0) * 4px - 0.5px)
+          calc(var(--ly, 0) * 3px - 0.5px) 0
+          rgba(0, 0, 0, 0.22);
+  mix-blend-mode: screen;
+  transition: opacity 0.3s ease;
+}
+
+/* ============================================================
+   FRAME — premium defaults for --lx / --ly CSS vars
+   ============================================================ */
+
+.frame {
+  --lx: 0;
+  --ly: 0;
+}
+
+/* Deeper glass depth when hovering */
+.frame:hover {
+  box-shadow:
+    0 100px 200px rgba(0,0,0,.55),
+    0 40px  80px  rgba(0,0,0,.30),
+    0 0     60px  rgba(var(--accent, 60,100,255),.08);
+}
+
+/* ============================================================
+   FRAME EDGE — physical thickness simulation
+   ============================================================ */
+
+.frameEdge {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 9;
+  box-shadow:
+    /* Top-left lit edge (light source = top-left) */
+    inset  1.5px  1.5px 0   rgba(255,255,255,0.20),
+    inset  0.5px  0.5px 0   rgba(255,255,255,0.10),
+    /* Bottom-right shadow edge */
+    inset -1.5px -1.5px 0   rgba(0,0,0,0.30);
+}
+
+/* ============================================================
+   TRAFFIC LIGHTS
+   ============================================================ */
+
+.trafficLights {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+.light {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  display: block;
+  transition: filter 0.3s ease, transform 0.3s ease;
+}
+
+.lightRed    { background: #ff5f57; box-shadow: 0 0 7px rgba(255,95,87,0.55); }
+.lightYellow { background: #ffbd2e; box-shadow: 0 0 7px rgba(255,189,46,0.50); }
+.lightGreen  { background: #28c840; box-shadow: 0 0 7px rgba(40,200,64,0.55); }
+
+.frame:hover .light { filter: brightness(1.2); transform: scale(1.08); }
+
+/* ============================================================
+   ADDRESS BAR
+   ============================================================ */
+
+.addressBar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 340px;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.09);
+  backdrop-filter: blur(6px);
+  overflow: hidden;
+}
+
+.lockIcon {
+  width: 10px;
+  height: 12px;
+  flex-shrink: 0;
+  color: rgba(255,255,255,0.50);
+}
+
+.addressBar .frameUrl {
+  font-size: 0.73rem !important;
+  opacity: 0.75;
+  max-width: min(220px, 28vw) !important;
+}
+
+/* ============================================================
+   LIVE INDICATOR
+   ============================================================ */
+
+.frameRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.liveLabel {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(40,200,64,0.88);
+  font-family: monospace;
+}
+
+/* ============================================================
+   SCREEN REFLECTION — diagonal specular sweep
+   ============================================================ */
+
+.screenReflection {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+  background: linear-gradient(
+    128deg,
+    rgba(255,255,255,0.065) 0%,
+    rgba(255,255,255,0.012) 35%,
+    transparent 55%
+  );
+  border-radius: inherit;
+  animation: screenReflSweep 9s ease-in-out infinite;
+}
+
+@keyframes screenReflSweep {
+  0%   { opacity: 0.45; transform: translateX(0);    }
+  40%  { opacity: 0.85; }
+  70%  { opacity: 0.45; transform: translateX(4px);  }
+  100% { opacity: 0.45; transform: translateX(0);    }
+}
+
+/* ============================================================
+   BROWSER GLOW — accented by --glow from project config
+   ============================================================ */
+
+.browserGlow {
+  position: absolute;
+  left: 50%;
+  bottom: -90px;
+  transform: translateX(-50%);
+  width: 70%;
+  height: 180px;
+  background: radial-gradient(ellipse, var(--glow, rgba(60,100,255,0.4)), transparent 70%);
+  filter: blur(80px);
+  pointer-events: none;
+  z-index: -1;
+  animation: glowBreathe 4.5s ease-in-out infinite;
+  transition: background 0.8s ease;
+}
+
+@keyframes glowBreathe {
+  0%, 100% { opacity: 0.7; transform: translateX(-50%) scaleY(1);    }
+  50%       { opacity: 1.0; transform: translateX(-50%) scaleY(1.18); }
+}

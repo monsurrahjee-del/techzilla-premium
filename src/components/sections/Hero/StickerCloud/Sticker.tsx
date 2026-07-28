@@ -16,23 +16,35 @@ interface StickerProps {
   depth: number;
   floatDur: number;
   floatAmp: number;
-  /** true → z-index 18 (in front of script word); false → z-index 12 (behind) */
   front?: boolean;
-  /** How strongly cursor attracts this sticker (0 = none, 1 = strong) */
+  /** Attraction pull strength when cursor is in mid-range (0–1) */
   pull?: number;
-  /** Max px displacement toward cursor */
+  /** Max px displacement */
   maxPull?: number;
-  /** Spring stiffness (higher = snappier) */
+  /** Spring stiffness */
   stiffness?: number;
   /** Spring damping */
   damping?: number;
 }
 
+/**
+ * Each sticker behaves like a physical floating object:
+ *
+ *  • cursor < DEFLECT_RADIUS px  → exponential push-away  (avoidance zone)
+ *  • cursor < ATTRACT_RADIUS px  → spring attraction      (magnetic zone)
+ *  • cursor > ATTRACT_RADIUS px  → spring to origin        (resting)
+ *
+ * The three zones create a "magnetic/repulsive" personality per sticker
+ * that makes interactions feel alive and physical rather than scripted.
+ */
+const DEFLECT_RADIUS = 92;   // px — push-away zone
+const ATTRACT_RADIUS = 520;  // px — pull-in zone
+
 export default function Sticker({
   src, size, top, left, delay, rotate, depth, floatDur, floatAmp,
   front = false,
   pull = 0.3,
-  maxPull = 40,
+  maxPull = 42,
   stiffness = 120,
   damping = 18,
 }: StickerProps) {
@@ -41,13 +53,13 @@ export default function Sticker({
 
   const zIndex = front ? 18 : 12;
 
-  // Spring-based cursor attraction
   const cursorX = useMotionValue(0);
   const cursorY = useMotionValue(0);
   const springX = useSpring(cursorX, { stiffness, damping, restDelta: 0.5 });
   const springY = useSpring(cursorY, { stiffness, damping, restDelta: 0.5 });
 
-  const dropShadow = `drop-shadow(0 ${12 + depth * 0.25}px ${28 + depth * 0.8}px rgba(0,0,0,0.38))`;
+  // Shadow deepens with depth (closer to viewer = harder shadow)
+  const dropShadow = `drop-shadow(0 ${10 + depth * 0.22}px ${24 + depth * 0.72}px rgba(0,0,0,${0.30 + depth * 0.003}))`;
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
@@ -58,12 +70,27 @@ export default function Sticker({
       const cy   = rect.top  + rect.height / 2;
       const dx   = e.clientX - cx;
       const dy   = e.clientY - cy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      const dist = Math.hypot(dx, dy);
 
-      // Attraction falls off with distance — full pull within ~200px, fades to 0 at 600px
-      const influence = Math.max(0, 1 - dist / 600);
-      const targetX   = Math.min(Math.max(dx * pull * influence, -maxPull), maxPull);
-      const targetY   = Math.min(Math.max(dy * pull * influence, -maxPull), maxPull);
+      let targetX = 0;
+      let targetY = 0;
+
+      if (dist < DEFLECT_RADIUS && dist > 0.5) {
+        // Avoidance zone: exponential push-away — sticker flees the cursor
+        const pushStrength = Math.pow(1 - dist / DEFLECT_RADIUS, 2.2) * maxPull * 2.2;
+        const nx = dx / dist;
+        const ny = dy / dist;
+        targetX  = -nx * pushStrength;
+        targetY  = -ny * pushStrength;
+      } else if (dist < ATTRACT_RADIUS) {
+        // Magnetic zone: smooth attraction with distance falloff
+        const influence = Math.max(0, (1 - dist / ATTRACT_RADIUS));
+        // Ease-in the attraction so it doesn't snap immediately
+        const eased = influence * influence;
+        targetX = Math.sign(dx) * Math.min(Math.abs(dx * pull * eased), maxPull);
+        targetY = Math.sign(dy) * Math.min(Math.abs(dy * pull * eased), maxPull);
+      }
+      // else: resting — targetX/targetY stay 0, spring settles naturally
 
       cursorX.set(targetX);
       cursorY.set(targetY);
@@ -87,28 +114,29 @@ export default function Sticker({
       ref={containerRef}
       className={styles.sticker}
       style={{ top, left, width: size, height: size, zIndex, x: springX, y: springY }}
-      initial={{ opacity: 0, scale: 0.4, rotate: rotate - 22 }}
-      animate={{ opacity: 1, scale: 1,   rotate }}
+      initial={{ opacity: 0, scale: 0.35, rotate: rotate - 28, filter: "blur(6px)" }}
+      animate={{ opacity: 1, scale: 1,   rotate,               filter: "blur(0px)" }}
       transition={{
-        opacity: { duration: 0.60, delay,       ease: [0.22, 1, 0.36, 1] },
-        scale:   { duration: 0.70, delay,       ease: [0.34, 1.56, 0.64, 1] },
-        rotate:  { duration: 0.80, delay,       ease: [0.22, 1, 0.36, 1] },
+        opacity: { duration: 0.65, delay,       ease: [0.22, 1, 0.36, 1] },
+        scale:   { duration: 0.80, delay,       ease: [0.34, 1.60, 0.64, 1] },
+        rotate:  { duration: 0.85, delay,       ease: [0.22, 1, 0.36, 1] },
+        filter:  { duration: 0.60, delay,       ease: "easeOut" },
       }}
     >
-      {/* Inner div: continuous idle float with unique path */}
+      {/* Idle float: each sticker has a completely unique 6-keyframe path */}
       <motion.div
         style={{ width: "100%", height: "100%", willChange: "transform" }}
         animate={{
-          y:      [0, -floatAmp, floatAmp * 0.45, -floatAmp * 0.6, floatAmp * 0.2, 0],
-          rotate: [rotate, rotate + 6, rotate - 5, rotate + 4, rotate - 2, rotate],
-          scale:  [1, 1.025, 0.978, 1.01, 0.99, 1],
+          y:      [0, -floatAmp, floatAmp * 0.42, -floatAmp * 0.64, floatAmp * 0.18, 0],
+          rotate: [rotate, rotate + 7, rotate - 5, rotate + 4, rotate - 2, rotate],
+          scale:  [1, 1.028, 0.972, 1.014, 0.988, 1],
         }}
         transition={{
           duration: floatDur,
-          delay:    delay + 0.9,
+          delay:    delay + 0.95,
           repeat:   Infinity,
           ease:     "easeInOut",
-          times:    [0, 0.22, 0.44, 0.62, 0.82, 1],
+          times:    [0, 0.20, 0.42, 0.62, 0.82, 1],
         }}
       >
         <Image
