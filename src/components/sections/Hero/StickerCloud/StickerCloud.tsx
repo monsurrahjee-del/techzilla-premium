@@ -1,7 +1,6 @@
 "use client";
 
 import { useLoaded } from "@/hooks/useLoaded";
-import { useIsMobile } from "@/hooks/useIsMobile";
 import Sticker from "./Sticker";
 
 const stickers = [
@@ -21,10 +20,10 @@ const stickers = [
 
 export default function StickerCloud() {
   const loaded = useLoaded();
-  const isMobile = useIsMobile();
 
-  // Don't render stickers on mobile (saves GPU/CPU) or before the hero is ready.
-  if (!loaded || isMobile) return null;
+  // Don't render any stickers until the hero is ready — they'll appear
+  // naturally with their own float animations as the page reveals.
+  if (!loaded) return null;
 
   return (
     <>

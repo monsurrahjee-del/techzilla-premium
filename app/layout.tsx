@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
-import DesktopOnlyEffects from "@/components/ui/DesktopOnlyEffects";
+import TargetCursor from "@/components/ui/TargetCursor";
+import ScrollBar from "@/components/ui/ScrollBar/ScrollBar";
+import HeroSplash from "@/components/ui/SplashCursor/HeroSplash";
 import { Geist, Geist_Mono, Instrument_Serif, Pacifico, Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
 import Loader from "@/components/ui/Loader";
@@ -50,8 +52,10 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} ${pacifico.variable} ${bricolage.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <DesktopOnlyEffects />
+        <HeroSplash />
+        <TargetCursor spinDuration={2} hideDefaultCursor parallaxOn hoverDuration={0.2} cursorColor="#ffffff" cursorColorOnTarget="#B497CF" />
         <Loader />
+        <ScrollBar />
       {children}</body>
     </html>
   );

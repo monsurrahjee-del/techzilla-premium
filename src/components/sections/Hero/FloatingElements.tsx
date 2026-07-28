@@ -5,7 +5,6 @@ import { gsap } from "@/lib/gsap";
 
 import styles from "./Hero.module.css";
 import Parallax from "@/components/ui/Parallax";
-import { useIsMobile } from "@/hooks/useIsMobile";
 
 
 const items = [
@@ -20,11 +19,9 @@ const items = [
 export default function FloatingElements(){
 
 const container = useRef<HTMLDivElement>(null);
-const isMobile = useIsMobile();
 
 
 useEffect(()=>{
-  if (isMobile) return;
 
 const elements =
 container.current?.querySelectorAll(
@@ -63,8 +60,6 @@ delay:index*.3
 },[]);
 
 
-
-if (isMobile) return null;
 
 return (
 
