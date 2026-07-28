@@ -101,7 +101,7 @@ export default function Showcase({ onIndexChange }: { onIndexChange?: (i: number
       if (!overlay) return;
 
       const nextProject = projects[(index + 1) % projects.length];
-      const enterEase   = nextProject.enterEase ?? [0.22, 1, 0.36, 1];
+      const enterEase   = nextProject.enterEase ?? "power3.out";
 
       switch (variant) {
         case 0: {
