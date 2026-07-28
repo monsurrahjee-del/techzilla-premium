@@ -16,6 +16,9 @@ export default function HeroContent({ children }: { children: React.ReactNode })
     const yTo       = gsap.quickTo(ref.current, "y",       { duration: 0.1, ease: "power3.out" });
     const rotateYTo = gsap.quickTo(ref.current, "rotateY", { duration: 0.1, ease: "power3.out" });
 
+    // Touch devices have no cursor — skip the tilt/pan listener.
+    if (window.matchMedia("(pointer: coarse)").matches) return;
+
     let heroActive = true;
     const onHeroActive = (e: Event) => {
       heroActive = (e as CustomEvent<{ heroActive: boolean }>).detail.heroActive;

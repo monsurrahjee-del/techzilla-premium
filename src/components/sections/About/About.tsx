@@ -67,16 +67,22 @@ interface AboutProps {
 export default function About({ active = false }: AboutProps) {
   // ── Coord display — update DOM directly, never trigger a React re-render ───
   const coordSpanRef = useRef<HTMLSpanElement>(null);
+  // Touch devices have no cursor — skip the coordinate-tracking listener.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mobile = window.matchMedia("(pointer: coarse)").matches;
+    setIsMobile(mobile);
+  }, []);
   useEffect(() => {
     const span = coordSpanRef.current;
-    if (!span) return;
+    if (!span || isMobile) return;
     const fn = (e: MouseEvent) => {
       span.textContent =
         `${String(e.clientX).padStart(4, "0")}\u00a0X\u00a0${String(e.clientY).padStart(4, "0")}\u00a0Y`;
     };
     window.addEventListener("mousemove", fn, { passive: true });
     return () => window.removeEventListener("mousemove", fn);
-  }, []);
+  }, [isMobile]);
 
   // ── Clock — also DOM-direct ───────────────────────────────────────────────
   const clockSpanRef = useRef<HTMLSpanElement>(null);
@@ -125,8 +131,8 @@ export default function About({ active = false }: AboutProps) {
         <LiquidEther
           paused={paused}
           colors={["#1a0a4f", "#5227FF", "#B497CF", "#FF9FFC"]}
-          mouseForce={60}
-          cursorSize={60}
+          mouseForce={isMobile ? 0 : 60}
+          cursorSize={isMobile ? 0 : 60}
           isViscous
           viscous={6}
           iterationsViscous={8}
@@ -153,8 +159,8 @@ export default function About({ active = false }: AboutProps) {
           noiseAmp={0.9}
           curvature={0.08}
           tint="#B497CF"
-          mouseReact
-          mouseStrength={0.4}
+          mouseReact={!isMobile}
+          mouseStrength={isMobile ? 0 : 0.4}
           mouseLerp={1}
           pageLoadAnimation={false}
           brightness={0.55}

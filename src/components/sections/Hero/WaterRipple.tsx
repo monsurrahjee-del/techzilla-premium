@@ -19,6 +19,19 @@ export default function WaterRipple() {
     const el = ref.current;
     if (!el) return;
 
+    // On touch/mobile devices there is no cursor to follow — show a static
+    // centred glow instead and skip the RAF + mousemove listener entirely.
+    if (window.matchMedia("(pointer: coarse)").matches) {
+      const cx = window.innerWidth  * 0.50;
+      const cy = window.innerHeight * 0.42;
+      el.style.background =
+        `radial-gradient(800px circle at ${cx}px ${cy}px,` +
+        `rgba(72,110,255,0.10) 0%,` +
+        `rgba(50,82,220,0.04) 42%,` +
+        `transparent 70%)`;
+      return;
+    }
+
     let cx = window.innerWidth  * 0.50;
     let cy = window.innerHeight * 0.42;
     let tx = cx, ty = cy;

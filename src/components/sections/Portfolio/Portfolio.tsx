@@ -368,6 +368,7 @@ export default function Portfolio({ active = false }: PortfolioProps) {
             isManual={isManual}
             rccgUnlocked={rccgUnlocked}
             renderPaused={mode === "modal" || mode === "preloading"}
+            isMobile={isMobile}
           />
         )}
       </div>

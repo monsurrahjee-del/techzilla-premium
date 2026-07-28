@@ -920,14 +920,19 @@ interface SceneProps {
   isManual:         boolean;
   rccgUnlocked:     boolean;          // false until Zennyola (station n-2) is visited
   renderPaused:     boolean;          // true = skip all updates (modal/preloader is covering canvas)
+  isMobile:         boolean;          // true = reduce DPR, tighten fog culling
 }
 
 function Scene({
   onNearProject, onAtBoundary, onAutoArrived,
   theme, carColors, autopilotTarget, autopilotTourId, autopilotRewindId, autopilotPaused, isManual, rccgUnlocked,
   renderPaused,
+  isMobile,
 }: SceneProps) {
   const t = THEMES[theme];
+  // Tighten fog on mobile to cull more city geometry — biggest GPU win after DPR.
+  const fogNear = isMobile ? Math.round(t.fogNear * 0.7) : t.fogNear;
+  const fogFar  = isMobile ? Math.round(t.fogFar  * 0.55) : t.fogFar;
 
   const carRef       = useRef<THREE.Group>(null!);
 
@@ -1332,7 +1337,7 @@ function Scene({
         <Car carRef={carRef} colors={carColors} theme={theme} />
       </Suspense>
 
-      <fog attach="fog" args={[t.fogCol, t.fogNear, t.fogFar]} />
+      <fog attach="fog" args={[t.fogCol, fogNear, fogFar]} />
     </>
   );
 }
@@ -1362,12 +1367,15 @@ interface ProjectWorldProps {
   rccgUnlocked:      boolean;
   /** Pause Three.js rendering (e.g. while modal/overlay is in front). */
   renderPaused?:     boolean;
+  /** Mobile flag forwarded from Portfolio — enables GPU budget reductions. */
+  isMobile?:         boolean;
 }
 
 export default function ProjectWorld({
   onNearProject, onAtBoundary, onAutoArrived,
   theme, carColors, autopilotTarget, autopilotTourId, autopilotRewindId, autopilotPaused, isManual, rccgUnlocked,
   renderPaused = false,
+  isMobile = false,
 }: ProjectWorldProps) {
   const bg = THEMES[theme].bg;
   return (
@@ -1378,7 +1386,7 @@ export default function ProjectWorld({
       }}
       style={{ width: "100%", height: "100%" }}
       gl={{ antialias: false, alpha: false, stencil: false, powerPreference: "high-performance" }}
-      dpr={0.75}
+      dpr={isMobile ? 0.5 : 0.75}
       frameloop="always"
     >
       <color attach="background" args={[bg]} />
@@ -1395,6 +1403,7 @@ export default function ProjectWorld({
         isManual={isManual}
         rccgUnlocked={rccgUnlocked}
         renderPaused={renderPaused}
+        isMobile={isMobile}
       />
     </Canvas>
   );

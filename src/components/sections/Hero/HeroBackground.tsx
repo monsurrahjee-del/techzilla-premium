@@ -17,6 +17,9 @@ export default function HeroBackground() {
     const xTo = gsap.quickTo(glow, "x", { duration: 0.1, ease: "power3.out" });
     const yTo = gsap.quickTo(glow, "y", { duration: 0.1, ease: "power3.out" });
 
+    // Touch devices have no cursor — skip the mousemove listener.
+    if (window.matchMedia("(pointer: coarse)").matches) return;
+
     let heroActive = true;
     const onHeroActive = (e: Event) => {
       heroActive = (e as CustomEvent<{ heroActive: boolean }>).detail.heroActive;
