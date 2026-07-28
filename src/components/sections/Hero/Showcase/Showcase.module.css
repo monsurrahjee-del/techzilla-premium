@@ -2,1033 +2,363 @@
    SHOWCASE
 ======================================= */
 
-.showcase{
-
-position:relative;
-
-width:min(950px,92vw);
-
-margin:70px auto 40px;
-
-perspective:2200px;
-
-z-index:20;
-
-display:flex;
-
-flex-direction:column;
-
-align-items:center;
-
+.showcase {
+  position: relative;
+  width: min(950px, 92vw);
+  margin: 70px auto 40px;
+  perspective: 2200px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
-
 
 /* =======================================
-   BROWSER
+   BROWSER FRAME (legacy .browser — kept for safety)
 ======================================= */
 
-.browser{
-    position: relative;
-    cursor:none;
-
-    width: 100%;
-    aspect-ratio: 16 / 10;
-
-    border-radius: 28px;
-
-    overflow: hidden;
-
-    background: rgba(10,20,75,.80);
-
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-
-    border: 1px solid rgba(255,255,255,.14);
-
-    box-shadow:
-        0 120px 180px rgba(0,0,0,.30),
-        0 50px 80px rgba(0,0,0,.18),
-        0 0 80px rgba(255,255,255,.04);
-
-    transform-style: preserve-3d;
-
-    will-change: transform;
-
-    transition: transform .5s ease;
-
-    animation: browserFloat 6s ease-in-out infinite;
+.browser {
+  position: relative;
+  cursor: none;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 28px;
+  overflow: hidden;
+  background: rgba(10, 20, 75, .80);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,.14);
+  box-shadow:
+    0 120px 180px rgba(0,0,0,.30),
+    0 50px 80px rgba(0,0,0,.18),
+    0 0 80px rgba(255,255,255,.04);
+  transform-style: preserve-3d;
+  will-change: transform;
+  transition: transform .5s ease;
+  animation: browserFloat 6s ease-in-out infinite;
 }
-
-
-
-
 
 /* =======================================
-TOP BAR
+   CONTENT
 ======================================= */
 
+.browserContent {
+  position: relative;
+  height: calc(100% - 58px);
+  overflow: hidden;
+  border-bottom-left-radius: 28px;
+  border-bottom-right-radius: 28px;
+}
 
+.imageWrapper { position: absolute; inset: 0; }
 
+.image {
+  object-fit: cover;
+  object-position: top;
+  transition: transform 8s linear;
+}
 
-
+.browser:hover .image { transform: translateY(-10%); }
 
 /* =======================================
-CONTENT
+   REFLECTION
 ======================================= */
 
-.browserContent{
-    position: relative;
-    height: calc(100% - 58px);
-
-    overflow: hidden;
-
-    border-bottom-left-radius: 28px;
-    border-bottom-right-radius: 28px;
-}
-
-
-.imageWrapper{
-
-position:absolute;
-
-inset:0;
-
-}
-
-
-.image{
-
-object-fit:cover;
-
-object-position:top;
-
-transition:transform 8s linear;
-
-}
-
-
-.browser:hover .image{
-
-transform:translateY(-10%);
-
-}
-/* =======================================
-REFLECTION
-======================================= */
-
-.reflection{
-
-position:absolute;
-
-inset:0;
-
-pointer-events:none;
-
-overflow:hidden;
-
-border-radius:28px;
-
-}
-
-
-.reflection::before{
-
-content:"";
-
-position:absolute;
-
-top:-50%;
-
-left:-30%;
-
-width:40%;
-
-height:220%;
-
-background:
-
-linear-gradient(
-
-90deg,
-
-transparent,
-
-rgba(255,255,255,.18),
-
-transparent
-
-);
-
-transform:
-
-rotate(18deg);
-
-animation:
-
-reflectionMove
-
-6s linear infinite;
-
-}
-
-
-@keyframes reflectionMove{
-
-0%{
-
-transform:
-
-translateX(-150%)
-
-rotate(18deg);
-
-}
-
-100%{
-
-transform:
-
-translateX(450%)
-
-rotate(18deg);
-
-}
-
-}
-.projectInfo{
-
-margin-top:28px;
-
-text-align:left;
-
-display:flex;
-
-flex-direction:column;
-
-align-items:flex-start;
-
-}
-
-
-.projectMeta{
-
-display:flex;
-
-align-items:center;
-
-gap:16px;
-
-margin-bottom:14px;
-
-}
-
-
-.projectCount{
-
-font-family:var(--font-geist-mono),monospace;
-
-font-size:12px;
-
-letter-spacing:.15em;
-
-color:var(--accent);
-
-font-weight:600;
-
-}
-
-
-.projectCountTotal{
-
-color:rgba(255,255,255,.4);
-
-}
-
-
-.category{
-
-position:relative;
-
-text-transform:uppercase;
-
-letter-spacing:.32em;
-
-font-size:12px;
-
-opacity:.65;
-
-padding-left:16px;
-
-}
-
-
-.category::before{
-
-content:"";
-
-position:absolute;
-
-left:0;
-
-top:50%;
-
-transform:translateY(-50%);
-
-width:6px;
-
-height:6px;
-
-border-radius:50%;
-
-background:var(--accent);
-
-box-shadow:0 0 12px var(--accent);
-
-}
-
-
-.projectInfo h3{
-
-font-family:var(--font-display),sans-serif;
-
-font-size:clamp(13px,1.3vw,16px);
-
-font-weight:700;
-
-letter-spacing:-.02em;
-
-margin-bottom:20px;
-
-}
-
-
-.viewLink{
-
-margin-top:22px;
-
-display:inline-flex;
-
-align-items:center;
-
-gap:10px;
-
-padding:12px 22px;
-
-border-radius:999px;
-
-font-size:13px;
-
-font-weight:600;
-
-letter-spacing:.02em;
-
-color:#fff;
-
-background:rgba(255,255,255,.06);
-
-border:1px solid rgba(255,255,255,.14);
-
-backdrop-filter:blur(12px);
-
-transition:background .3s ease,border-color .3s ease,transform .3s ease,box-shadow .3s ease;
-
-}
-
-
-.viewLink svg{
-
-transition:transform .3s ease;
-
-}
-
-
-.viewLink:hover{
-
-background:var(--accent);
-
-border-color:var(--accent);
-
-transform:translateY(-2px);
-
-box-shadow:0 12px 30px var(--glow);
-
-}
-
-
-.viewLink:hover svg{
-
-transform:translate(2px,-2px);
-
-}
-
-
-.tech{
-
-display:flex;
-
-justify-content:center;
-
-flex-wrap:wrap;
-
-gap:10px;
-
-}
-
-
-.tech span{
-
-padding:
-
-10px 18px;
-
-border-radius:999px;
-
-background:
-
-rgba(255,255,255,.06);
-
-border:
-
-1px solid rgba(255,255,255,.08);
-
-font-size:13px;
-
-}
-@media(max-width:768px){
-
-.showcase{
-
-margin-top:40px;
-
-width:94vw;
-
-}
-
-
-.browser{
-animation:
-browserFloat 6s ease-in-out infinite;
-border-radius:18px;
-
-}
-
-
-.browserTop{
-
-height:48px;
-
-padding:0 14px;
-
-}
-
-
-.browserAddress{
-
-font-size:10px;
-
-}
-
-
-.projectInfo h3{
-
-font-size:24px;
-
-}
-
-
-.tech{
-
-gap:8px;
-
-}
-
-
-.tech span{
-
-font-size:11px;
-
-padding:8px 14px;
-
-}
-
-}
-/* showcase glow removed — contained glow lives in .browserGlow inside .frame */
-@keyframes glowPulse{
-
-0%{
-transform:scale(.9);
-opacity:.5;
-}
-
-50%{
-transform:scale(1.15);
-opacity:1;
-}
-
-100%{
-transform:scale(.9);
-opacity:.5;
-}
-
-}
-@keyframes browserFloat{
-
-0%{
-transform:
-translateY(0px);
-}
-
-50%{
-transform:
-translateY(-12px);
-}
-
-100%{
-transform:
-translateY(0px);
-}
-
-}
-.browser::before{
-
-content:"";
-
-position:absolute;
-
-inset:0;
-
-padding:1px;
-
-border-radius:inherit;
-
-background:
-linear-gradient(
-135deg,
-rgba(255,255,255,.45),
-rgba(255,255,255,.02),
-rgba(255,255,255,.18)
-);
-
-mask:
-linear-gradient(#fff 0 0) content-box,
-linear-gradient(#fff 0 0);
-
--webkit-mask:
-linear-gradient(#fff 0 0) content-box,
-linear-gradient(#fff 0 0);
-
-mask-composite:exclude;
--webkit-mask-composite:xor;
-
-pointer-events:none;
-
-}
-.noise{
-
-opacity:.03;
-
-mix-blend-mode:soft-light;
-
-pointer-events:none;
-
-}
-.browserViewport{
-    position: relative;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-}
-
-.browserImage{
-
-position:absolute;
-
-top:0;
-
-left:0;
-
-width:100%;
-
-will-change:transform;
-
-}
-
-.projectImage{
-
-position:relative!important;
-
-width:100%!important;
-
-height:auto!important;
-
-display:block;
-
-object-fit:unset;
-
-}
-
-
-.browserRight::before{
-
-content:"";
-
-width:8px;
-
-height:8px;
-
-border-radius:50%;
-
-background:#22C55E;
-
-display:inline-block;
-
-margin-right:8px;
-
-animation:
-livePulse
-1.4s infinite;
-}
-@keyframes livePulse{
-
-0%{
-
-transform:scale(.8);
-
-opacity:1;
-
-}
-
-70%{
-
-transform:scale(1.8);
-
-opacity:.3;
-
-}
-
-100%{
-
-transform:scale(.8);
-
-opacity:1;
-
-}
-
-}
-.browser::after{
-
-content:"";
-
-position:absolute;
-
-inset:0;
-
-border-radius:inherit;
-
-pointer-events:none;
-
-background:
-
-linear-gradient(
-135deg,
-rgba(255,255,255,.08),
-transparent 45%
-);
-
-opacity:.4;
-
-}
-.browserGlow{
-
-position:absolute;
-
-left:50%;
-
-bottom:-90px;
-
-transform:translateX(-50%);
-
-width:70%;
-
-height:180px;
-
-background:
-
-radial-gradient(
-
-ellipse,
-
-var(--glow),
-
-transparent 70%
-
-);
-
-filter:blur(80px);
-
-pointer-events:none;
-
-transition:
-
-background .8s ease,
-filter .8s ease,
-opacity .8s ease;
-
-z-index:-1;
-
-}
-
-.frame{
-
-position:relative;
-
-width:100%;
-
-border-radius:32px;
-
-overflow:hidden;
-
-background:
-rgba(255,255,255,.06);
-
-backdrop-filter:blur(10px);
-
-border:1px solid rgba(255,255,255,.12);
-
-box-shadow:
-0 80px 180px rgba(0,0,0,.45);
-
-transform-style:preserve-3d;
-
-transition:
-transform .5s ease;
-}
-.frameHeader{
-
-display:flex;
-
-justify-content:space-between;
-
-align-items:center;
-
-padding:22px 28px;
-
-background:
-linear-gradient(
-180deg,
-rgba(255,255,255,.05),
-rgba(255,255,255,.015)
-);
-}
-.frameLeft{
-  display:flex;
-  align-items:center;
-  gap:14px;
-}
-.frameUrl{
-  font-size:.82rem;
-  font-weight:600;
-  opacity:.88;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  max-width:min(280px,40vw);
-  color:inherit;
-  text-decoration:none;
-}
-.frameUrl:hover{
-  opacity:1;
-  text-decoration:underline;
-  text-underline-offset:3px;
-}
-.frameDivider{
-
-height:1px;
-
-background:rgba(255,255,255,.08);
-}
-.frameViewport{
-
-position:relative;
-
-overflow:hidden;
-
-aspect-ratio:16/10;
-}
-.liveDot{
-
-width:10px;
-
-height:10px;
-
-border-radius:50%;
-
-background:#00ff8c;
-
-display:block;
-
-box-shadow:
-0 0 18px #00ff8c;
-
-animation:
-livePulse 1.6s infinite;
-}
-.transitionOverlay{
-
-position:absolute;
-
-inset:0;
-
-pointer-events:none;
-
-border-radius:32px;
-
-opacity:0;
-
-backdrop-filter:blur(0px);
-
-background:
-
-linear-gradient(
-120deg,
-transparent,
-rgba(255,255,255,.16),
-transparent
-);
-
-mix-blend-mode:screen;
-
-z-index:8;
-
-}
-
-/* ── mobile: proportional browser frame ── */
-@media (max-width: 767px) {
-  /* Use svh-based height so the frame scales with the phone's actual
-     visible viewport height — tall phones (iPhone 14, Pro Max, etc.)
-     get a taller showcase, filling more of the screen and matching
-     the proportional feel of iPhone SE. */
-  .browser {
-    /* .browser is not rendered by ShowcaseFrame — left here for safety only */
-    aspect-ratio: unset;
-    border-radius: 18px;
-  }
-  .frameViewport {
-    /* Apply svh height directly to the viewport content area (no header
-       subtraction).  Original aspect-ratio:16/6 on SE (337px wide) gave
-       ~127px; floor of 130px restores that.  Tall phones scale up so the
-       showcase proportionally fills more of the taller screen. */
-    aspect-ratio: unset;
-    height: clamp(130px, 22svh, 200px);
-  }
-  .frameHeader {
-    padding: 12px 16px;
-    height: 46px;
-    flex-shrink: 0;
-    box-sizing: border-box;
-  }
-  .showcase {
-    margin: 8px auto 10px;
-    width: 100%;
-  }
-}
-
-/* ============================================================
-   PREMIUM BROWSER CHROME — ShowcaseFrame additions
-   ============================================================ */
-
-/* Simulated physical edge: a thin gradient border that implies thickness */
-.frameEdge {
+.reflection {
   position: absolute;
   inset: 0;
-  border-radius: inherit;
   pointer-events: none;
-  z-index: 10;
-  /* Top-left lit edge (light source = top-left) vs bottom-right shadow edge */
-  box-shadow:
-    inset  1px  1px 0   rgba(255,255,255,0.22),
-    inset  0px  0px 1px rgba(255,255,255,0.08),
-    inset -1px -1px 0   rgba(0,0,0,0.28);
+  overflow: hidden;
+  border-radius: 28px;
 }
 
-/* Traffic light cluster */
-.trafficLights {
+.reflection::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -30%;
+  width: 40%;
+  height: 220%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);
+  transform: rotate(18deg);
+  animation: reflectionMove 6s linear infinite;
+}
+
+@keyframes reflectionMove {
+  0%   { transform: translateX(-150%) rotate(18deg); }
+  100% { transform: translateX(450%)  rotate(18deg); }
+}
+
+/* =======================================
+   PROJECT INFO
+======================================= */
+
+.projectInfo {
+  margin-top: 28px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.projectMeta {
   display: flex;
   align-items: center;
-  gap: 7px;
-  flex-shrink: 0;
+  gap: 16px;
+  margin-bottom: 14px;
 }
 
-.light {
-  width: 11px;
-  height: 11px;
+.projectCount {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+  letter-spacing: .15em;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.projectCountTotal { color: rgba(255,255,255,.4); }
+
+.category {
+  position: relative;
+  text-transform: uppercase;
+  letter-spacing: .32em;
+  font-size: 12px;
+  opacity: .65;
+  padding-left: 16px;
+}
+
+.category::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  display: block;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
 }
 
-.lightRed {
-  background: #ff5f57;
-  box-shadow: 0 0 6px rgba(255,95,87,0.6);
+.projectInfo h3 {
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(13px, 1.3vw, 16px);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  margin-bottom: 20px;
 }
 
-.lightYellow {
-  background: #ffbd2e;
-  box-shadow: 0 0 6px rgba(255,189,46,0.5);
-}
-
-.lightGreen {
-  background: #28c840;
-  box-shadow: 0 0 6px rgba(40,200,64,0.55);
-}
-
-/* Address bar pill */
-.addressBar {
-  flex: 1;
-  display: flex;
+.viewLink {
+  margin-top: 22px;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  max-width: 340px;
-  height: 28px;
-  padding: 0 12px;
+  gap: 10px;
+  padding: 12px 22px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.07);
-  border: 1px solid rgba(255,255,255,0.10);
-  backdrop-filter: blur(6px);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  color: #fff;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.14);
+  backdrop-filter: blur(12px);
+  transition: background .3s ease, border-color .3s ease, transform .3s ease, box-shadow .3s ease;
+}
+
+.viewLink svg { transition: transform .3s ease; }
+
+.viewLink:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px var(--glow);
+}
+
+.viewLink:hover svg { transform: translate(2px,-2px); }
+
+.tech {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tech span {
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.08);
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .showcase { margin-top: 40px; width: 94vw; }
+  .browser { animation: browserFloat 6s ease-in-out infinite; border-radius: 18px; }
+  .browserTop { height: 48px; padding: 0 14px; }
+  .browserAddress { font-size: 10px; }
+  .projectInfo h3 { font-size: 24px; }
+  .tech { gap: 8px; }
+  .tech span { font-size: 11px; padding: 8px 14px; }
+}
+
+/* =======================================
+   GLOW / FLOAT ANIMATIONS
+======================================= */
+
+@keyframes glowPulse {
+  0%   { transform: scale(.9);  opacity: .5; }
+  50%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(.9);  opacity: .5; }
+}
+
+@keyframes browserFloat {
+  0%   { transform: translateY(0px); }
+  50%  { transform: translateY(-12px); }
+  100% { transform: translateY(0px); }
+}
+
+/* Gradient border (legacy .browser::before) */
+.browser::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(255,255,255,.45), rgba(255,255,255,.02), rgba(255,255,255,.18));
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+  pointer-events: none;
+}
+
+.noise { opacity: .03; mix-blend-mode: soft-light; pointer-events: none; }
+
+/* =======================================
+   PREMIUM FRAME (ShowcaseFrame)
+======================================= */
+
+.browserViewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
 }
 
-.lockIcon {
-  width: 10px;
-  height: 12px;
-  flex-shrink: 0;
-  color: rgba(255,255,255,0.55);
+.browserImage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  will-change: transform;
 }
 
-/* Right cluster: live indicator */
-.frameRight {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex-shrink: 0;
+.projectImage {
+  position: relative !important;
+  width: 100% !important;
+  height: auto !important;
+  display: block;
+  object-fit: unset;
 }
 
-.liveLabel {
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(40,200,64,0.9);
+.browserRight::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22C55E;
+  display: inline-block;
+  margin-right: 8px;
+  animation: livePulse 1.4s infinite;
 }
 
-/* Screen-space glass reflection — diagonal specular sweep */
-.screenReflection {
+@keyframes livePulse {
+  0%   { transform: scale(.8); opacity: 1; }
+  70%  { transform: scale(1.8); opacity: .3; }
+  100% { transform: scale(.8); opacity: 1; }
+}
+
+.browser::after {
+  content: "";
   position: absolute;
   inset: 0;
-  pointer-events: none;
-  z-index: 6;
-  background: linear-gradient(
-    128deg,
-    rgba(255,255,255,0.07) 0%,
-    rgba(255,255,255,0.01) 35%,
-    transparent 55%
-  );
   border-radius: inherit;
-  /* Animate the reflection sweep every 8s */
-  animation: screenReflSweep 8s ease-in-out infinite;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255,255,255,.08), transparent 45%);
+  opacity: .4;
 }
 
-@keyframes screenReflSweep {
-  0%   { opacity: 0.5; background-position: 0 0;    }
-  40%  { opacity: 0.9; }
-  70%  { opacity: 0.5; }
-  100% { opacity: 0.5; background-position: 100% 0; }
-}
-
-/* Deeper bloom glow that reacts to project accent */
+/* ── Under-glow bloom (deeper, reacts to project accent) ── */
 .browserGlow {
-  animation: glowBreathe 4s ease-in-out infinite;
+  position: absolute;
+  left: 50%;
+  bottom: -90px;
+  transform: translateX(-50%);
+  width: 72%;
+  height: 190px;
+  background: radial-gradient(ellipse, var(--glow, rgba(60,100,255,0.4)), transparent 70%);
+  filter: blur(85px);
+  pointer-events: none;
+  z-index: -1;
+  animation: glowBreathe 4.5s ease-in-out infinite;
+  transition: background 0.9s ease;
 }
 
 @keyframes glowBreathe {
-  0%,100% { opacity: 0.7; transform: translateX(-50%) scaleY(1);   }
-  50%      { opacity: 1.0; transform: translateX(-50%) scaleY(1.15); }
+  0%,100% { opacity: 0.65; transform: translateX(-50%) scaleY(1);    }
+  50%      { opacity: 1.0;  transform: translateX(-50%) scaleY(1.20); }
 }
 
-/* ============================================================
-   FRAME HEADER — updated layout for new premium chrome
-   (traffic lights + address bar + right cluster)
-   ============================================================ */
-
-/* Override the existing frameHeader to accommodate 3-column layout */
-.frameHeader {
-  justify-content: space-between !important;
-  gap: 12px !important;
-  padding: 14px 18px !important;
-}
-
-/* frameUrl inside addressBar: narrower pill context */
-.addressBar .frameUrl {
-  font-size: 0.75rem !important;
-  opacity: 0.78;
-  color: rgba(255, 255, 255, 0.85);
-  max-width: min(220px, 30vw) !important;
-}
-
-/* ============================================================
-   RIM LIGHTING — cursor-reactive frame edge highlight
-   --lx / --ly are set by Showcase.tsx onMove (-1 to +1)
-   ============================================================ */
-
-.rimLight {
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 8;
-  /* Radial glow that follows cursor position via CSS vars */
-  background: radial-gradient(
-    ellipse 65% 75% at
-    calc(50% + var(--lx, 0) * 42%)
-    calc(50% + var(--ly, 0) * 42%),
-    rgba(180, 210, 255, 0.065) 0%,
-    rgba(120, 170, 255, 0.020) 45%,
-    transparent 68%
-  );
-  /* Edge highlight: shifts toward the light source side */
-  box-shadow:
-    /* Lit edge — side facing light source */
-    inset calc(var(--lx, 0) * -4px + 0.5px)
-          calc(var(--ly, 0) * -3px + 0.5px) 0
-          rgba(255, 255, 255, 0.18),
-    /* Shadow edge — opposite side */
-    inset calc(var(--lx, 0) * 4px - 0.5px)
-          calc(var(--ly, 0) * 3px - 0.5px) 0
-          rgba(0, 0, 0, 0.22);
-  mix-blend-mode: screen;
-  transition: opacity 0.3s ease;
-}
-
-/* ============================================================
-   FRAME — premium defaults for --lx / --ly CSS vars
-   ============================================================ */
-
+/* ── PREMIUM FRAME ROOT ── */
 .frame {
   --lx: 0;
   --ly: 0;
+  --glass-tint: rgba(10,18,60,0.06);
+
+  position: relative;
+  width: 100%;
+  border-radius: 32px;
+  overflow: hidden;
+
+  /*
+   * Multi-layer glass body:
+   *  • Dark translucent base
+   *  • Per-project tint injected via --glass-tint
+   *  • Frosted glass via backdrop-filter
+   */
+  background:
+    var(--glass-tint, rgba(10,18,60,0.06)),
+    rgba(255,255,255,.055);
+
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+
+  border: 1px solid rgba(255,255,255,.115);
+
+  /*
+   * Deep shadow stack — three layers create genuine physical depth:
+   *   1. Distant environment shadow (broad, soft)
+   *   2. Mid-distance cast shadow (medium)
+   *   3. Contact shadow (tight, dark)
+   */
+  box-shadow:
+    0 80px 180px rgba(0,0,0,.50),
+    0 30px  70px rgba(0,0,0,.30),
+    0  8px  20px rgba(0,0,0,.22);
+
+  transform-style: preserve-3d;
+  transition: transform .5s ease, box-shadow .5s ease;
 }
 
-/* Deeper glass depth when hovering */
 .frame:hover {
   box-shadow:
-    0 100px 200px rgba(0,0,0,.55),
-    0 40px  80px  rgba(0,0,0,.30),
-    0 0     60px  rgba(var(--accent, 60,100,255),.08);
+    0 100px 220px rgba(0,0,0,.58),
+    0 40px  90px  rgba(0,0,0,.36),
+    0 10px  28px  rgba(0,0,0,.26),
+    0  0    60px  rgba(var(--accent, 60,100,255), .10);
 }
 
-/* ============================================================
-   FRAME EDGE — physical thickness simulation
-   ============================================================ */
-
+/* ── Thickness edge — simulated physical depth ── */
 .frameEdge {
   position: absolute;
   inset: 0;
@@ -1036,23 +366,125 @@ z-index:8;
   pointer-events: none;
   z-index: 9;
   box-shadow:
-    /* Top-left lit edge (light source = top-left) */
-    inset  1.5px  1.5px 0   rgba(255,255,255,0.20),
-    inset  0.5px  0.5px 0   rgba(255,255,255,0.10),
-    /* Bottom-right shadow edge */
-    inset -1.5px -1.5px 0   rgba(0,0,0,0.30);
+    /*  Top-left lit edge (light source = upper-left) */
+    inset  1.5px  1.5px 0   rgba(255,255,255,0.22),
+    inset  0.5px  0.5px 0   rgba(255,255,255,0.11),
+    /*  Bottom-right shadow edge (opposite side) */
+    inset -1.5px -1.5px 0   rgba(0,0,0,0.32),
+    inset -0.5px -0.5px 0   rgba(0,0,0,0.18);
 }
 
-/* ============================================================
-   TRAFFIC LIGHTS
-   ============================================================ */
+/* ── Ambient refraction streak (prismatic top-edge highlight) ── */
+.frameRefraction {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 32px 32px 0 0;
+  pointer-events: none;
+  z-index: 10;
+  background: linear-gradient(
+    90deg,
+    transparent                    0%,
+    rgba(140, 190, 255, 0.08)     10%,
+    rgba(200, 230, 255, 0.28)     30%,
+    rgba(255, 255, 255, 0.45)     50%,
+    rgba(200, 220, 255, 0.28)     70%,
+    rgba(120, 170, 255, 0.08)     90%,
+    transparent                   100%
+  );
+  animation: refractionShift 7s ease-in-out infinite alternate;
+  mix-blend-mode: screen;
+}
 
-.trafficLights {
+@keyframes refractionShift {
+  0%   { opacity: 0.55; transform: translateX(-10%); }
+  100% { opacity: 0.90; transform: translateX(10%);  }
+}
+
+/* ── Cursor-reactive rim light ── */
+.rimLight {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 8;
+  background: radial-gradient(
+    ellipse 65% 75% at
+    calc(50% + var(--lx, 0) * 44%)
+    calc(50% + var(--ly, 0) * 44%),
+    rgba(180, 215, 255, 0.075) 0%,
+    rgba(120, 175, 255, 0.025) 45%,
+    transparent 68%
+  );
+  box-shadow:
+    inset calc(var(--lx, 0) * -4.5px + 0.5px)
+          calc(var(--ly, 0) * -3.5px + 0.5px) 0
+          rgba(255, 255, 255, 0.20),
+    inset calc(var(--lx, 0) *  4.5px - 0.5px)
+          calc(var(--ly, 0) *  3.5px - 0.5px) 0
+          rgba(0, 0, 0, 0.24);
+  mix-blend-mode: screen;
+  transition: opacity 0.3s ease;
+}
+
+/* ── Per-project glass tint layer ── */
+.glassTintLayer {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 2;
+  background: var(--glass-tint, transparent);
+  mix-blend-mode: multiply;
+  opacity: 0.7;
+}
+
+/* ── Frame Header ── */
+.frameHeader {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 7px;
-  flex-shrink: 0;
+  gap: 12px;
+  padding: 14px 18px;
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,.055),
+    rgba(255,255,255,.015)
+  );
 }
+
+.frameLeft { display: flex; align-items: center; gap: 14px; }
+
+.frameUrl {
+  font-size: .82rem;
+  font-weight: 600;
+  opacity: .88;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: min(280px, 40vw);
+  color: inherit;
+  text-decoration: none;
+}
+
+.frameUrl:hover {
+  opacity: 1;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.frameDivider { height: 1px; background: rgba(255,255,255,.09); }
+
+.frameViewport {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16/10;
+}
+
+/* ── Traffic lights ── */
+.trafficLights { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
 
 .light {
   width: 11px;
@@ -1066,12 +498,9 @@ z-index:8;
 .lightYellow { background: #ffbd2e; box-shadow: 0 0 7px rgba(255,189,46,0.50); }
 .lightGreen  { background: #28c840; box-shadow: 0 0 7px rgba(40,200,64,0.55); }
 
-.frame:hover .light { filter: brightness(1.2); transform: scale(1.08); }
+.frame:hover .light { filter: brightness(1.22); transform: scale(1.10); }
 
-/* ============================================================
-   ADDRESS BAR
-   ============================================================ */
-
+/* ── Address bar ── */
 .addressBar {
   flex: 1;
   display: flex;
@@ -1087,29 +516,12 @@ z-index:8;
   overflow: hidden;
 }
 
-.lockIcon {
-  width: 10px;
-  height: 12px;
-  flex-shrink: 0;
-  color: rgba(255,255,255,0.50);
-}
+.lockIcon { width: 10px; height: 12px; flex-shrink: 0; color: rgba(255,255,255,0.50); }
 
-.addressBar .frameUrl {
-  font-size: 0.73rem !important;
-  opacity: 0.75;
-  max-width: min(220px, 28vw) !important;
-}
+.addressBar .frameUrl { font-size: 0.73rem !important; opacity: 0.75; max-width: min(220px, 28vw) !important; }
 
-/* ============================================================
-   LIVE INDICATOR
-   ============================================================ */
-
-.frameRight {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
+/* ── Live indicator ── */
+.frameRight { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 
 .liveLabel {
   font-size: 0.68rem;
@@ -1119,10 +531,17 @@ z-index:8;
   font-family: monospace;
 }
 
-/* ============================================================
-   SCREEN REFLECTION — diagonal specular sweep
-   ============================================================ */
+.liveDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #00ff8c;
+  display: block;
+  box-shadow: 0 0 18px #00ff8c;
+  animation: livePulse 1.6s infinite;
+}
 
+/* ── Screen-space diagonal reflection sweep ── */
 .screenReflection {
   position: absolute;
   inset: 0;
@@ -1139,32 +558,43 @@ z-index:8;
 }
 
 @keyframes screenReflSweep {
-  0%   { opacity: 0.45; transform: translateX(0);    }
+  0%   { opacity: 0.45; transform: translateX(0);   }
   40%  { opacity: 0.85; }
-  70%  { opacity: 0.45; transform: translateX(4px);  }
-  100% { opacity: 0.45; transform: translateX(0);    }
+  70%  { opacity: 0.45; transform: translateX(4px); }
+  100% { opacity: 0.45; transform: translateX(0);   }
 }
 
-/* ============================================================
-   BROWSER GLOW — accented by --glow from project config
-   ============================================================ */
-
-.browserGlow {
+/* ── Screen corner vignette — adds depth inside the glass ── */
+.screenVignette {
   position: absolute;
-  left: 50%;
-  bottom: -90px;
-  transform: translateX(-50%);
-  width: 70%;
-  height: 180px;
-  background: radial-gradient(ellipse, var(--glow, rgba(60,100,255,0.4)), transparent 70%);
-  filter: blur(80px);
+  inset: 0;
   pointer-events: none;
-  z-index: -1;
-  animation: glowBreathe 4.5s ease-in-out infinite;
-  transition: background 0.8s ease;
+  z-index: 5;
+  border-radius: inherit;
+  background: radial-gradient(
+    ellipse 110% 100% at 50% 50%,
+    transparent 55%,
+    rgba(0, 0, 20, 0.28) 100%
+  );
 }
 
-@keyframes glowBreathe {
-  0%, 100% { opacity: 0.7; transform: translateX(-50%) scaleY(1);    }
-  50%       { opacity: 1.0; transform: translateX(-50%) scaleY(1.18); }
+/* ── Transition overlay ── */
+.transitionOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 32px;
+  opacity: 0;
+  backdrop-filter: blur(0px);
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,.16), transparent);
+  mix-blend-mode: screen;
+  z-index: 8;
+}
+
+/* ── Mobile ── */
+@media (max-width: 767px) {
+  .browser  { aspect-ratio: unset; border-radius: 18px; }
+  .frameViewport { aspect-ratio: unset; height: clamp(130px, 22svh, 200px); }
+  .frameHeader { padding: 12px 16px; height: 46px; flex-shrink: 0; box-sizing: border-box; }
+  .showcase { margin: 8px auto 10px; width: 100%; }
 }

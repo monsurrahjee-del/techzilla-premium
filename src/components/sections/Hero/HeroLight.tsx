@@ -4,52 +4,65 @@ import { useEffect, useRef } from "react";
 import styles from "./Hero.module.css";
 
 /**
- * Unified lighting system — one radial light blob that follows the cursor.
+ * Unified lighting system — one virtual light source that broadcasts its
+ * position so stickers, cursor, and background all belong to the same
+ * illuminated environment.
  *
- * The light is split into two layers that move at slightly different speeds,
- * creating depth: a large soft ambient halo + a tighter specular point.
+ * Layers:
+ *  • Large soft ambient halo (follows cursor instantly)
+ *  • Tight specular point (lerps slightly behind for cinematic depth)
  *
- * Both layers use direct style mutation (no lerp) for zero lag, which is
- * intentional — the light should feel like it's emanating from the cursor,
- * not chasing it.
+ * Emits:  hero-light-pos  { x: 0‥1, y: 0‥1 }  (normalised viewport coords)
+ * so every other component can react to the same virtual light.
  */
 export default function HeroLight() {
-  const ambientRef  = useRef<HTMLDivElement>(null);
-  const specRef     = useRef<HTMLDivElement>(null);
+  const ambientRef = useRef<HTMLDivElement>(null);
+  const specRef    = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const ambient  = ambientRef.current;
-    const spec     = specRef.current;
+    const ambient = ambientRef.current;
+    const spec    = specRef.current;
     if (!ambient || !spec) return;
 
-    // Centred default on mount
     const cx = window.innerWidth  / 2;
     const cy = window.innerHeight / 2;
     ambient.style.transform = `translate3d(${cx}px,${cy}px,0) translate(-50%,-50%)`;
     spec.style.transform    = `translate3d(${cx}px,${cy}px,0) translate(-50%,-50%)`;
 
-    // Touch devices — keep centred, no listener needed
-    if (window.matchMedia("(pointer: coarse)").matches) return;
+    if (window.matchMedia("(pointer: coarse)").matches) {
+      // Mobile: emit a static centred light position once
+      window.dispatchEvent(new CustomEvent("hero-light-pos", { detail: { x: 0.5, y: 0.5 } }));
+      return;
+    }
 
-    // Lerped position for the specular layer (lagging slightly = more cinematic)
     let sx = cx, sy = cy;
     let lax = cx, lay = cy;
     let raf = 0;
+    let lastEmitTime = 0;
 
-    const tick = () => {
+    const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
-      // Spec: tight follow
-      ambient.style.transform  = `translate3d(${lax}px,${lay}px,0) translate(-50%,-50%)`;
-      spec.style.transform     = `translate3d(${sx}px,${sy}px,0) translate(-50%,-50%)`;
+
+      ambient.style.transform = `translate3d(${lax}px,${lay}px,0) translate(-50%,-50%)`;
+      spec.style.transform    = `translate3d(${sx}px,${sy}px,0) translate(-50%,-50%)`;
+
+      // Broadcast light position at ~30 fps (enough for shadow updates)
+      if (now - lastEmitTime > 33) {
+        lastEmitTime = now;
+        window.dispatchEvent(new CustomEvent("hero-light-pos", {
+          detail: {
+            x: lax / window.innerWidth,
+            y: lay / window.innerHeight,
+          },
+        }));
+      }
     };
 
     const onMove = (e: MouseEvent) => {
-      // Ambient — instant (no lerp)
       lax = e.clientX;
       lay = e.clientY;
-      // Spec — lerp toward mouse every frame
-      sx += (e.clientX - sx) * 0.22;
-      sy += (e.clientY - sy) * 0.22;
+      sx += (e.clientX - sx) * 0.18;
+      sy += (e.clientY - sy) * 0.18;
     };
 
     raf = requestAnimationFrame(tick);
@@ -62,9 +75,7 @@ export default function HeroLight() {
 
   return (
     <>
-      {/* Large soft ambient halo */}
       <div ref={ambientRef} className={styles.heroLight} />
-      {/* Tight specular point */}
       <div ref={specRef}    className={styles.heroLightSpec} />
     </>
   );

@@ -11,12 +11,13 @@
   z-index: 999999;
   will-change: transform;
   box-shadow: 0 0 8px rgba(160, 200, 255, 0.9);
-  transition: width 0.2s ease, height 0.2s ease;
+  transition: width 0.15s ease, height 0.15s ease, background 0.2s ease;
 }
 
 .dotClicked {
   width: 3px;
   height: 3px;
+  background: rgba(160, 200, 255, 1);
 }
 
 /* ── Lagging ring with velocity stretch ─────────────────── */
@@ -32,7 +33,6 @@
   pointer-events: none;
   z-index: 999998;
   will-change: transform, box-shadow;
-  /* Stretch is driven by JS transform; CSS transition only for discrete states */
   transition:
     width  0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
     height 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
@@ -49,11 +49,11 @@
     from 0deg,
     rgba(120, 190, 255, 0.40)  0deg,
     rgba(255, 255, 255, 0.08)  80deg,
-    rgba(80, 140, 255, 0.30)  160deg,
+    rgba(80,  140, 255, 0.30) 160deg,
     rgba(255, 255, 255, 0.04) 240deg,
     rgba(120, 190, 255, 0.40) 360deg
   );
-  animation: rotateGlow 3s linear infinite;
+  animation: rotateGlow 2.8s linear infinite;
   opacity: 0.7;
   pointer-events: none;
 }
@@ -66,9 +66,9 @@
 .ring::after {
   content: "";
   position: absolute;
-  inset: -12px;
+  inset: -14px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(80, 140, 255, 0.06) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(80, 140, 255, 0.07) 0%, transparent 70%);
   pointer-events: none;
   transition: opacity 0.35s ease;
   opacity: 0;
@@ -76,8 +76,8 @@
 
 /* ── Interactive states ──────────────────────────────────── */
 .hovered {
-  width: 56px;
-  height: 56px;
+  width: 58px;
+  height: 58px;
   border-color: rgba(140, 200, 255, 0.95);
 }
 
@@ -86,8 +86,8 @@
 }
 
 .clicked {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-color: rgba(255, 255, 255, 0.95);
 }
 
@@ -100,7 +100,7 @@
   z-index: 999997;
 }
 
-/* Individual trail dots — JS sets size/opacity/transform */
+/* Individual trail dots */
 .trailDot {
   position: fixed;
   top: 0;
@@ -111,9 +111,54 @@
   pointer-events: none;
 }
 
+/* ── Click ripple container ──────────────────────────────── */
+.rippleContainer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 999996;
+}
+
+/* Individual ripple ring — positioned absolutely from rippleContainer */
+.ripple {
+  position: fixed;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(120, 180, 255, 0.7);
+  transform: translate(-50%, -50%) scale(0);
+  pointer-events: none;
+  animation: rippleExpand 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes rippleExpand {
+  0%   { width: 0px;   height: 0px;   opacity: 0.9; transform: translate(-50%,-50%) scale(1); }
+  60%  { opacity: 0.4; }
+  100% { width: 80px;  height: 80px;  opacity: 0;   transform: translate(-50%,-50%) scale(1); }
+}
+
+/* Second echo ring — slightly delayed */
+.ripple::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 1px solid rgba(100, 160, 255, 0.35);
+  animation: rippleEcho 0.9s 0.1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  opacity: 0;
+}
+
+@keyframes rippleEcho {
+  0%   { opacity: 0.6; transform: scale(0.85); }
+  100% { opacity: 0;   transform: scale(1.5); }
+}
+
 /* ── Hide on touch devices ───────────────────────────────── */
 @media (pointer: coarse) {
-  .dot, .ring, .trail {
+  .dot, .ring, .trail, .rippleContainer {
     display: none;
   }
 }

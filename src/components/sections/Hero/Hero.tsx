@@ -34,7 +34,7 @@ export default function Hero() {
   useClickSound(sound);
   useParallax(headingRef, 5);
 
-  // Broadcast theme changes so HeroSplash can pause its WebGL fluid sim
+  // Broadcast theme changes
   useEffect(() => {
     window.dispatchEvent(
       new CustomEvent("hero-theme-change", { detail: { theme } })
@@ -52,11 +52,11 @@ export default function Hero() {
         scrub: 1.4,
       },
     });
-    tl.to(contentRef.current, { y: -50, ease: "none" });
+    tl.to(contentRef.current, { y: -55, ease: "none" });
     return () => { tl.scrollTrigger?.kill(); tl.kill(); };
   }, []);
 
-  // ── Scroll storytelling: browser + stickers animate out as hero exits ──────
+  // ── Scroll storytelling — one continuous scene transition ─────────────────
   useEffect(() => {
     const wrap    = showcaseWrapRef.current;
     const hero    = heroRef.current;
@@ -66,27 +66,43 @@ export default function Hero() {
     const tl = gsap.timeline({
       scrollTrigger: {
         trigger: hero,
-        start: "55% top",
+        start: "52% top",
         end: "bottom top",
         scrub: 1.8,
       },
     });
 
-    // Browser rises, shrinks, tilts and fades → blends into next section
+    // Browser rises, shrinks and tilts — blends naturally into next section
     tl.to(wrap, {
-      y:       -80,
-      scale:   0.88,
-      rotateX:  6,
+      y:        -90,
+      scale:    0.86,
+      rotateX:  8,
+      rotateY:  -2,
       opacity:  0,
-      ease:    "power2.inOut",
+      ease:     "power2.inOut",
     }, 0);
 
-    // Stickers scatter/fade on exit
+    // Stickers scatter outward with individual trajectories
     if (stickers) {
+      const stickerEls = stickers.querySelectorAll<HTMLElement>("[class*='sticker']");
+      stickerEls.forEach((el, i) => {
+        const angle   = (i / stickerEls.length) * Math.PI * 2;
+        const dist    = 60 + Math.random() * 40;
+        tl.to(el, {
+          x:       Math.cos(angle) * dist,
+          y:       Math.sin(angle) * dist - 20,
+          scale:   0.75 + Math.random() * 0.35,
+          opacity: 0,
+          rotate:  `+=${(Math.random() - 0.5) * 30}`,
+          ease:    "power3.in",
+        }, 0);
+      });
+
+      // Fallback for the layer as a whole if individual queries miss
       tl.to(stickers, {
-        scale:   1.10,
+        scale:   1.06,
         opacity: 0,
-        ease:    "power3.in",
+        ease:    "power2.inOut",
       }, 0);
     }
 
@@ -109,7 +125,7 @@ export default function Hero() {
         onSoundToggle={() => setSound((s) => !s)}
       />
 
-      {/* ── sticker decorative layer (ref for scroll exit animation) ── */}
+      {/* ── sticker decorative layer ── */}
       <div ref={stickerLayerRef} className={styles.stickerLayer}>
         <StickerCloud />
       </div>

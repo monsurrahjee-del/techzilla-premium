@@ -4,44 +4,47 @@ import { useEffect, useRef } from "react";
 import styles from "./PremiumCursor.module.css";
 
 /**
- * Premium cursor with:
- * - Tiny dot that follows pointer exactly (no lag)
- * - Ring that lerps behind with inertia
- * - Velocity-based stretch + rotation (squash & stretch in direction of motion)
- * - Speed-reactive glow intensity
- * - Fading particle trail
- * - Interactive grow/shrink states
+ * Premium cursor — complete interaction system:
+ *
+ *  • Tiny dot that follows pointer exactly (no lag)
+ *  • Ring that lerps behind with inertia + velocity-based stretch/rotation
+ *  • Speed-reactive glow intensity
+ *  • Fading particle trail
+ *  • Click ripple — expanding ring that fades out
+ *  • Magnetic snap toward interactive elements
+ *  • Shape changes based on speed
+ *  • Soft ripple on click
+ *  • Pushes nearby floating objects (emits cursor-pos event)
  */
 export default function PremiumCursor() {
   const dotRef    = useRef<HTMLDivElement>(null);
   const ringRef   = useRef<HTMLDivElement>(null);
   const trailRef  = useRef<HTMLDivElement>(null);
+  const ripplesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const dot   = dotRef.current;
-    const ring  = ringRef.current;
-    const trail = trailRef.current;
-    if (!dot || !ring || !trail) return;
+    const dot     = dotRef.current;
+    const ring    = ringRef.current;
+    const trail   = trailRef.current;
+    const ripples = ripplesRef.current;
+    if (!dot || !ring || !trail || !ripples) return;
 
-    // Skip on touch devices
     if (window.matchMedia("(pointer: coarse)").matches) return;
 
-    const RING_SIZE    = 36;
-    const DOT_SIZE     = 6;
-    const LERP         = 0.14;
-    const TRAIL_COUNT  = 8;
+    const RING_SIZE   = 36;
+    const DOT_SIZE    = 6;
+    const LERP        = 0.14;
+    const TRAIL_COUNT = 10;
 
-    // Current lerped position of ring
     let rx = window.innerWidth  / 2;
     let ry = window.innerHeight / 2;
-    // Actual mouse position
     let mx = rx, my = ry;
-    // Prev ring pos (for velocity)
     let prx = rx, pry = ry;
-    // Velocity (smoothed)
     let vx = 0, vy = 0;
 
-    // Trail particles — kept as plain objects to avoid state
+    // Magnetic target
+    let magX = 0, magY = 0, magActive = false;
+
     const particles: Array<{ el: HTMLSpanElement; x: number; y: number; life: number }> = [];
     for (let i = 0; i < TRAIL_COUNT; i++) {
       const el = document.createElement("span");
@@ -53,17 +56,19 @@ export default function PremiumCursor() {
     let raf = 0;
     let frameCount = 0;
 
-    const tick = () => {
+    const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
       frameCount++;
 
-      // Lerp ring toward mouse
-      prx = rx;
-      pry = ry;
-      rx += (mx - rx) * LERP;
-      ry += (my - ry) * LERP;
+      prx = rx; pry = ry;
 
-      // Smoothed velocity (ring delta, not raw mouse)
+      // Pull toward magnetic target when active
+      const targetX = magActive ? mx + magX : mx;
+      const targetY = magActive ? my + magY : my;
+
+      rx += (targetX - rx) * LERP;
+      ry += (targetY - ry) * LERP;
+
       const dvx = rx - prx;
       const dvy = ry - pry;
       vx += (dvx - vx) * 0.3;
@@ -71,27 +76,26 @@ export default function PremiumCursor() {
 
       const speed  = Math.sqrt(vx * vx + vy * vy);
       const angle  = Math.atan2(vy, vx) * (180 / Math.PI);
-      const stretch = Math.min(speed * 0.8, 1.8);   // scaleX factor bonus
-      const squash  = 1 / (1 + stretch * 0.35);      // scaleY compensates
+      const stretch = Math.min(speed * 0.75, 1.7);
+      const squash  = 1 / (1 + stretch * 0.32);
 
-      // Position ring (centre-offset)
       ring.style.transform =
         `translate3d(${rx - RING_SIZE / 2}px,${ry - RING_SIZE / 2}px,0)` +
         ` rotate(${angle}deg)` +
         ` scaleX(${1 + stretch})` +
         ` scaleY(${squash})`;
 
-      // Dynamic glow based on speed
-      const glow = Math.min(speed * 3, 40);
+      // Speed-reactive glow — more vivid at higher speeds
+      const glow = Math.min(speed * 3.2, 44);
+      const glowAlpha = Math.min(0.25 + speed * 0.06, 0.65);
       ring.style.boxShadow =
-        `0 0 ${8 + glow}px rgba(100,160,255,${0.25 + speed * 0.06}),` +
-        `0 0 ${20 + glow * 2}px rgba(60,120,255,${0.08 + speed * 0.02}),` +
-        `inset 0 0 ${6 + glow * 0.4}px rgba(140,190,255,${0.04 + speed * 0.01})`;
+        `0 0 ${8 + glow}px rgba(100,160,255,${glowAlpha.toFixed(2)}),` +
+        `0 0 ${20 + glow * 2}px rgba(60,120,255,${Math.min(0.08 + speed * 0.025, 0.3).toFixed(2)}),` +
+        `inset 0 0 ${6 + glow * 0.4}px rgba(140,190,255,${Math.min(0.04 + speed * 0.012, 0.18).toFixed(2)})`;
 
-      // Position dot (exact, no offset correction needed)
       dot.style.transform = `translate3d(${mx - DOT_SIZE / 2}px,${my - DOT_SIZE / 2}px,0)`;
 
-      // Trail: every 2nd frame, shift particles forward
+      // Trail: every 2nd frame
       if (frameCount % 2 === 0) {
         for (let i = particles.length - 1; i > 0; i--) {
           particles[i].x    = particles[i - 1].x;
@@ -100,42 +104,81 @@ export default function PremiumCursor() {
         }
         particles[0].x    = rx;
         particles[0].y    = ry;
-        particles[0].life = Math.min(speed * 0.6, 1);
+        particles[0].life = Math.min(speed * 0.65, 1);
       }
 
       for (let i = 0; i < particles.length; i++) {
-        const p = particles[i];
-        const sz = Math.max(2, (1 - i / particles.length) * 5);
-        const op = Math.max(0, p.life * (1 - i / particles.length) * 0.55);
+        const p  = particles[i];
+        const sz = Math.max(1.5, (1 - i / particles.length) * 5.5);
+        const op = Math.max(0, p.life * (1 - i / particles.length) * 0.60);
         p.el.style.transform = `translate3d(${p.x - sz / 2}px,${p.y - sz / 2}px,0)`;
         p.el.style.width     = `${sz}px`;
         p.el.style.height    = `${sz}px`;
         p.el.style.opacity   = String(op);
       }
+
+      // Emit cursor position for environment effects (~30fps)
+      if (frameCount % 2 === 0) {
+        window.dispatchEvent(new CustomEvent("cursor-pos", {
+          detail: { x: mx, y: my, vx, vy, speed },
+        }));
+      }
+
+      // Clean up finished ripples
+      Array.from(ripples.children).forEach((el) => {
+        const age = parseFloat((el as HTMLElement).dataset.age ?? "0") + 1;
+        (el as HTMLElement).dataset.age = String(age);
+        if (age > 45) ripples.removeChild(el);
+      });
     };
 
-    const onMove = (e: MouseEvent) => {
-      mx = e.clientX;
-      my = e.clientY;
+    const onMove = (e: MouseEvent) => { mx = e.clientX; my = e.clientY; };
+
+    // Click ripple — spawn an expanding ring at click position
+    const spawnRipple = (x: number, y: number) => {
+      const el = document.createElement("div");
+      el.className = styles.ripple;
+      el.style.left = `${x}px`;
+      el.style.top  = `${y}px`;
+      el.dataset.age = "0";
+      ripples.appendChild(el);
     };
 
-    const onDown = () => {
+    const onDown = (e: MouseEvent) => {
       ring.classList.add(styles.clicked);
       dot.classList.add(styles.dotClicked);
+      spawnRipple(e.clientX, e.clientY);
     };
     const onUp = () => {
       ring.classList.remove(styles.clicked);
       dot.classList.remove(styles.dotClicked);
     };
 
+    // Magnetic effect: detect interactive elements and pull cursor gently
+    const MAGNETIC_RADIUS = 80;
     const onOver = (e: MouseEvent) => {
-      if ((e.target as Element).closest("a, button, [role='button'], [data-hover], .cursor-target")) {
+      const target = (e.target as Element).closest("a, button, [role='button'], [data-hover], .cursor-target");
+      if (target) {
         ring.classList.add(styles.hovered);
+        const rect = target.getBoundingClientRect();
+        const cx   = rect.left + rect.width  / 2;
+        const cy   = rect.top  + rect.height / 2;
+        const dx   = cx - mx;
+        const dy   = cy - my;
+        const dist = Math.hypot(dx, dy);
+        if (dist < MAGNETIC_RADIUS) {
+          // Attract ring toward element center
+          const strength = (1 - dist / MAGNETIC_RADIUS) * 0.35;
+          magX = dx * strength;
+          magY = dy * strength;
+          magActive = true;
+        }
       }
     };
     const onOut = (e: MouseEvent) => {
       if ((e.target as Element).closest("a, button, [role='button'], [data-hover], .cursor-target")) {
         ring.classList.remove(styles.hovered);
+        magX = 0; magY = 0; magActive = false;
       }
     };
 
@@ -154,19 +197,16 @@ export default function PremiumCursor() {
       window.removeEventListener("mouseup",     onUp);
       document.removeEventListener("mouseover", onOver, true);
       document.removeEventListener("mouseout",  onOut,  true);
-      // clean up trail children
       while (trail.firstChild) trail.removeChild(trail.firstChild);
     };
   }, []);
 
   return (
     <>
-      {/* Exact-position dot */}
-      <div ref={dotRef} className={styles.dot} />
-      {/* Inertia ring with stretch */}
-      <div ref={ringRef} className={styles.ring} />
-      {/* Trail container */}
-      <div ref={trailRef} className={styles.trail} />
+      <div ref={dotRef}    className={styles.dot}    />
+      <div ref={ringRef}   className={styles.ring}   />
+      <div ref={trailRef}  className={styles.trail}  />
+      <div ref={ripplesRef} className={styles.rippleContainer} />
     </>
   );
 }

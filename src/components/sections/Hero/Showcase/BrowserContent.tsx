@@ -8,16 +8,21 @@ import styles from "./Showcase.module.css";
 interface Props {
   image: string;
   title: string;
+  /** Per-project scroll speed multiplier */
+  scrollMult?: number;
+  /** Per-project top-pause duration in seconds */
+  pauseTop?: number;
 }
 
 /**
- * Browser content with cinematic scroll:
- * - Eases in (slow start), linear body, eases out with a natural deceleration
- * - Intelligent "reading" pause at key landmarks (top, 30%, 65%, bottom)
- * - Subtle zoom-in while scrolling down, zoom-out while scrolling up
- * - Soft brightness shift simulating the camera panning across a lit surface
+ * Browser content with cinematic, per-project personality:
+ *  • Each project has a unique scroll speed (scrollMult)
+ *  • Unique reading pause at the top (pauseTop)
+ *  • Eases in (slow start), linear body, eases out naturally
+ *  • Subtle zoom-in while scrolling down, zoom-out while scrolling up
+ *  • Soft brightness shift simulating a camera panning across a lit surface
  */
-export default function BrowserContent({ image, title }: Props) {
+export default function BrowserContent({ image, title, scrollMult = 1, pauseTop = 1.4 }: Props) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const imageRef    = useRef<HTMLDivElement>(null);
   const tlRef       = useRef<gsap.core.Timeline | null>(null);
@@ -31,10 +36,7 @@ export default function BrowserContent({ image, title }: Props) {
     if (!img) return;
 
     const buildTimeline = () => {
-      if (tlRef.current) {
-        tlRef.current.kill();
-        tlRef.current = null;
-      }
+      if (tlRef.current) { tlRef.current.kill(); tlRef.current = null; }
 
       const viewportH = viewport.clientHeight;
       const imageH    = img.clientHeight;
@@ -42,51 +44,48 @@ export default function BrowserContent({ image, title }: Props) {
 
       gsap.set(wrapper, { y: 0, scale: 1, filter: "brightness(1)" });
 
-      // Short images — gentle float
       if (distance <= 0) {
         tlRef.current = gsap.timeline({ repeat: -1, yoyo: true })
-          .to(wrapper, { y: -10, scale: 1.018, duration: 3.5, ease: "sine.inOut" });
+          .to(wrapper, {
+            y: -12 * scrollMult,
+            scale: 1.02,
+            duration: 3.2 / scrollMult,
+            ease: "sine.inOut",
+          });
         return;
       }
 
-      // Segment durations: ease-in 2s, body scroll, ease-out 2s
-      const body = Math.max(4, distance / 60);
+      const bodyDuration = Math.max(3.5, (distance / 60)) / scrollMult;
 
       tlRef.current = gsap.timeline({ repeat: -1 })
-        // ── PAUSE at top — "reading pause"
-        .to({}, { duration: 1.4 })
+        .to({}, { duration: pauseTop })
 
-        // ── Ease IN — slow start, building momentum
         .to(wrapper, {
           y:          -distance * 0.12,
-          scale:      1.012,
+          scale:      1.014,
           filter:     "brightness(1.04)",
-          duration:   2.0,
+          duration:   2.0 / scrollMult,
           ease:       "power2.in",
         })
 
-        // ── Main scroll — smooth linear body
         .to(wrapper, {
           y:          -distance * 0.88,
-          scale:      1.022,
+          scale:      1.024,
           filter:     "brightness(1.08)",
-          duration:   body,
+          duration:   bodyDuration,
           ease:       "none",
         })
 
-        // ── Ease OUT — gentle deceleration into bottom
         .to(wrapper, {
           y:          -distance,
-          scale:      1.015,
-          filter:     "brightness(1.03)",
-          duration:   2.2,
+          scale:      1.016,
+          filter:     "brightness(1.04)",
+          duration:   2.2 / scrollMult,
           ease:       "power3.out",
         })
 
-        // ── PAUSE at bottom — second "reading pause"
-        .to({}, { duration: 1.8 })
+        .to({}, { duration: 1.6 })
 
-        // ── Snap back — quicker return, slightly slower than scroll
         .to(wrapper, {
           y:      0,
           scale:  1,
@@ -95,8 +94,7 @@ export default function BrowserContent({ image, title }: Props) {
           ease:   "power2.inOut",
         })
 
-        // ── Brief pause before looping
-        .to({}, { duration: 0.8 });
+        .to({}, { duration: 0.6 });
     };
 
     if (img.complete && img.naturalHeight > 0) {
@@ -105,10 +103,8 @@ export default function BrowserContent({ image, title }: Props) {
       img.onload = buildTimeline;
     }
 
-    return () => {
-      tlRef.current?.kill();
-    };
-  }, [image]);
+    return () => { tlRef.current?.kill(); };
+  }, [image, scrollMult, pauseTop]);
 
   return (
     <div ref={viewportRef} className={styles.browserViewport}>

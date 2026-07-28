@@ -2330,3 +2330,112 @@ font-size:clamp(72px,18vw,140px);
     line-height: 0.92;
   }
 }
+
+/* ============================================================
+   FLOATING PILL LABELS — light-direction inner glow
+   --light-x / --light-y set by FloatingElements.tsx
+   ============================================================ */
+
+.floatingItem {
+  --light-x: 30%;
+  --light-y: 30%;
+}
+
+.floatingItem::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at var(--light-x, 30%) var(--light-y, 30%),
+    rgba(120,180,255,0.18) 0%,
+    transparent 60%
+  );
+  pointer-events: none;
+  transition: background 0.15s ease;
+  mix-blend-mode: screen;
+}
+
+/* ============================================================
+   REDUCED-MOTION — respect user preference throughout
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+
+  /* Stop all animations and transitions that are purely decorative */
+  .mesh span,
+  .heroLight,
+  .heroLightSpec,
+  .atmosphereCanvas,
+  .floatingItem,
+  .floatingContainer > div {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Static grid — no fade */
+  .grid {
+    opacity: 0.06;
+  }
+
+  /* Freeze mesh blobs at their resting positions */
+  .mesh span {
+    transform: none !important;
+  }
+
+  /* Keep canvas visible but frozen (JS checks this independently) */
+  .atmosphereCanvas {
+    opacity: 0.4;
+  }
+
+  /* Disable 3D perspective transforms on showcase */
+  .showcaseExit {
+    transform: none !important;
+  }
+
+  /* Headline: entrance is a simple fade, no 3D flip */
+  .headlineLineMask .headlineLine {
+    transform: none !important;
+    filter: none !important;
+    transition: opacity 0.5s ease !important;
+  }
+
+  /* Cursor ring: no glow animation */
+  .floatingItem::before {
+    display: none;
+  }
+}
+
+/* ============================================================
+   GRID — improved depth perspective fade
+   ============================================================ */
+
+.grid {
+  /* Override the earlier definition with a richer perspective fade */
+  mask-image:
+    radial-gradient(ellipse 95% 78% at 50% 38%, black 0%, black 35%, transparent 82%);
+  -webkit-mask-image:
+    radial-gradient(ellipse 95% 78% at 50% 38%, black 0%, black 35%, transparent 82%);
+}
+
+/* ============================================================
+   HERO HEADLINE — headlineScales  (subtle scale breathing)
+   ============================================================ */
+
+.headlineScales {
+  display: inline-block;
+  animation: headlineBreath 8s ease-in-out infinite;
+  transform-origin: left center;
+}
+
+@keyframes headlineBreath {
+  0%,100% { transform: scaleX(1);    }
+  40%      { transform: scaleX(1.006); }
+  70%      { transform: scaleX(0.996); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .headlineScales {
+    animation: none !important;
+  }
+}
