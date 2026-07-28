@@ -19,6 +19,9 @@ export default function WaterRipple() {
     const el = ref.current;
     if (!el) return;
 
+    // No pointer to follow on touch devices — skip the whole RAF loop.
+    if (window.matchMedia("(pointer: coarse)").matches) return;
+
     let cx = window.innerWidth  * 0.50;
     let cy = window.innerHeight * 0.42;
     let tx = cx, ty = cy;

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import styles from "./About.module.css";
 import LiquidEther from "./LiquidEther";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import FaultyTerminal from "./FaultyTerminal";
 import DecryptedText from "@/components/ui/DecryptedText";
 import RichTypewriter, { RichSegment } from "@/components/ui/RichTypewriter";
@@ -115,14 +116,15 @@ export default function About({ active = false }: AboutProps) {
   }, []);
 
   const paused = !active;
+  const isMobile = useIsMobile();
 
   return (
     <section id="about" ref={sectionRef} className={styles.section}>
       <SectionNav navItems={["Service", "Work", "Contact"]} />
 
-      {/* ── WebGL backgrounds ── */}
+      {/* ── WebGL backgrounds — skipped on mobile (heavy Three.js sim) ── */}
       <div className={styles.bgLayer}>
-        <LiquidEther
+        {!isMobile && <LiquidEther
           paused={paused}
           colors={["#1a0a4f", "#5227FF", "#B497CF", "#FF9FFC"]}
           mouseForce={60}
@@ -138,10 +140,10 @@ export default function About({ active = false }: AboutProps) {
           takeoverDuration={0}
           autoResumeDelay={2000}
           autoRampDuration={0.8}
-        />
+        />}
       </div>
       <div className={styles.terminalLayer}>
-        <FaultyTerminal
+        {!isMobile && <FaultyTerminal
           pause={paused}
           scale={1.4}
           gridMul={[2, 1]}
@@ -158,7 +160,7 @@ export default function About({ active = false }: AboutProps) {
           mouseLerp={1}
           pageLoadAnimation={false}
           brightness={0.55}
-        />
+        />}
       </div>
 
       {/* Crosshair markers */}

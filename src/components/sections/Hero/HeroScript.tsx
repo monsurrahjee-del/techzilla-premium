@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useRef } from "react";
 import styles from "./Hero.module.css";
 import { useLoaded } from "@/hooks/useLoaded";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 const BuildFluid3D = dynamic(() => import("./BuildFluid3D"), {
   ssr: false,
@@ -134,17 +135,20 @@ interface HeroScriptProps {
 
 export default function HeroScript({ theme }: HeroScriptProps) {
   const loaded = useLoaded();
+  const isMobile = useIsMobile();
 
   // When the theme leaves "light", signal BuildFluid3D to stop its render loop
   // immediately — before AnimatePresence finishes the 0.9 s exit animation.
-  // Without this, the expensive Three.js FBO double-pass keeps running on the
-  // GPU for nearly a full second after the user can no longer see it, competing
-  // with SplashCursor's fluid sim and making the cursor feel sluggish.
   useEffect(() => {
     window.dispatchEvent(
       new CustomEvent("build-fluid-3d-active", { detail: { active: theme === "light" } })
     );
   }, [theme]);
+
+  // Skip the heavy 3-D / CSS-var RAF loops entirely on touch devices.
+  // BuildFluid3D (Three.js FBO) and ThemeABuild (60-fps CSS var writes) are
+  // the two biggest contributors to jank on mobile.
+  if (isMobile) return null;
 
   return (
     <div className={styles.scriptLayer} aria-hidden="true">

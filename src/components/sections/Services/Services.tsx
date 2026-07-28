@@ -394,29 +394,30 @@ export default function Services({ active = false }: { active?: boolean }) {
     <section ref={sectionRef} className={styles.section} id="services">
       <SectionNav navItems={["About", "Work", "Contact"]} onOpenChange={setNavOpen} />
 
-      {/* CursorGrid fills entire section — always rendered, colour tracks
-          active card. eventRef = sectionRef so events bubble from any child. */}
-      <div className="absolute inset-0 z-0">
-        <CursorGrid
-          eventRef={sectionRef}
-          color={currentAccent}
-          cellSize={65}
-          radius={150}
-          falloff="smooth"
-          holdTime={300}
-          fadeDuration={700}
-          lineWidth={1.1}
-          maxOpacity={active ? 0.75 : 0.25}
-          fillOpacity={0.04}
-          gridOpacity={0.035}
-          clickPulse={active}
-          pulseSpeed={500}
-        />
-      </div>
+      {/* CursorGrid — desktop only (mouse-following canvas, no value on touch) */}
+      {!isMobile && (
+        <div className="absolute inset-0 z-0">
+          <CursorGrid
+            eventRef={sectionRef}
+            color={currentAccent}
+            cellSize={65}
+            radius={150}
+            falloff="smooth"
+            holdTime={300}
+            fadeDuration={700}
+            lineWidth={1.1}
+            maxOpacity={active ? 0.75 : 0.25}
+            fillOpacity={0.04}
+            gridOpacity={0.035}
+            clickPulse={active}
+            pulseSpeed={500}
+          />
+        </div>
+      )}
 
-      {/* Content + ClickSpark overlay */}
+      {/* Content + ClickSpark overlay (ClickSpark skipped on mobile) */}
       <div className="absolute inset-0 z-10">
-        {active ? (
+        {active && !isMobile ? (
           <ClickSpark
             sparkColor={currentAccent}
             sparkCount={10}

@@ -14,6 +14,7 @@ import styles from "./Craft.module.css";
 import ContactModal from "./ContactModal";
 import GiftFlow     from "./GiftFlow";
 import { LiquidEffectAnimation } from "@/components/ui/LiquidEffectAnimation";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import SectionNav from "@/components/ui/SectionNav";
 
 export interface CraftSectionHandle {
@@ -28,6 +29,7 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
   const [showContact, setShowContact] = useState(false);
   const [showGift,    setShowGift]    = useState(false);
   const activeRef = useRef(false);
+  const isMobile  = useIsMobile();
 
   const slideIn = () => {
     const w = wrapRef.current;
@@ -139,8 +141,8 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
         {/* ── Section-level hamburger nav — light variant for Craft's background ── */}
         <SectionNav navItems={["About", "Service", "Work"]} variant="light" />
 
-        {/* ── Liquid background — sole background layer ── */}
-        <LiquidEffectAnimation />
+        {/* ── Liquid background — desktop only (CDN WebGL, too heavy on mobile) ── */}
+        {!isMobile && <LiquidEffectAnimation />}
 
         {/* ── Centre: static "Craft With Taste" title + contact popover button ── */}
         <div className={styles.craftCenter}>
