@@ -21,29 +21,27 @@ import { useParallax } from "@/hooks/useParallax";
 import { useClickSound } from "@/hooks/useClickSound";
 
 export default function Hero() {
-  const heroRef     = useRef<HTMLElement>(null);
-  const contentRef  = useRef<HTMLDivElement>(null);
-  const headingRef  = useRef<HTMLDivElement>(null);
+  const heroRef         = useRef<HTMLElement>(null);
+  const contentRef      = useRef<HTMLDivElement>(null);
+  const headingRef      = useRef<HTMLDivElement>(null);
+  const showcaseWrapRef = useRef<HTMLDivElement>(null);
+  const stickerLayerRef = useRef<HTMLDivElement>(null);
 
   const [showcaseIndex, setShowcaseIndex] = useState(0);
-
-  // ── Theme A (dark) = CSS "build" text | Theme B (light) = 3-D glass canvas
   const [theme, setTheme] = useState<"dark" | "light">("light");
-  // ── Sound toggle — click anywhere plays a short UI tone when on
   const [sound, setSound] = useState(false);
 
   useClickSound(sound);
   useParallax(headingRef, 5);
 
-  // Broadcast theme changes so HeroSplash can pause its WebGL fluid sim while
-  // BuildFluid3D (Theme B) is active — two heavy WebGL loops at once saturate
-  // the GPU and make the cursor feel sluggish.
+  // Broadcast theme changes so HeroSplash can pause its WebGL fluid sim
   useEffect(() => {
     window.dispatchEvent(
       new CustomEvent("hero-theme-change", { detail: { theme } })
     );
   }, [theme]);
 
+  // ── Parallax content drift on scroll ──────────────────────────────────────
   useEffect(() => {
     if (!heroRef.current || !contentRef.current) return;
     const tl = gsap.timeline({
@@ -55,6 +53,43 @@ export default function Hero() {
       },
     });
     tl.to(contentRef.current, { y: -50, ease: "none" });
+    return () => { tl.scrollTrigger?.kill(); tl.kill(); };
+  }, []);
+
+  // ── Scroll storytelling: browser + stickers animate out as hero exits ──────
+  useEffect(() => {
+    const wrap    = showcaseWrapRef.current;
+    const hero    = heroRef.current;
+    const stickers = stickerLayerRef.current;
+    if (!wrap || !hero) return;
+
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: hero,
+        start: "55% top",
+        end: "bottom top",
+        scrub: 1.8,
+      },
+    });
+
+    // Browser rises, shrinks, tilts and fades → blends into next section
+    tl.to(wrap, {
+      y:       -80,
+      scale:   0.88,
+      rotateX:  6,
+      opacity:  0,
+      ease:    "power2.inOut",
+    }, 0);
+
+    // Stickers scatter/fade on exit
+    if (stickers) {
+      tl.to(stickers, {
+        scale:   1.10,
+        opacity: 0,
+        ease:    "power3.in",
+      }, 0);
+    }
+
     return () => { tl.scrollTrigger?.kill(); tl.kill(); };
   }, []);
 
@@ -74,32 +109,32 @@ export default function Hero() {
         onSoundToggle={() => setSound((s) => !s)}
       />
 
-      {/* ── decorative layers ── */}
-      <StickerCloud />
+      {/* ── sticker decorative layer (ref for scroll exit animation) ── */}
+      <div ref={stickerLayerRef} className={styles.stickerLayer}>
+        <StickerCloud />
+      </div>
       <HeroScript theme={theme} />
 
       {/* ── main two-column content ── */}
       <div ref={contentRef} className={styles.heroContent}>
 
-        {/* LEFT — tagline + headline + CTA (CTA hidden on mobile via desktopOnly) */}
+        {/* LEFT — tagline + headline + CTA */}
         <div ref={headingRef} className={styles.heroLeft}>
           <p className={styles.heroTagline}>
             Code with craft.<br />Ship with intention.
           </p>
           <HeroHeadline />
-          {/* Desktop buttons — hidden on mobile */}
           <div className={styles.desktopOnly}>
             <HeroButtons />
           </div>
         </div>
 
-        {/* RIGHT — showcase → bio → buttons (mobile order via CSS order property) */}
+        {/* RIGHT — showcase → bio → buttons */}
         <div className={styles.heroRight}>
           <HeroIntro />
-          <div className={styles.showcaseWrap}>
+          <div ref={showcaseWrapRef} className={`${styles.showcaseWrap} ${styles.showcaseExit}`}>
             <Showcase onIndexChange={setShowcaseIndex} />
           </div>
-          {/* Mobile-only buttons — appear after bio on mobile */}
           <div className={styles.mobileOnly}>
             <HeroButtons />
           </div>

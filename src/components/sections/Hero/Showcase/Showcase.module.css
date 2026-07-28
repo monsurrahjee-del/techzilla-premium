@@ -832,3 +832,144 @@ z-index:8;
     width: 100%;
   }
 }
+
+/* ============================================================
+   PREMIUM BROWSER CHROME — ShowcaseFrame additions
+   ============================================================ */
+
+/* Simulated physical edge: a thin gradient border that implies thickness */
+.frameEdge {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 10;
+  /* Top-left lit edge (light source = top-left) vs bottom-right shadow edge */
+  box-shadow:
+    inset  1px  1px 0   rgba(255,255,255,0.22),
+    inset  0px  0px 1px rgba(255,255,255,0.08),
+    inset -1px -1px 0   rgba(0,0,0,0.28);
+}
+
+/* Traffic light cluster */
+.trafficLights {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+.light {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  display: block;
+}
+
+.lightRed {
+  background: #ff5f57;
+  box-shadow: 0 0 6px rgba(255,95,87,0.6);
+}
+
+.lightYellow {
+  background: #ffbd2e;
+  box-shadow: 0 0 6px rgba(255,189,46,0.5);
+}
+
+.lightGreen {
+  background: #28c840;
+  box-shadow: 0 0 6px rgba(40,200,64,0.55);
+}
+
+/* Address bar pill */
+.addressBar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 340px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.10);
+  backdrop-filter: blur(6px);
+  overflow: hidden;
+}
+
+.lockIcon {
+  width: 10px;
+  height: 12px;
+  flex-shrink: 0;
+  color: rgba(255,255,255,0.55);
+}
+
+/* Right cluster: live indicator */
+.frameRight {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+.liveLabel {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(40,200,64,0.9);
+}
+
+/* Screen-space glass reflection — diagonal specular sweep */
+.screenReflection {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+  background: linear-gradient(
+    128deg,
+    rgba(255,255,255,0.07) 0%,
+    rgba(255,255,255,0.01) 35%,
+    transparent 55%
+  );
+  border-radius: inherit;
+  /* Animate the reflection sweep every 8s */
+  animation: screenReflSweep 8s ease-in-out infinite;
+}
+
+@keyframes screenReflSweep {
+  0%   { opacity: 0.5; background-position: 0 0;    }
+  40%  { opacity: 0.9; }
+  70%  { opacity: 0.5; }
+  100% { opacity: 0.5; background-position: 100% 0; }
+}
+
+/* Deeper bloom glow that reacts to project accent */
+.browserGlow {
+  animation: glowBreathe 4s ease-in-out infinite;
+}
+
+@keyframes glowBreathe {
+  0%,100% { opacity: 0.7; transform: translateX(-50%) scaleY(1);   }
+  50%      { opacity: 1.0; transform: translateX(-50%) scaleY(1.15); }
+}
+
+/* ============================================================
+   FRAME HEADER — updated layout for new premium chrome
+   (traffic lights + address bar + right cluster)
+   ============================================================ */
+
+/* Override the existing frameHeader to accommodate 3-column layout */
+.frameHeader {
+  justify-content: space-between !important;
+  gap: 12px !important;
+  padding: 14px 18px !important;
+}
+
+/* frameUrl inside addressBar: narrower pill context */
+.addressBar .frameUrl {
+  font-size: 0.75rem !important;
+  opacity: 0.78;
+  color: rgba(255, 255, 255, 0.85);
+  max-width: min(220px, 30vw) !important;
+}
