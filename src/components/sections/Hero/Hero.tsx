@@ -21,27 +21,29 @@ import { useParallax } from "@/hooks/useParallax";
 import { useClickSound } from "@/hooks/useClickSound";
 
 export default function Hero() {
-  const heroRef         = useRef<HTMLElement>(null);
-  const contentRef      = useRef<HTMLDivElement>(null);
-  const headingRef      = useRef<HTMLDivElement>(null);
-  const showcaseWrapRef = useRef<HTMLDivElement>(null);
-  const stickerLayerRef = useRef<HTMLDivElement>(null);
+  const heroRef     = useRef<HTMLElement>(null);
+  const contentRef  = useRef<HTMLDivElement>(null);
+  const headingRef  = useRef<HTMLDivElement>(null);
 
   const [showcaseIndex, setShowcaseIndex] = useState(0);
+
+  // ── Theme A (dark) = CSS "build" text | Theme B (light) = 3-D glass canvas
   const [theme, setTheme] = useState<"dark" | "light">("light");
+  // ── Sound toggle — click anywhere plays a short UI tone when on
   const [sound, setSound] = useState(false);
 
   useClickSound(sound);
   useParallax(headingRef, 5);
 
-  // Broadcast theme changes
+  // Broadcast theme changes so HeroSplash can pause its WebGL fluid sim while
+  // BuildFluid3D (Theme B) is active — two heavy WebGL loops at once saturate
+  // the GPU and make the cursor feel sluggish.
   useEffect(() => {
     window.dispatchEvent(
       new CustomEvent("hero-theme-change", { detail: { theme } })
     );
   }, [theme]);
 
-  // ── Parallax content drift on scroll ──────────────────────────────────────
   useEffect(() => {
     if (!heroRef.current || !contentRef.current) return;
     const tl = gsap.timeline({
@@ -52,60 +54,7 @@ export default function Hero() {
         scrub: 1.4,
       },
     });
-    tl.to(contentRef.current, { y: -55, ease: "none" });
-    return () => { tl.scrollTrigger?.kill(); tl.kill(); };
-  }, []);
-
-  // ── Scroll storytelling — one continuous scene transition ─────────────────
-  useEffect(() => {
-    const wrap    = showcaseWrapRef.current;
-    const hero    = heroRef.current;
-    const stickers = stickerLayerRef.current;
-    if (!wrap || !hero) return;
-
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: hero,
-        start: "52% top",
-        end: "bottom top",
-        scrub: 1.8,
-      },
-    });
-
-    // Browser rises, shrinks and tilts — blends naturally into next section
-    tl.to(wrap, {
-      y:        -90,
-      scale:    0.86,
-      rotateX:  8,
-      rotateY:  -2,
-      opacity:  0,
-      ease:     "power2.inOut",
-    }, 0);
-
-    // Stickers scatter outward with individual trajectories
-    if (stickers) {
-      const stickerEls = stickers.querySelectorAll<HTMLElement>("[class*='sticker']");
-      stickerEls.forEach((el, i) => {
-        const angle   = (i / stickerEls.length) * Math.PI * 2;
-        const dist    = 60 + Math.random() * 40;
-        tl.to(el, {
-          x:       Math.cos(angle) * dist,
-          y:       Math.sin(angle) * dist - 20,
-          scale:   0.75 + Math.random() * 0.35,
-          opacity: 0,
-          rotate:  `+=${(Math.random() - 0.5) * 30}`,
-          ease:    "power3.in",
-        }, 0);
-      });
-
-      // Fallback for the layer as a whole if individual queries miss
-      tl.to(stickers, {
-        scale:   1.06,
-        opacity: 0,
-        ease:    "power2.inOut",
-      }, 0);
-    }
-
+    tl.to(contentRef.current, { y: -50, ease: "none" });
     return () => { tl.scrollTrigger?.kill(); tl.kill(); };
   }, []);
 
@@ -125,32 +74,32 @@ export default function Hero() {
         onSoundToggle={() => setSound((s) => !s)}
       />
 
-      {/* ── sticker decorative layer ── */}
-      <div ref={stickerLayerRef} className={styles.stickerLayer}>
-        <StickerCloud />
-      </div>
+      {/* ── decorative layers ── */}
+      <StickerCloud />
       <HeroScript theme={theme} />
 
       {/* ── main two-column content ── */}
       <div ref={contentRef} className={styles.heroContent}>
 
-        {/* LEFT — tagline + headline + CTA */}
+        {/* LEFT — tagline + headline + CTA (CTA hidden on mobile via desktopOnly) */}
         <div ref={headingRef} className={styles.heroLeft}>
           <p className={styles.heroTagline}>
             Code with craft.<br />Ship with intention.
           </p>
           <HeroHeadline />
+          {/* Desktop buttons — hidden on mobile */}
           <div className={styles.desktopOnly}>
             <HeroButtons />
           </div>
         </div>
 
-        {/* RIGHT — showcase → bio → buttons */}
+        {/* RIGHT — showcase → bio → buttons (mobile order via CSS order property) */}
         <div className={styles.heroRight}>
           <HeroIntro />
-          <div ref={showcaseWrapRef} className={`${styles.showcaseWrap} ${styles.showcaseExit}`}>
+          <div className={styles.showcaseWrap}>
             <Showcase onIndexChange={setShowcaseIndex} />
           </div>
+          {/* Mobile-only buttons — appear after bio on mobile */}
           <div className={styles.mobileOnly}>
             <HeroButtons />
           </div>

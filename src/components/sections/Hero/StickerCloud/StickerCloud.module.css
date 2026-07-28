@@ -16,15 +16,3 @@
     object-fit:contain;
     user-select:none;
 }
-/* ── Avoidance/attraction physics need window-level mousemove listener.
-   Disable pointer capture on the container so mouse events reach window. */
-.sticker {
-  pointer-events: none;
-}
-
-/* Image itself needs no pointer events either — physics are in JS */
-.image {
-  pointer-events: none;
-  -webkit-user-drag: none;
-  user-select: none;
-}
