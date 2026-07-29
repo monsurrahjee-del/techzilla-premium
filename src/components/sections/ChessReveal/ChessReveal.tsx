@@ -523,7 +523,10 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       }
       const dy = touchY - currentY;
       touchY   = currentY;
-      applyVirtualDelta(dy * 3);
+      // 5× multiplier on touch (vs 3× for wheel) — on a typical phone screen
+      // one full-length swipe (~650 px) moves 3 250 virtual units, so the user
+      // needs ≈ 2 swipes to traverse the full chess reveal rather than 3–4.
+      applyVirtualDelta(dy * 5);
     };
 
     // ── Keyboard: arrow keys, Page Up/Down, Space, Home/End ──────────────────

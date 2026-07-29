@@ -171,8 +171,21 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
       }
     };
 
-    const onTouchEnd = () => {
-      // If the finger lifts without triggering dismiss, reset state cleanly.
+    const onTouchEnd = (e: TouchEvent) => {
+      // Fallback: if the full gesture had enough net downward displacement
+      // but onTouchMove never crossed the threshold (e.g. slow drag or iOS
+      // holding the first event until the finger lifts), dismiss now.
+      if (activeRef.current && !showContact && !showGift && !dismissed) {
+        const endY  = e.changedTouches?.[0]?.clientY ?? lastTouchY;
+        const netDy = endY - touchStartY; // positive = finger moved down = go back
+        if (netDy > 20) {
+          dismissed = true;
+          activeRef.current = false;
+          setActive(false);
+          slideOut();
+          window.dispatchEvent(new CustomEvent("craft-section-dismiss"));
+        }
+      }
       touchActive = false;
     };
 
