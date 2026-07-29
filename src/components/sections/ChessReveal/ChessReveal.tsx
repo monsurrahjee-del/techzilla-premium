@@ -44,12 +44,13 @@ function drawWarpLines(
   W: number, H: number,
   progress: number,
   time: number,
+  seeds: WarpSeed[] = WARP_SEEDS,
 ) {
   if (progress <= 0) return;
   const maxDist = Math.hypot(W, H) * 0.62;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
-  for (const seed of WARP_SEEDS) {
+  for (const seed of seeds) {
     const t = (seed.phase + time * seed.speed * 0.055) % 1;
     const bandLen  = maxDist * (0.06 + seed.speed * 0.09) * progress;
     const startFrac = t * progress;
@@ -468,6 +469,13 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     if (!canvas) return;
     const s = stateRef.current;
 
+    // Detect mobile once — used to apply performance budget throughout.
+    const isMobile =
+      window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 767;
+
+    // Reduced warp seed set for mobile (25 lines vs 80 on desktop).
+    const activeSeeds = isMobile ? WARP_SEEDS.slice(0, 25) : WARP_SEEDS;
+
     const pawn  = new Image(); pawn.src  = "/chess/pawn.png";
     const queen = new Image(); queen.src = "/chess/queen.png";
     pawnRef.current  = pawn;
@@ -583,11 +591,12 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     };
     window.addEventListener("craft-section-dismiss", onCraftDismiss);
 
-    // Cap canvas redraws to ~30 fps (same as FrameDriver in ProjectWorld).
+    // Cap canvas redraws to ~30 fps on desktop, ~20 fps on mobile.
     // At 60 fps the 16 ms frame budget was exhausted by canvas drawing,
     // leaving almost no slack for mousemove events — making the cursor laggy.
     // 30 fps gives ~33 ms per frame so pointer events are always processed first.
-    const FRAME_MS = 1000 / 30;
+    // On mobile 20 fps (~50 ms) gives even more headroom for touch events.
+    const FRAME_MS = isMobile ? 1000 / 20 : 1000 / 30;
     let lastDrawTs = 0;
 
     const tick = (ts: number) => {
@@ -637,7 +646,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
 
       /* ── 3. Warp lines (background; reduced during Phase B) ───── */
       const warpIntensity = inPhaseB ? linesP * 0.30 : linesP;
-      drawWarpLines(ctx, cx, cy, W, H, warpIntensity, s.time);
+      drawWarpLines(ctx, cx, cy, W, H, warpIntensity, s.time, activeSeeds);
 
       /* ── 4. Blue fill ─────────────────────────────────────────── */
       drawBlueFill(ctx, cx, cy, W, H, blueP);
@@ -645,8 +654,17 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       /* ── 5. HUD brackets ──────────────────────────────────────── */
       drawCornerBrackets(ctx, W, H, introP * (1 - blueP * 0.5));
 
+      /* ── 6. Rings — skip on mobile (each ellipse triggers shadow blur) ── */
+      if (!isMobile) {
+        drawRings(ctx, cx, cy, W, H, morphP, s.time);
+      }
+
       /* ── 7. Chess piece (hidden during Phase C) ────────────────── */
-      const maxH   = H * 0.52;
+      // On mobile the viewport height is much shorter, so H * 0.52 would
+      // produce a piece that fills more than half the screen. Cap at 28 % on
+      // mobile so the pawn/queen remains clearly "icon-sized" rather than
+      // dominating the entire canvas.
+      const maxH   = isMobile ? H * 0.28 : H * 0.52;
       const minH   = maxH * 0.04;
       const sizeT  = easeOut3(clamp(growP + morphP * 0.30, 0, 1));
       const pieceH = lerp(minH, maxH, sizeT);
@@ -678,7 +696,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
         ctx.fillRect(0, 0, W, H);
         ctx.restore();
         // Warp lines on top of dark fill
-        drawWarpLines(ctx, cx, cy, W, H, 0.28, s.time * 0.6);
+        drawWarpLines(ctx, cx, cy, W, H, 0.28, s.time * 0.6, activeSeeds);
         // Final text — 3 lines
         drawHeadline(ctx, W, H, "YOUR\nSATISFACTION\nALWAYS", easeInOut(pC), 0.44);
         if (queenRef.current) {

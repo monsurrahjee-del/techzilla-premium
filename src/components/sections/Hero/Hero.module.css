@@ -763,6 +763,24 @@ background:
 animation-delay:-4s;
 
 }
+/* ── Mesh gradient: simplify on mobile to cut GPU cost ── */
+@media (max-width: 767px) {
+  /* Hide two of the four heavy blur-blobs — half the overdraw */
+  .mesh span:nth-child(3),
+  .mesh span:nth-child(4) {
+    display: none;
+  }
+  /* Reduce blur radius: 100px → 50px saves a GPU compositing pass */
+  .mesh span {
+    filter: blur(50px) !important;
+    /* Slow the animation so the GPU isn't constantly invalidating */
+    animation-duration: 56s !important;
+    /* Reduce blob dimensions to cut blending area */
+    width: 280px !important;
+    height: 280px !important;
+  }
+}
+
 @keyframes meshMove{
 
 0%{
