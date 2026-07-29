@@ -1097,6 +1097,9 @@
   padding: 8px 20px 12px;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  /* Only claim horizontal swipes — vertical swipes pass through to the
+     page scroll gate so the user can swipe up/down to leave the section. */
+  touch-action: pan-x;
 }
 .mobileCarousel::-webkit-scrollbar { display: none; }
 

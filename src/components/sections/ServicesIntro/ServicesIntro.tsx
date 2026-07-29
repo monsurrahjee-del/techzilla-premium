@@ -17,6 +17,7 @@ import {
 } from "react";
 import DotGrid            from "@/components/ui/DotGrid";
 import VaporizeTextCycle, { Tag } from "@/components/ui/VaporizeTextCycle";
+import VapourWords        from "@/components/ui/VapourWords";
 import styles             from "./ServicesIntro.module.css";
 
 /* ── imperative handle (kept for API compat with page.tsx ref) ─────────────── */
@@ -38,6 +39,19 @@ const ServicesIntro = forwardRef<ServicesIntroHandle, Props>(
   ({ visible, vapourActive, onVapourComplete }, ref) => {
     const [mounted, setMounted] = useState(false);
     const [fading,  setFading]  = useState(false);
+
+    /* Mobile detection — skip canvas effects on touch devices / narrow screens */
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+      const check = () =>
+        setIsMobile(
+          window.matchMedia("(pointer: coarse)").matches ||
+          window.innerWidth <= 767
+        );
+      check();
+      window.addEventListener("resize", check, { passive: true });
+      return () => window.removeEventListener("resize", check);
+    }, []);
 
     /* Dynamic font size — responsive to viewport, capped at 380 px. */
     const [fontSize, setFontSize] = useState("240px");
@@ -80,60 +94,69 @@ const ServicesIntro = forwardRef<ServicesIntroHandle, Props>(
         ].join(" ")}
         aria-hidden="true"
       >
-        {/* ── DotGrid background fills the full overlay ── */}
+        {/* ── Background — DotGrid on desktop, plain dark on mobile (no canvas) ── */}
         <div className={styles.bg}>
-          <DotGrid
-            dotSize={4}
-            gap={22}
-            baseColor="#07112e"
-            activeColor="#5227FF"
-            proximity={130}
-            speedTrigger={100}
-            shockRadius={260}
-            shockStrength={5}
-            resistance={750}
-            returnDuration={1.5}
-          />
+          {!isMobile && (
+            <DotGrid
+              dotSize={4}
+              gap={22}
+              baseColor="#07112e"
+              activeColor="#5227FF"
+              proximity={130}
+              speedTrigger={100}
+              shockRadius={260}
+              shockStrength={5}
+              resistance={750}
+              returnDuration={1.5}
+            />
+          )}
+          {/* Mobile: static dark background — zero canvas/GSAP overhead */}
+          {isMobile && (
+            <div style={{ position: "absolute", inset: 0, background: "#07112e" }} />
+          )}
         </div>
 
-        {/* ── VaporizeTextCycle — canvas-based glowing word-by-word reveal ──
-            Wrapper uses position:absolute + inset:0 (NOT flex) so the inner
-            div's height:100% resolves to the full overlay height.
-            flex + align-items:center collapses that to ~20 px (canvas
-            minHeight), making the canvas too small to render anything.
-            Glow filter matches the reference from commit c2645b9. ── */}
         {vapourActive && (
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              zIndex: 20,
-              pointerEvents: "none",
-              filter:
-                "brightness(2.6) " +
-                "drop-shadow(0 0 12px rgba(255,255,255,1)) " +
-                "drop-shadow(0 0 50px rgba(255,255,255,0.85)) " +
-                "drop-shadow(0 0 100px rgba(255,255,255,0.6))",
-            }}
-          >
-            <VaporizeTextCycle
-              texts={["The", "Services", "We", "Provide"]}
-              font={{
-                fontFamily: "Geist, system-ui, sans-serif",
-                fontSize,
-                fontWeight: 900,
-              }}
-              color="rgb(255, 255, 255)"
-              spread={4}
-              density={2}
-              animation={{ vaporizeDuration: 1.0, fadeInDuration: 0.5, waitDuration: 0.3 }}
-              direction="left-to-right"
-              alignment="center"
-              tag={Tag.H1}
-              forceActive={true}
+          isMobile ? (
+            /* ── Mobile: CSS-only VapourWords — no canvas, no RAF loop ── */
+            <VapourWords
+              active={vapourActive}
               onComplete={onVapourComplete}
             />
-          </div>
+          ) : (
+            /* ── Desktop: full canvas particle VaporizeTextCycle ── */
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                zIndex: 20,
+                pointerEvents: "none",
+                filter:
+                  "brightness(2.6) " +
+                  "drop-shadow(0 0 12px rgba(255,255,255,1)) " +
+                  "drop-shadow(0 0 50px rgba(255,255,255,0.85)) " +
+                  "drop-shadow(0 0 100px rgba(255,255,255,0.6))",
+              }}
+            >
+              <VaporizeTextCycle
+                texts={["The", "Services", "We", "Provide"]}
+                font={{
+                  fontFamily: "Geist, system-ui, sans-serif",
+                  fontSize,
+                  fontWeight: 900,
+                }}
+                color="rgb(255, 255, 255)"
+                spread={4}
+                density={2}
+                animation={{ vaporizeDuration: 1.0, fadeInDuration: 0.5, waitDuration: 0.3 }}
+                direction="left-to-right"
+                alignment="center"
+                tag={Tag.H1}
+                forceActive={true}
+                onComplete={onVapourComplete}
+              />
+            </div>
+          )
         )}
       </div>
     );
