@@ -105,8 +105,17 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* Scroll-up dismisses back to ChessReveal */
+  /* Scroll-up / swipe-up dismisses back to ChessReveal */
   useEffect(() => {
+    const dismiss = (e: Event) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      activeRef.current = false;
+      setActive(false);
+      slideOut();
+      window.dispatchEvent(new CustomEvent("craft-section-dismiss"));
+    };
+
     const onWheel = (e: WheelEvent) => {
       if (!activeRef.current) return;
       if (showContact || showGift) return;
@@ -115,17 +124,36 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
       const deltaY = e.deltaY * multiplier;
       const deltaX = e.deltaX * multiplier;
       const delta = Math.abs(deltaY) > Math.abs(deltaX) ? deltaY : deltaX;
-      if (delta < 0) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        activeRef.current = false;
-        setActive(false);
-        slideOut();
-        window.dispatchEvent(new CustomEvent("craft-section-dismiss"));
+      if (delta < 0) dismiss(e);
+    };
+
+    // Mobile: upward swipe (finger moving DOWN = page scrolling UP = going back)
+    let touchStartY = 0;
+    let dismissed = false;
+    const onTouchStart = (e: TouchEvent) => {
+      touchStartY = e.touches[0]?.clientY ?? 0;
+      dismissed   = false;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (!activeRef.current) return;
+      if (showContact || showGift) return;
+      if (dismissed) { e.preventDefault(); return; }
+      const dy = (e.touches[0]?.clientY ?? touchStartY) - touchStartY;
+      // dy > 0 → finger moved down → user is swiping to go back
+      if (dy > 12) {
+        dismissed = true;
+        dismiss(e);
       }
     };
-    window.addEventListener("wheel", onWheel, { passive: false, capture: true });
-    return () => window.removeEventListener("wheel", onWheel, { capture: true });
+
+    window.addEventListener("wheel",      onWheel,      { passive: false, capture: true });
+    window.addEventListener("touchstart", onTouchStart, { passive: true,  capture: true });
+    window.addEventListener("touchmove",  onTouchMove,  { passive: false, capture: true });
+    return () => {
+      window.removeEventListener("wheel",      onWheel,      { capture: true } as EventListenerOptions);
+      window.removeEventListener("touchstart", onTouchStart, { capture: true } as EventListenerOptions);
+      window.removeEventListener("touchmove",  onTouchMove,  { capture: true } as EventListenerOptions);
+    };
   }, [showContact, showGift]);
 
   return (

@@ -321,21 +321,15 @@ export default function Home() {
   useEffect(() => {
     if (!vaporRevealed || vaporDone) return;
     const blockWheel = (e: WheelEvent) => { e.preventDefault(); e.stopImmediatePropagation(); };
-    let ty = 0;
-    const onTS = (e: TouchEvent) => { ty = e.touches[0]?.clientY ?? 0; };
-    const blockTouch = (e: TouchEvent) => {
-      if ((e.touches[0]?.clientY ?? 0) - ty > 0) {
-        e.preventDefault();
-        window.scrollTo(0, frozenScrollRef.current);
-      }
-    };
+    // Block ALL touch scroll directions — the animation plays on its own timer.
+    // Blocking only one direction and calling scrollTo on the other causes iOS
+    // inertia to fight window.scrollTo, producing visible jitter.
+    const blockTouch = (e: TouchEvent) => { e.preventDefault(); };
     window.addEventListener("wheel",      blockWheel,  { passive: false, capture: true });
-    window.addEventListener("touchstart", onTS,        { passive: true });
-    window.addEventListener("touchmove",  blockTouch,  { passive: false });
+    window.addEventListener("touchmove",  blockTouch,  { passive: false, capture: true });
     return () => {
       window.removeEventListener("wheel",      blockWheel,  { capture: true } as EventListenerOptions);
-      window.removeEventListener("touchstart", onTS);
-      window.removeEventListener("touchmove",  blockTouch);
+      window.removeEventListener("touchmove",  blockTouch,  { capture: true } as EventListenerOptions);
     };
   }, [vaporRevealed, vaporDone]);
 
@@ -343,21 +337,13 @@ export default function Home() {
   useEffect(() => {
     if (!servicesHolding) return;
     const blockWheel = (e: WheelEvent) => { e.preventDefault(); e.stopImmediatePropagation(); };
-    let ty = 0;
-    const onTS = (e: TouchEvent) => { ty = e.touches[0]?.clientY ?? 0; };
-    const blockTouch = (e: TouchEvent) => {
-      if ((e.touches[0]?.clientY ?? 0) - ty > 0) {
-        e.preventDefault();
-        window.scrollTo(0, frozenScrollRef.current);
-      }
-    };
+    // Block ALL touch scroll directions for the same reason as vapour above.
+    const blockTouch = (e: TouchEvent) => { e.preventDefault(); };
     window.addEventListener("wheel",      blockWheel,  { passive: false, capture: true });
-    window.addEventListener("touchstart", onTS,        { passive: true });
-    window.addEventListener("touchmove",  blockTouch,  { passive: false });
+    window.addEventListener("touchmove",  blockTouch,  { passive: false, capture: true });
     return () => {
       window.removeEventListener("wheel",      blockWheel,  { capture: true } as EventListenerOptions);
-      window.removeEventListener("touchstart", onTS);
-      window.removeEventListener("touchmove",  blockTouch);
+      window.removeEventListener("touchmove",  blockTouch,  { capture: true } as EventListenerOptions);
     };
   }, [servicesHolding]);
 
@@ -411,12 +397,12 @@ export default function Home() {
     const onTS = (e: TouchEvent) => { ty = e.touches[0]?.clientY ?? 0; };
     const blockTouch = (e: TouchEvent) => {
       if (gateReleased) return;
-      e.preventDefault();
+      e.preventDefault(); // always block — don't fight iOS inertia with scrollTo
       const currentY = e.touches[0]?.clientY ?? ty;
       const delta = (ty - currentY) * 3;
       ty = currentY;
       if (portfolioGateReadyRef.current && delta) releaseFromGate(delta);
-      else window.scrollTo(0, frozenScrollRef.current);
+      // No else-scrollTo: e.preventDefault() already freezes the page cleanly.
     };
     /**
      * Scrollbar sent a navigate intent while frozen.

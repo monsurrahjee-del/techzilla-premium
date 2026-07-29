@@ -66,6 +66,14 @@ const ServicesIntro = forwardRef<ServicesIntroHandle, Props>(
       return () => window.removeEventListener("resize", calc);
     }, []);
 
+    /* Mobile: no vapour text — auto-complete so the page transitions normally */
+    useEffect(() => {
+      if (!isMobile || !vapourActive) return;
+      // Skip the animation entirely and call completion right away.
+      onVapourComplete();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isMobile, vapourActive]);
+
     /* mount / unmount with fade */
     useEffect(() => {
       if (visible) {
@@ -116,14 +124,7 @@ const ServicesIntro = forwardRef<ServicesIntroHandle, Props>(
           )}
         </div>
 
-        {vapourActive && (
-          isMobile ? (
-            /* ── Mobile: CSS-only VapourWords — no canvas, no RAF loop ── */
-            <VapourWords
-              active={vapourActive}
-              onComplete={onVapourComplete}
-            />
-          ) : (
+        {vapourActive && !isMobile && (
             /* ── Desktop: full canvas particle VaporizeTextCycle ── */
             <div
               style={{
@@ -156,7 +157,6 @@ const ServicesIntro = forwardRef<ServicesIntroHandle, Props>(
                 onComplete={onVapourComplete}
               />
             </div>
-          )
         )}
       </div>
     );
