@@ -394,13 +394,43 @@ export default function Home() {
       }
     };
     let ty = 0;
-    const onTS = (e: TouchEvent) => { ty = e.touches[0]?.clientY ?? 0; };
+    let tx = 0;
+    let touchIsHorizontal = false;
+    let touchDirLocked    = false;
+    const onTS = (e: TouchEvent) => {
+      ty = e.touches[0]?.clientY ?? 0;
+      tx = e.touches[0]?.clientX ?? 0;
+      touchIsHorizontal = false;
+      touchDirLocked    = false;
+    };
     const blockTouch = (e: TouchEvent) => {
       if (gateReleased) return;
-      e.preventDefault(); // always block — don't fight iOS inertia with scrollTo
       const currentY = e.touches[0]?.clientY ?? ty;
+      const currentX = e.touches[0]?.clientX ?? tx;
+
+      // Lock scroll direction on the first significant movement so the project
+      // card carousel can still be swiped horizontally while the gate is active.
+      if (!touchDirLocked) {
+        const absX = Math.abs(currentX - tx);
+        const absY = Math.abs(currentY - ty);
+        if (absX > 6 || absY > 6) {
+          touchIsHorizontal = absX > absY;
+          touchDirLocked    = true;
+        }
+      }
+
+      // Horizontal swipe (browsing the project carousel) — pass through freely.
+      if (touchIsHorizontal) {
+        tx = currentX;
+        ty = currentY;
+        return;
+      }
+
+      // Vertical swipe — block native scroll and measure intent.
+      e.preventDefault(); // don't fight iOS inertia with scrollTo
       const delta = (ty - currentY) * 3;
       ty = currentY;
+      tx = currentX;
       if (portfolioGateReadyRef.current && delta) releaseFromGate(delta);
       // No else-scrollTo: e.preventDefault() already freezes the page cleanly.
     };

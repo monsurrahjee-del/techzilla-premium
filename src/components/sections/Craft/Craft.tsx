@@ -137,7 +137,12 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
     const onTouchMove = (e: TouchEvent) => {
       if (!activeRef.current) return;
       if (showContact || showGift) return;
-      if (dismissed) { e.preventDefault(); return; }
+      // Claim the gesture immediately so iOS cannot lock it to native page scroll
+      // before we measure the direction. Without this, the first touchmove that
+      // doesn't call preventDefault can cause Safari to decide this is a page
+      // scroll and swallow the remaining events before dy > 12 is ever reached.
+      e.preventDefault();
+      if (dismissed) return;
       const dy = (e.touches[0]?.clientY ?? touchStartY) - touchStartY;
       // dy > 0 → finger moved down → user is swiping to go back
       if (dy > 12) {
