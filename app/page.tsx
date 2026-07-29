@@ -441,7 +441,7 @@ export default function Home() {
       const netV = startY - endY; // positive = finger moved up = scroll forward
       // On mobile lower the threshold (35 → 12 px) so a gentle upward drag
       // reliably releases the gate — a fast flick already worked, slow drags didn't.
-      const releaseThreshold = isTouchDevice ? 12 : 35;
+      const releaseThreshold = window.matchMedia("(pointer: coarse)").matches ? 12 : 35;
       if (Math.abs(netV) > releaseThreshold) releaseFromGate(netV * 3);
     };
     const blockTouch = (e: TouchEvent) => {
@@ -480,7 +480,7 @@ export default function Home() {
           const netV = startY - currentY; // positive = upward = forward nav
           // On mobile lower the threshold (40 → 18 px) so browsing the carousel
           // then pushing upward in the same gesture reliably releases the gate.
-          const hThreshold = isTouchDevice ? 18 : 40;
+          const hThreshold = window.matchMedia("(pointer: coarse)").matches ? 18 : 40;
           if (Math.abs(netV) > hThreshold) {
             releaseFromGate(netV * 3);
             return;
