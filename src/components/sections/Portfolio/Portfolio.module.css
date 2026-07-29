@@ -1097,9 +1097,11 @@
   padding: 8px 20px 12px;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  /* Only claim horizontal swipes — vertical swipes pass through to the
-     page scroll gate so the user can swipe up/down to leave the section. */
-  touch-action: pan-x;
+  /* Claim horizontal swipes for the carousel AND allow vertical swipes to
+     reach the page scroll gate so the user can swipe up/down to leave the
+     section. pan-x alone can prevent the document from scrolling vertically
+     on iOS Safari when all intermediate ancestors have overflow:hidden. */
+  touch-action: pan-x pan-y;
 }
 .mobileCarousel::-webkit-scrollbar { display: none; }
 

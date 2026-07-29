@@ -496,12 +496,33 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
 
     // ── Touch ─────────────────────────────────────────────────────────────────
     let touchY = 0;
-    const onTouchStart = (e: TouchEvent) => { if (s.active) touchY = e.touches[0]?.clientY ?? 0; };
+    // Track whether touchstart fired while chess was already active.
+    // When chess is activated mid-gesture (releaseFromGate in page.tsx calls
+    // activate() inside a touchmove handler), onTouchStart runs BEFORE chess
+    // is active so touchY stays 0. The first onTouchMove then computes
+    // dy = 0 - fingerY (a huge negative number) which instantly dismisses chess.
+    // Fix: if touchstart fired while chess was inactive, skip the first
+    // touchmove's delta (releaseFromGate already passed the initial delta via
+    // scrollBy) and just re-initialize touchY for incremental tracking.
+    let touchStartedWhileActive = false;
+    const onTouchStart = (e: TouchEvent) => {
+      touchY = e.touches[0]?.clientY ?? 0;
+      touchStartedWhileActive = s.active;
+    };
     const onTouchMove  = (e: TouchEvent) => {
       if (!s.active) return;
       e.preventDefault();
-      const dy = touchY - (e.touches[0]?.clientY ?? 0);
-      touchY   = e.touches[0]?.clientY ?? 0;
+      const currentY = e.touches[0]?.clientY ?? touchY;
+      if (!touchStartedWhileActive) {
+        // Chess was activated mid-gesture. releaseFromGate already forwarded
+        // the initial swipe delta via scrollBy(). Just seed touchY for the
+        // next incremental move so we don't double-count or go negative.
+        touchY = currentY;
+        touchStartedWhileActive = true;
+        return;
+      }
+      const dy = touchY - currentY;
+      touchY   = currentY;
       applyVirtualDelta(dy * 3);
     };
 
