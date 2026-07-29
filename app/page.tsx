@@ -106,8 +106,11 @@ export default function Home() {
       }
       // The gate opens after two seconds, but it never advances on its own.
       // On touch devices the 2-s hold feels like a bug, not a feature.
-      // 300 ms is enough to feel intentional without trapping the user.
-      const gateDelay = window.matchMedia("(pointer: coarse)").matches ? 300 : 2000;
+      // 0 ms on mobile: gate is ready on the next event-loop tick so the user's
+      // very first upward swipe (even within the same gesture) releases it.
+      // Any remaining accidental-trigger protection comes from the >10 px minimum
+      // delta check in blockTouch / blockWheel.
+      const gateDelay = window.matchMedia("(pointer: coarse)").matches ? 0 : 2000;
       portfolioGateTimerRef.current = setTimeout(() => {
         portfolioGateReadyRef.current = true;
         portfolioGateTimerRef.current = null;
@@ -436,7 +439,10 @@ export default function Home() {
       if (gateReleased || !portfolioGateReadyRef.current) return;
       const endY = e.changedTouches?.[0]?.clientY ?? startY;
       const netV = startY - endY; // positive = finger moved up = scroll forward
-      if (Math.abs(netV) > 35) releaseFromGate(netV * 3);
+      // On mobile lower the threshold (35 → 12 px) so a gentle upward drag
+      // reliably releases the gate — a fast flick already worked, slow drags didn't.
+      const releaseThreshold = isTouchDevice ? 12 : 35;
+      if (Math.abs(netV) > releaseThreshold) releaseFromGate(netV * 3);
     };
     const blockTouch = (e: TouchEvent) => {
       if (gateReleased) {
@@ -472,7 +478,10 @@ export default function Home() {
       if (touchIsHorizontal) {
         if (portfolioGateReadyRef.current) {
           const netV = startY - currentY; // positive = upward = forward nav
-          if (Math.abs(netV) > 40) {
+          // On mobile lower the threshold (40 → 18 px) so browsing the carousel
+          // then pushing upward in the same gesture reliably releases the gate.
+          const hThreshold = isTouchDevice ? 18 : 40;
+          if (Math.abs(netV) > hThreshold) {
             releaseFromGate(netV * 3);
             return;
           }

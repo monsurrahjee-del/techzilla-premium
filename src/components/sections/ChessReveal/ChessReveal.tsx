@@ -569,7 +569,14 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
 
     // ── Section-nav navigation: dismiss chess so the user can navigate away ──
     const onSectionNavNavigate = () => {
-      if (!s.active) return;
+      // Also dismiss when s.active is false but the panel is still on-screen.
+      // This happens when the user navigated from Craft's hamburger: Craft opened
+      // on top of Chess, setting s.active = false without sliding Chess out.
+      // Chess must slide out so chessActiveRef in page.tsx gets cleared and the
+      // subsequent window.scrollTo from navigateTo can actually take effect.
+      const w = wrapRef.current;
+      const panelVisible = w && w.style.transform !== "translateY(100%)";
+      if (!s.active && !panelVisible) return;
       // Pass "nav" so page.tsx releases the portfolio hold without re-arming the gate
       dismissChess("nav");
     };
