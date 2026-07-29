@@ -194,8 +194,11 @@ export default function Home() {
         const sMax = document.documentElement.scrollHeight - window.innerHeight;
         frozenScrollRef.current = Math.round(sMax * SERVICES_BOUNDARY);
         setServicesHolding(true);
-        // Shorter hold on mobile — 2 s feels frozen on touch.
-        const holdMs = window.matchMedia("(pointer: coarse)").matches ? 300 : 2000;
+        // Same 2 s hold on mobile and desktop. The hold is visible and
+        // intentional — it gives the user time to read the services section
+        // before the portfolio slides in.  scroll is frozen via scrollTo in
+        // onScroll (see below) which works cleanly in the middle of the doc.
+        const holdMs = 2000;
         setTimeout(() => {
           servicesHoldRef.current = false;
           setServicesHolding(false);
@@ -239,11 +242,18 @@ export default function Home() {
         portfolioHoldRef.current  ||
         chessActiveRef.current
       ) {
-        // On mobile the capture-phase blockTouch/blockWheel handlers already
-        // call e.preventDefault(), so the native scroll position cannot drift.
-        // Calling window.scrollTo here fights iOS elastic-scroll physics and
-        // creates continuous jitter — skip it on touch devices.
-        if (!isTouchDevice) window.scrollTo(0, frozenScrollRef.current);
+        // On mobile during vapour/portfolioHold/chess, the capture-phase
+        // blockTouch handlers call e.preventDefault(), so scroll cannot drift —
+        // no scrollTo needed (it would fight iOS physics and jitter).
+        // EXCEPTION: servicesHold on mobile has no blockTouch (removed to keep
+        // the touch gesture alive across the services→portfolio transition).
+        // For that case we DO need scrollTo to actually hold position. At 2/3
+        // of the document (not at the elastic bounce zone at top/bottom), iOS
+        // honors scrollTo without jitter because there is no rubber-band physics
+        // in the middle of the scroll range.
+        if (!isTouchDevice || servicesHoldRef.current) {
+          window.scrollTo(0, frozenScrollRef.current);
+        }
         return;
       }
 

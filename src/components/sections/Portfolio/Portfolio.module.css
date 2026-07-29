@@ -1100,13 +1100,18 @@
   scrollbar-width: none;
   -ms-overflow-style: none;
   overscroll-behavior-x: contain;
-  /* pan-x only: tells iOS that horizontal panning is handled by this element.
-     Vertical panning (pan-y) is intentionally NOT claimed here so iOS delivers
-     vertical touch events to our window-level capture handler, allowing the user
-     to swipe up/down to leave the section even after browsing the carousel.
-     Previously pan-x pan-y was used, which caused iOS to sometimes retain the
-     gesture as horizontal even when the user changed to a vertical intent. */
-  touch-action: pan-x;
+  /* pan-x pan-y: both directions allowed at the browser level.
+     pan-x lets the browser handle the horizontal carousel swipe natively.
+     pan-y is REQUIRED so vertical scroll passes through to the page — without
+     it the effective touch-action on this subtree is pan-x only (browsers
+     intersect every ancestor's touch-action), which completely blocks vertical
+     scrolling when the user's finger is on the carousel area.
+     The previous comment was wrong: removing pan-y does NOT send vertical events
+     to window-level JS capture handlers — it simply discards them, making the
+     page scroll dead on the visible portfolio area.  The "iOS retaining gesture
+     as horizontal" issue was caused by a separate swipe-direction lock bug in
+     the blockTouch handler (since fixed), not by pan-y itself. */
+  touch-action: pan-x pan-y;
 }
 .mobileCarousel::-webkit-scrollbar { display: none; }
 
