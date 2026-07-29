@@ -131,10 +131,18 @@
 html,
 body {
     cursor: none;
+    /* Prevent elastic/rubber-band overscroll at page boundaries.
+       Without this, iOS bounce at the top/bottom of the scroll range
+       fights our custom scroll gates (portfolio hold, services hold)
+       causing visible jitter on mobile. */
+    overscroll-behavior: none;
 }
 
 * {
     cursor: none;
+    /* Suppress the blue / grey tap highlight rectangle on iOS/Android.
+       Each tappable element should define its own active state if needed. */
+    -webkit-tap-highlight-color: transparent;
 }
 
 /* Hide native scrollbar — replaced by the custom ScrollBar component */
@@ -143,6 +151,14 @@ html {
 }
 html::-webkit-scrollbar {
     display: none; /* Chrome / Safari / Edge */
+}
+
+/* ── Mobile scroll smoothness ───────────────────────────────────────────── */
+/* Prevent touch delays on interactive elements */
+@media (max-width: 767px) {
+  button, a, [role="button"] {
+    touch-action: manipulation;
+  }
 }
 /* ── Craft section dots pulse animation ─────────────────────────────────── */
 @keyframes craftDotsPulse {

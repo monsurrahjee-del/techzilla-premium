@@ -128,37 +128,68 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
       if (delta < 0) dismiss(e);
     };
 
-    // Mobile: upward swipe (finger moving DOWN = page scrolling UP = going back)
-    let touchStartY = 0;
-    let dismissed = false;
+    // Mobile: swipe DOWN (finger moving toward bottom) = go back to previous section.
+    // We track both the cumulative direction and per-move velocity so even a slow
+    // deliberate drag reliably triggers dismiss, while accidental tiny movements don't.
+    let touchStartY  = 0;
+    let lastTouchY   = 0;
+    let dismissed    = false;
+    let touchActive  = false;
+
     const onTouchStart = (e: TouchEvent) => {
-      touchStartY = e.touches[0]?.clientY ?? 0;
-      dismissed   = false;
+      touchStartY  = e.touches[0]?.clientY ?? 0;
+      lastTouchY   = touchStartY;
+      dismissed    = false;
+      touchActive  = true;
     };
+
     const onTouchMove = (e: TouchEvent) => {
       if (!activeRef.current) return;
       if (showContact || showGift) return;
       // Claim the gesture immediately so iOS cannot lock it to native page scroll
       // before we measure the direction. Without this, the first touchmove that
       // doesn't call preventDefault can cause Safari to decide this is a page
-      // scroll and swallow the remaining events before dy > 12 is ever reached.
+      // scroll and swallow the remaining events before the threshold is reached.
       e.preventDefault();
       if (dismissed) return;
-      const dy = (e.touches[0]?.clientY ?? touchStartY) - touchStartY;
-      // dy > 0 → finger moved down → user is swiping to go back
-      if (dy > 12) {
+
+      const currentY = e.touches[0]?.clientY ?? lastTouchY;
+      // Net displacement from gesture start (positive = finger moved down = going back)
+      const netDy    = currentY - touchStartY;
+      // Per-frame velocity (positive = finger moving down this frame)
+      const frameDy  = currentY - lastTouchY;
+      lastTouchY     = currentY;
+
+      // Trigger dismiss when:
+      //   a) net downward drag exceeds 8 px (deliberate swipe), OR
+      //   b) net downward drag exceeds 4 px AND the most recent frame is also
+      //      moving down (velocity confirmation — catches fast flick gestures
+      //      where the finger barely travels before lifting).
+      if (netDy > 8 || (netDy > 4 && frameDy > 0)) {
         dismissed = true;
         dismiss(e);
       }
     };
 
+    const onTouchEnd = () => {
+      // If the finger lifts without triggering dismiss, reset state cleanly.
+      touchActive = false;
+    };
+
+    // Suppress unused-variable warning — touchActive is used as a guard in future
+    void touchActive;
+
     window.addEventListener("wheel",      onWheel,      { passive: false, capture: true });
     window.addEventListener("touchstart", onTouchStart, { passive: true,  capture: true });
     window.addEventListener("touchmove",  onTouchMove,  { passive: false, capture: true });
+    window.addEventListener("touchend",   onTouchEnd,   { passive: true });
+    window.addEventListener("touchcancel",onTouchEnd,   { passive: true });
     return () => {
-      window.removeEventListener("wheel",      onWheel,      { capture: true } as EventListenerOptions);
-      window.removeEventListener("touchstart", onTouchStart, { capture: true } as EventListenerOptions);
-      window.removeEventListener("touchmove",  onTouchMove,  { capture: true } as EventListenerOptions);
+      window.removeEventListener("wheel",       onWheel,      { capture: true } as EventListenerOptions);
+      window.removeEventListener("touchstart",  onTouchStart, { capture: true } as EventListenerOptions);
+      window.removeEventListener("touchmove",   onTouchMove,  { capture: true } as EventListenerOptions);
+      window.removeEventListener("touchend",    onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchEnd);
     };
   }, [showContact, showGift]);
 

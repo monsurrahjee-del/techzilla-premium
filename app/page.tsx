@@ -410,17 +410,25 @@ export default function Home() {
     };
     let ty = 0;
     let tx = 0;
+    let startY = 0; // tracks gesture start Y for cumulative measurement
     let touchIsHorizontal = false;
     let touchDirLocked    = false;
     // Set to true by touchend so blockTouch stops calling preventDefault after
     // the user lifts their finger (allows the NEXT gesture to scroll freely).
     let currentTouchEnded = false;
+    // Cumulative absolute displacement since touchstart — used to re-evaluate
+    // direction mid-gesture (e.g. horizontal carousel swipe → vertical page scroll).
+    let cumAbsX = 0;
+    let cumAbsY = 0;
     const onTS = (e: TouchEvent) => {
       ty = e.touches[0]?.clientY ?? 0;
       tx = e.touches[0]?.clientX ?? 0;
+      startY = ty;
       touchIsHorizontal  = false;
       touchDirLocked     = false;
       currentTouchEnded  = false;
+      cumAbsX = 0;
+      cumAbsY = 0;
     };
     const onTE = () => { currentTouchEnded = true; };
     const blockTouch = (e: TouchEvent) => {
@@ -436,14 +444,29 @@ export default function Home() {
       const currentY = e.touches[0]?.clientY ?? ty;
       const currentX = e.touches[0]?.clientX ?? tx;
 
+      const stepX = Math.abs(currentX - tx);
+      const stepY = Math.abs(currentY - ty);
+      cumAbsX += stepX;
+      cumAbsY += stepY;
+
       // Lock scroll direction on the first significant movement so the project
       // card carousel can still be swiped horizontally while the gate is active.
       if (!touchDirLocked) {
-        const absX = Math.abs(currentX - tx);
-        const absY = Math.abs(currentY - ty);
-        if (absX > 6 || absY > 6) {
-          touchIsHorizontal = absX > absY;
+        if (stepX > 6 || stepY > 6) {
+          touchIsHorizontal = stepX > stepY;
           touchDirLocked    = true;
+        }
+      } else if (touchIsHorizontal) {
+        // Re-evaluate direction: if cumulative vertical clearly dominates over
+        // horizontal AND the total net downward/upward movement from the gesture
+        // start is substantial, switch to vertical. This handles the common
+        // mobile pattern of swiping the carousel then immediately swiping up/down
+        // to leave the section — all within one touch gesture.
+        const netY = Math.abs(currentY - startY);
+        if (cumAbsY > cumAbsX * 1.8 && netY > 20) {
+          touchIsHorizontal = false;
+          // Seed ty from startY so the first vertical delta is the full net move.
+          ty = startY;
         }
       }
 

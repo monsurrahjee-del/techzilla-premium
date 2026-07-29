@@ -1092,16 +1092,21 @@
   overflow-y: hidden;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
+  /* Removed scroll-behavior: smooth — conflicts with snap scrolling on iOS Safari
+     and causes inertia to fight against our capture-phase touch handler, producing
+     a stuck / unresponsive feel after a card swipe. Snap alone gives smooth behavior. */
   gap: 14px;
   padding: 8px 20px 12px;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  /* Claim horizontal swipes for the carousel AND allow vertical swipes to
-     reach the page scroll gate so the user can swipe up/down to leave the
-     section. pan-x alone can prevent the document from scrolling vertically
-     on iOS Safari when all intermediate ancestors have overflow:hidden. */
-  touch-action: pan-x pan-y;
+  overscroll-behavior-x: contain;
+  /* pan-x only: tells iOS that horizontal panning is handled by this element.
+     Vertical panning (pan-y) is intentionally NOT claimed here so iOS delivers
+     vertical touch events to our window-level capture handler, allowing the user
+     to swipe up/down to leave the section even after browsing the carousel.
+     Previously pan-x pan-y was used, which caused iOS to sometimes retain the
+     gesture as horizontal even when the user changed to a vertical intent. */
+  touch-action: pan-x;
 }
 .mobileCarousel::-webkit-scrollbar { display: none; }
 
