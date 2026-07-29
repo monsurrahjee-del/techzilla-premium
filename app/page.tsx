@@ -262,9 +262,20 @@ export default function Home() {
         portfolioHoldRef.current = false;
         setPortfolioHolding(false);
         window.dispatchEvent(new CustomEvent("tz-scroll-released"));
+      } else if (window.matchMedia("(pointer: coarse)").matches) {
+        // On mobile: dismissed by swipe — release immediately and jump back to
+        // 90 % of the document so the user can scroll freely in both directions.
+        // Re-arming the gate here traps the user in a chess→gate→chess loop
+        // where every attempt to scroll back requires an extra swipe to escape.
+        // The gate will naturally re-arm the next time the user scrolls to the bottom.
+        portfolioHoldRef.current = false;
+        setPortfolioHolding(false);
+        const docMax = document.documentElement.scrollHeight - window.innerHeight;
+        if (docMax > 0) window.scrollTo(0, Math.round(docMax * 0.90));
+        window.dispatchEvent(new CustomEvent("tz-scroll-released"));
       } else {
-        // Dismissed via wheel/touch — show the deliberate 2-s gate so the user
-        // can't accidentally re-trigger chess the moment they release the wheel.
+        // Desktop: dismissed via wheel/touch — show the deliberate 2-s gate so
+        // the user can't accidentally re-trigger chess the moment they release.
         beginPortfolioGate();
       }
     };
@@ -355,7 +366,23 @@ export default function Home() {
   useEffect(() => {
     if (!servicesHolding) return;
     const blockWheel = (e: WheelEvent) => { e.preventDefault(); e.stopImmediatePropagation(); };
-    // Block ALL touch scroll directions for the same reason as vapour above.
+    // On touch devices, do NOT call e.preventDefault() on touchmove.
+    // iOS marks an entire gesture as "JS-controlled" the moment any touchmove in
+    // that gesture has e.preventDefault() called.  Even after the listener is
+    // removed the current gesture is permanently dead for native scroll — the user
+    // must lift and re-touch before the page will scroll again.  For a 300 ms hold
+    // that is a visible, confusing freeze that persists through the full services →
+    // portfolio transition.  The visual hold is driven by CSS scroll-driven
+    // animation and needs no JS touch-blocking to stay in place.
+    if (window.matchMedia("(pointer: coarse)").matches) {
+      // Mobile: block wheel only (a trackpad connected to a phone is edge-case,
+      // but harmless to guard against).
+      window.addEventListener("wheel", blockWheel, { passive: false, capture: true });
+      return () => {
+        window.removeEventListener("wheel", blockWheel, { capture: true } as EventListenerOptions);
+      };
+    }
+    // Desktop: block both wheel and touch (trackpad-heavy users need the full hold).
     const blockTouch = (e: TouchEvent) => { e.preventDefault(); };
     window.addEventListener("wheel",      blockWheel,  { passive: false, capture: true });
     window.addEventListener("touchmove",  blockTouch,  { passive: false, capture: true });
@@ -387,9 +414,22 @@ export default function Home() {
         return;
       }
 
-      // Upward input should be honored immediately after the gate, rather than
-      // being swallowed by the capture listener that opened the gate.
-      window.scrollTo(0, Math.max(0, Math.min(max, frozenScrollRef.current + delta)));
+      // Upward input — scroll back after releasing the gate.
+      // On mobile, jump all the way to 90 % of the document max.  This gives
+      // three things at once:
+      //   1. Clear visual feedback (portfolio snaps back to ~70 % slide-in).
+      //   2. The gate one-shot (portfolioHoldTriggeredRef) resets because
+      //      raw (0.90) < PORTFOLIO_FULL − 0.06 (0.939), so the next scroll
+      //      to the bottom will fire the gate correctly instead of being silently
+      //      swallowed because the one-shot was still armed.
+      //   3. Enough distance from the boundary that iOS inertia can't fling the
+      //      user straight back to 100 % in the same gesture.
+      // On desktop, honor the actual swipe delta as before.
+      if (window.matchMedia("(pointer: coarse)").matches) {
+        window.scrollTo(0, Math.round(max * 0.90));
+      } else {
+        window.scrollTo(0, Math.max(0, Math.min(max, frozenScrollRef.current + delta)));
+      }
       // Keep the gate marked as handled until the scroll position is clearly
       // away from Our Work. Resetting this here lets the scroll event caused
       // by this same gesture immediately re-arm the gate at the threshold,
