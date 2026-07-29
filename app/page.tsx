@@ -453,13 +453,13 @@ export default function Home() {
     };
 
     window.addEventListener("wheel",               blockWheel,          { passive: false, capture: true });
-    window.addEventListener("touchstart",          onTS,                { passive: true });
-    window.addEventListener("touchmove",           blockTouch,          { passive: false });
+    window.addEventListener("touchstart",          onTS,                { passive: true,  capture: true });
+    window.addEventListener("touchmove",           blockTouch,          { passive: false, capture: true });
     window.addEventListener("tz-scrollbar-navigate", onScrollbarNavigate);
     return () => {
       window.removeEventListener("wheel",               blockWheel,          { capture: true } as EventListenerOptions);
-      window.removeEventListener("touchstart",          onTS);
-      window.removeEventListener("touchmove",           blockTouch);
+      window.removeEventListener("touchstart",          onTS,                { capture: true } as EventListenerOptions);
+      window.removeEventListener("touchmove",           blockTouch,          { capture: true } as EventListenerOptions);
       window.removeEventListener("tz-scrollbar-navigate", onScrollbarNavigate);
     };
   }, [portfolioHolding]);
