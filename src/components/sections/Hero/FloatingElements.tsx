@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { gsap } from "@/lib/gsap";
 
 import styles from "./Hero.module.css";
@@ -19,46 +19,52 @@ const items = [
 export default function FloatingElements(){
 
 const container = useRef<HTMLDivElement>(null);
-
+const [isMobile, setIsMobile] = useState(false);
 
 useEffect(()=>{
+  // Skip all floating animations on mobile — saves significant CPU/GPU
+  if (window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 767) {
+    setIsMobile(true);
+    return;
+  }
 
-const elements =
-container.current?.querySelectorAll(
-".floatingItem"
-);
-
-
-if(!elements) return;
-
-
-elements.forEach((item,index)=>{
-
-
-gsap.to(item,{
-
-y: index % 2 === 0 ? -25 : 25,
-
-x: index * 8,
-
-duration:3 + index,
-
-repeat:-1,
-
-yoyo:true,
-
-ease:"sine.inOut",
-
-delay:index*.3
-
-});
+  const elements =
+  container.current?.querySelectorAll(
+  ".floatingItem"
+  );
 
 
-});
+  if(!elements) return;
 
+
+  elements.forEach((item,index)=>{
+
+
+  gsap.to(item,{
+
+  y: index % 2 === 0 ? -25 : 25,
+
+  x: index * 8,
+
+  duration:3 + index,
+
+  repeat:-1,
+
+  yoyo:true,
+
+  ease:"sine.inOut",
+
+  delay:index*.3
+
+  });
+
+
+  });
 
 },[]);
 
+// On mobile, skip the entire floating elements layer
+if (isMobile) return null;
 
 
 return (

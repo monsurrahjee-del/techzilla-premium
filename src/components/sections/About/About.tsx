@@ -126,46 +126,50 @@ export default function About({ active = false }: AboutProps) {
     <section id="about" ref={sectionRef} className={styles.section}>
       <SectionNav navItems={["Service", "Work", "Contact"]} />
 
-      {/* ── WebGL backgrounds ── */}
-      <div className={styles.bgLayer}>
-        <LiquidEther
-          paused={paused}
-          colors={["#1a0a4f", "#5227FF", "#B497CF", "#FF9FFC"]}
-          mouseForce={isMobile ? 0 : 60}
-          cursorSize={isMobile ? 0 : 60}
-          isViscous
-          viscous={6}
-          iterationsViscous={8}
-          iterationsPoisson={8}
-          resolution={0.35}
-          autoDemo
-          autoSpeed={0.35}
-          autoIntensity={2.0}
-          takeoverDuration={0}
-          autoResumeDelay={2000}
-          autoRampDuration={0.8}
-        />
-      </div>
-      <div className={styles.terminalLayer}>
-        <FaultyTerminal
-          pause={paused}
-          scale={1.4}
-          gridMul={[2, 1]}
-          digitSize={1.2}
-          timeScale={0.4}
-          scanlineIntensity={0.4}
-          glitchAmount={1}
-          flickerAmount={0.8}
-          noiseAmp={0.9}
-          curvature={0.08}
-          tint="#B497CF"
-          mouseReact={!isMobile}
-          mouseStrength={isMobile ? 0 : 0.4}
-          mouseLerp={1}
-          pageLoadAnimation={false}
-          brightness={0.55}
-        />
-      </div>
+      {/* ── WebGL backgrounds — skipped on mobile to prevent GPU slowdown ── */}
+      {!isMobile && (
+        <>
+          <div className={styles.bgLayer}>
+            <LiquidEther
+              paused={paused}
+              colors={["#1a0a4f", "#5227FF", "#B497CF", "#FF9FFC"]}
+              mouseForce={60}
+              cursorSize={60}
+              isViscous
+              viscous={6}
+              iterationsViscous={8}
+              iterationsPoisson={8}
+              resolution={0.35}
+              autoDemo
+              autoSpeed={0.35}
+              autoIntensity={2.0}
+              takeoverDuration={0}
+              autoResumeDelay={2000}
+              autoRampDuration={0.8}
+            />
+          </div>
+          <div className={styles.terminalLayer}>
+            <FaultyTerminal
+              pause={paused}
+              scale={1.4}
+              gridMul={[2, 1]}
+              digitSize={1.2}
+              timeScale={0.4}
+              scanlineIntensity={0.4}
+              glitchAmount={1}
+              flickerAmount={0.8}
+              noiseAmp={0.9}
+              curvature={0.08}
+              tint="#B497CF"
+              mouseReact
+              mouseStrength={0.4}
+              mouseLerp={1}
+              pageLoadAnimation={false}
+              brightness={0.55}
+            />
+          </div>
+        </>
+      )}
 
       {/* Crosshair markers */}
       <div className={styles.cross} aria-hidden="true"

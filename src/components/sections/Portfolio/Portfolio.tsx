@@ -342,6 +342,119 @@ export default function Portfolio({ active = false }: PortfolioProps) {
   const showBrake  = mode === "auto" && tourStarted && autoPhase === "driving"  && !autopilotPaused;
   const showResume = mode === "auto" && tourStarted && autopilotPaused;
 
+  // ── Mobile view: clean card carousel — no WebGL, no car, zero lag ──────────
+  if (isMobile) {
+    return (
+      <section ref={sectionRef} className={`${styles.section} ${isDark ? styles.dark : styles.light}`}>
+        <SectionNav navItems={["About", "Service", "Contact"]} topOffset={74} proximityReveal />
+
+        {/* Header */}
+        <div className={styles.header}>
+          <span className={styles.sectionLabel}>Memory Lane</span>
+          <h2 className={`${styles.sectionTitle} ${isDark ? styles.titleDark : styles.titleLight}`}>
+            Our Work
+          </h2>
+        </div>
+
+        {/* Light / Dark toggle */}
+        <button
+          className={`${styles.themeToggle} ${isDark ? styles.toggleDark : styles.toggleLight}`}
+          onClick={() => setTheme(t => t === "dark" ? "light" : "dark")}
+          aria-label={isDark ? "Switch to day mode" : "Switch to night mode"}
+          title={isDark ? "Day mode" : "Night mode"}
+        >
+          {isDark ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="5"/>
+              <line x1="12" y1="1"  x2="12" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="23"/>
+              <line x1="4.22" y1="4.22"  x2="5.64" y2="5.64"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="1"  y1="12" x2="3"  y2="12"/>
+              <line x1="21" y1="12" x2="23" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          )}
+        </button>
+
+        {/* Horizontal card carousel — swipe left/right through projects */}
+        <div className={styles.mobileCarousel}>
+          {projects.map((project, i) => (
+            <div
+              key={i}
+              className={`${styles.mobileCard} ${isDark ? styles.mobileCardDark : styles.mobileCardLight}`}
+            >
+              {/* Project image */}
+              <div className={styles.mobileCardImgWrap}>
+                <img
+                  src={project.image}
+                  alt={`${project.title} preview`}
+                  className={styles.mobileCardImg}
+                />
+                <div
+                  className={styles.mobileCardImgFade}
+                  style={{ background: `linear-gradient(to bottom, transparent 50%, ${isDark ? "#08080f" : "#f0f4ff"} 100%)` }}
+                />
+                <a
+                  href={`https://${project.url}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.mobileCardLiveBadge}
+                  style={{ background: project.accent + "22", color: project.accent, border: `1px solid ${project.accent}55` }}
+                >
+                  <span className={styles.liveDot} style={{ background: project.accent }} />
+                  Live
+                </a>
+              </div>
+
+              {/* Card body */}
+              <div className={styles.mobileCardBody}>
+                <div className={styles.cardAccentBar} style={{ background: project.accent }} />
+                <p className={`${styles.cardCategory} ${isDark ? styles.catDark : styles.catLight}`}>
+                  {project.category}
+                </p>
+                <h3 className={`${styles.mobileCardTitle} ${isDark ? styles.cardTitleDark : styles.cardTitleLight}`}>
+                  {project.title}
+                </h3>
+                <div className={styles.techRow}>
+                  {project.tech.map(tech => (
+                    <span key={tech} className={`${styles.techPill} ${isDark ? styles.pillDark : styles.pillLight}`}>
+                      {tech}
+                    </span>
+                  ))}
+                </div>
+                <a
+                  href={`https://${project.url}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.cardLink}
+                  style={{ background: project.accent + "22", color: project.accent, border: `1px solid ${project.accent}44` }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                  Visit {project.url}
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Swipe hint */}
+        <p className={`${styles.mobileSwipeHint} ${isDark ? styles.swipeHintDark : styles.swipeHintLight}`}>
+          ← swipe to browse →
+        </p>
+      </section>
+    );
+  }
+
   return (
     <section ref={sectionRef} className={`${styles.section} ${isDark ? styles.dark : styles.light}`}>
       {/* topOffset pushes hamburger below the day/night toggle (top:22px + ~42px height) */}

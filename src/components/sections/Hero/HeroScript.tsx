@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import styles from "./Hero.module.css";
 import { useLoaded } from "@/hooks/useLoaded";
 
@@ -37,6 +37,12 @@ function ThemeABuild() {
     const stage = stageRef.current;
     const word  = wordRef.current;
     if (!stage || !word) return;
+
+    // Skip the mouse-tracking RAF loop on touch/mobile devices — no cursor
+    // to follow, and the loop wastes CPU even when _m.x / _m.y stay at 0.
+    if (window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 767) {
+      return;
+    }
 
     let lx = 0, ly = 0;
     const LERP = 0.12;
@@ -134,6 +140,15 @@ interface HeroScriptProps {
 
 export default function HeroScript({ theme }: HeroScriptProps) {
   const loaded = useLoaded();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    // BuildFluid3D is a heavy Three.js canvas — skip it on mobile to prevent
+    // GPU saturation that makes the whole page feel sluggish.
+    if (window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 767) {
+      setIsMobile(true);
+    }
+  }, []);
 
   // When the theme leaves "light", signal BuildFluid3D to stop its render loop
   // immediately — before AnimatePresence finishes the 0.9 s exit animation.
@@ -163,7 +178,9 @@ export default function HeroScript({ theme }: HeroScriptProps) {
           </motion.div>
         )}
 
-        {theme === "light" && (
+        {/* BuildFluid3D (Three.js glass canvas) is skipped on mobile — it's far
+            too heavy for mobile GPUs and would make the whole page feel sluggish. */}
+        {theme === "light" && !isMobile && (
           <motion.div
             key="themeB"
             className={styles.scriptStage3d}

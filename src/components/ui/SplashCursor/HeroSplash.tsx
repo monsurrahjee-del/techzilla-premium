@@ -27,11 +27,18 @@ import { useEffect, useRef, useState } from "react";
 import SplashCursor from "./index";
 
 export default function HeroSplash() {
+  const [isMobile, setIsMobile] = useState(false);
   // Pause only when the hero scrolls out of view — active in both themes.
   const [hidden, setHidden] = useState(false);
   const [paused, setPaused] = useState(false);
 
   useEffect(() => {
+    // WebGL fluid sim is far too heavy on mobile — skip entirely on touch devices.
+    if (window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 767) {
+      setIsMobile(true);
+      return;
+    }
+
     const onHeroSection = (e: Event) => {
       const { heroActive } = (e as CustomEvent<{ heroActive: boolean }>).detail;
       setHidden(!heroActive);
@@ -41,6 +48,9 @@ export default function HeroSplash() {
     window.addEventListener("hero-section-active", onHeroSection);
     return () => window.removeEventListener("hero-section-active", onHeroSection);
   }, []);
+
+  // Skip WebGL fluid sim on mobile — saves major GPU/CPU
+  if (isMobile) return null;
 
   return (
     <SplashCursor

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useLoaded } from "@/hooks/useLoaded";
 import Sticker from "./Sticker";
 
@@ -20,10 +21,22 @@ const stickers = [
 
 export default function StickerCloud() {
   const loaded = useLoaded();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    // Stickers use GSAP infinite float animations — expensive on mobile GPU.
+    // Skip them entirely on touch devices.
+    if (window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 767) {
+      setIsMobile(true);
+    }
+  }, []);
 
   // Don't render any stickers until the hero is ready — they'll appear
   // naturally with their own float animations as the page reveals.
   if (!loaded) return null;
+
+  // Skip all stickers on mobile — no GSAP loops, no images to decode
+  if (isMobile) return null;
 
   return (
     <>

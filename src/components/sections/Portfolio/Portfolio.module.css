@@ -1072,3 +1072,134 @@
 @media (max-width: 480px) {
   .projectCard { bottom: 148px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE-ONLY CARD CAROUSEL
+   Replaces the entire Three.js world on mobile (≤ 767px).
+   Zero WebGL, zero GSAP, zero car — just clean project cards.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Horizontal scroll carousel */
+.mobileCarousel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 88px;          /* clear the header */
+  bottom: 36px;       /* leave room for swipe hint */
+  display: flex;
+  flex-direction: row;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  gap: 14px;
+  padding: 8px 20px 12px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.mobileCarousel::-webkit-scrollbar { display: none; }
+
+/* Individual project card */
+.mobileCard {
+  flex-shrink: 0;
+  width: calc(100vw - 52px);
+  max-width: 380px;
+  scroll-snap-align: center;
+  border-radius: 18px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  /* GPU-only transforms — no layout work */
+  will-change: transform;
+  transition: transform 0.2s ease;
+}
+.mobileCard:active { transform: scale(0.98); }
+
+.mobileCardDark {
+  background: rgba(12, 12, 22, 0.97);
+  border: 1px solid rgba(255,255,255,0.09);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.55);
+}
+.mobileCardLight {
+  background: rgba(240,244,255,0.98);
+  border: 1px solid rgba(80,80,180,0.13);
+  box-shadow: 0 8px 32px rgba(80,80,160,0.12);
+}
+
+/* Image area */
+.mobileCardImgWrap {
+  position: relative;
+  width: 100%;
+  height: 44%;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.mobileCardImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+  pointer-events: none;
+}
+.mobileCardImgFade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.mobileCardLiveBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: "Geist Mono", monospace;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  padding: 4px 9px;
+  border-radius: 100px;
+  pointer-events: auto;
+}
+
+/* Card body */
+.mobileCardBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px 14px;
+  overflow: hidden;
+}
+.mobileCardTitle {
+  font-family: "Geist", system-ui, sans-serif;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 0;
+}
+
+/* Swipe hint */
+.mobileSwipeHint {
+  position: absolute;
+  bottom: 8px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: "Geist Mono", monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  pointer-events: none;
+  margin: 0;
+}
+.swipeHintDark  { color: rgba(255,255,255,0.25); }
+.swipeHintLight { color: rgba(20,20,60,0.25); }
