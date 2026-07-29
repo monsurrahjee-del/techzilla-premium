@@ -76,6 +76,10 @@ export default function Home() {
       typeof CSS !== "undefined" &&
       CSS.supports("animation-timeline", "scroll()");
 
+    // Detect touch once per effect lifetime — avoids repeated matchMedia calls
+    // on every scroll frame, which would add measurable overhead on mobile.
+    const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+
     const VAPOR_RAW         = 1 / 3 + 0.90 * (2 / 3 - 1 / 3);
     const SERVICES_BOUNDARY = 2 / 3;
     const PORTFOLIO_FULL    = 0.999; // portfolio fully slid into view (p3≈1 at raw≈1)
@@ -122,7 +126,9 @@ export default function Home() {
         hero.style.opacity        = (1 - p1 * 0.78).toFixed(4);
         services.style.transform  = `scale(${(0.06 + p2 * 0.94).toFixed(4)})`;
         services.style.opacity    = p2.toFixed(4);
-        services.style.filter     = `blur(${((1 - p2) * 18).toFixed(2)}px)`;
+        // Blur filter triggers a full GPU repaint on every scroll frame on
+        // mobile — skip it entirely on touch devices (saves ~8 ms/frame).
+        if (!isTouchDevice) services.style.filter = `blur(${((1 - p2) * 18).toFixed(2)}px)`;
         portfolio.style.transform = `translateX(${((1 - p3) * -100).toFixed(3)}%)`;
       }
 
@@ -230,7 +236,11 @@ export default function Home() {
         portfolioHoldRef.current  ||
         chessActiveRef.current
       ) {
-        window.scrollTo(0, frozenScrollRef.current);
+        // On mobile the capture-phase blockTouch/blockWheel handlers already
+        // call e.preventDefault(), so the native scroll position cannot drift.
+        // Calling window.scrollTo here fights iOS elastic-scroll physics and
+        // creates continuous jitter — skip it on touch devices.
+        if (!isTouchDevice) window.scrollTo(0, frozenScrollRef.current);
         return;
       }
 
@@ -402,14 +412,27 @@ export default function Home() {
     let tx = 0;
     let touchIsHorizontal = false;
     let touchDirLocked    = false;
+    // Set to true by touchend so blockTouch stops calling preventDefault after
+    // the user lifts their finger (allows the NEXT gesture to scroll freely).
+    let currentTouchEnded = false;
     const onTS = (e: TouchEvent) => {
       ty = e.touches[0]?.clientY ?? 0;
       tx = e.touches[0]?.clientX ?? 0;
-      touchIsHorizontal = false;
-      touchDirLocked    = false;
+      touchIsHorizontal  = false;
+      touchDirLocked     = false;
+      currentTouchEnded  = false;
     };
+    const onTE = () => { currentTouchEnded = true; };
     const blockTouch = (e: TouchEvent) => {
-      if (gateReleased) return;
+      if (gateReleased) {
+        // Gate was released by a previous touchmove in this same gesture.
+        // We MUST keep calling e.preventDefault() for the remaining events
+        // in this touch — if we don't, iOS re-activates its native scroll
+        // handling and the built-up momentum flings the page all the way back
+        // through Services and About.  Stop only once the finger is lifted.
+        if (!currentTouchEnded) e.preventDefault();
+        return;
+      }
       const currentY = e.touches[0]?.clientY ?? ty;
       const currentX = e.touches[0]?.clientX ?? tx;
 
@@ -475,11 +498,15 @@ export default function Home() {
 
     window.addEventListener("wheel",               blockWheel,          { passive: false, capture: true });
     window.addEventListener("touchstart",          onTS,                { passive: true,  capture: true });
+    window.addEventListener("touchend",            onTE,                { passive: true,  capture: true });
+    window.addEventListener("touchcancel",         onTE,                { passive: true,  capture: true });
     window.addEventListener("touchmove",           blockTouch,          { passive: false, capture: true });
     window.addEventListener("tz-scrollbar-navigate", onScrollbarNavigate);
     return () => {
       window.removeEventListener("wheel",               blockWheel,          { capture: true } as EventListenerOptions);
       window.removeEventListener("touchstart",          onTS,                { capture: true } as EventListenerOptions);
+      window.removeEventListener("touchend",            onTE,                { capture: true } as EventListenerOptions);
+      window.removeEventListener("touchcancel",         onTE,                { capture: true } as EventListenerOptions);
       window.removeEventListener("touchmove",           blockTouch,          { capture: true } as EventListenerOptions);
       window.removeEventListener("tz-scrollbar-navigate", onScrollbarNavigate);
     };
@@ -508,12 +535,16 @@ export default function Home() {
       setVaporFading(false);
     }, 650);
     servicesHoldTriggeredRef.current = true;
-    servicesHoldRef.current          = true;
-    setServicesHolding(true);
-    setTimeout(() => {
-      servicesHoldRef.current = false;
-      setServicesHolding(false);
-    }, 2000);
+    // On mobile the vapour animation never plays, so there is no visual reason
+    // to hold here. Skip the 2-s freeze entirely on touch devices.
+    if (!window.matchMedia("(pointer: coarse)").matches) {
+      servicesHoldRef.current = true;
+      setServicesHolding(true);
+      setTimeout(() => {
+        servicesHoldRef.current = false;
+        setServicesHolding(false);
+      }, 2000);
+    }
   };
 
   return (

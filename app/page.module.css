@@ -51,6 +51,17 @@
   will-change: transform, opacity, filter;
 }
 
+/* On mobile, drop the blur from services reveal:
+   - filter: blur() triggers a full GPU layer repaint on every scroll frame
+   - will-change: filter keeps an extra compositor layer resident in VRAM
+   Both are measurably expensive on mobile GPUs with no visible benefit. */
+@media (max-width: 767px) {
+  .servicesLayer {
+    filter: none;
+    will-change: transform, opacity;
+  }
+}
+
 /* ── Portfolio ──────────────────────────────────────────────────────────────
    Slides in from the LEFT. Safari fallback initial state. */
 .portfolioLayer {
@@ -75,6 +86,14 @@
 @keyframes services-scale-in {
   from { transform: scale(0.06); opacity: 0; filter: blur(18px); }
   to   { transform: scale(1);    opacity: 1; filter: blur(0px);  }
+}
+
+/* Mobile version of the same keyframe — no blur filter */
+@media (max-width: 767px) {
+  @keyframes services-scale-in {
+    from { transform: scale(0.06); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
+  }
 }
 
 @keyframes portfolio-slide-in {
