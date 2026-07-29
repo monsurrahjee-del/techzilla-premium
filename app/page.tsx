@@ -101,12 +101,15 @@ export default function Home() {
         clearTimeout(portfolioGateTimerRef.current);
       }
       // The gate opens after two seconds, but it never advances on its own.
+      // On touch devices the 2-s hold feels like a bug, not a feature.
+      // 300 ms is enough to feel intentional without trapping the user.
+      const gateDelay = window.matchMedia("(pointer: coarse)").matches ? 300 : 2000;
       portfolioGateTimerRef.current = setTimeout(() => {
         portfolioGateReadyRef.current = true;
         portfolioGateTimerRef.current = null;
         // Tell the scrollbar the gate is open so it can navigate again.
         window.dispatchEvent(new CustomEvent("tz-scroll-gate-ready"));
-      }, 2000);
+      }, gateDelay);
     };
 
     const driveFrame = (raw: number) => {
@@ -182,10 +185,12 @@ export default function Home() {
         const sMax = document.documentElement.scrollHeight - window.innerHeight;
         frozenScrollRef.current = Math.round(sMax * SERVICES_BOUNDARY);
         setServicesHolding(true);
+        // Shorter hold on mobile — 2 s feels frozen on touch.
+        const holdMs = window.matchMedia("(pointer: coarse)").matches ? 300 : 2000;
         setTimeout(() => {
           servicesHoldRef.current = false;
           setServicesHolding(false);
-        }, 2000);
+        }, holdMs);
       }
 
       /* ── Vapor reveal ─────────────────────────────────────────────────── */

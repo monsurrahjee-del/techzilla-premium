@@ -137,7 +137,9 @@ export default function Portfolio({ active = false }: PortfolioProps) {
     if (!active) return;
     if (mode !== "preloading") return;
     let start: number | null = null;
-    const DURATION = 2200;
+    // On mobile the Three.js world isn't used (card carousel instead),
+    // so the preloader is just a cosmetic bar — keep it short.
+    const DURATION = window.matchMedia("(pointer: coarse)").matches ? 700 : 2200;
     const tick = (ts: number) => {
       if (start === null) start = ts;
       const pct = Math.min(100, ((ts - start) / DURATION) * 100);

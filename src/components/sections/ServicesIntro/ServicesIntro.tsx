@@ -92,7 +92,10 @@ const ServicesIntro = forwardRef<ServicesIntroHandle, Props>(
       setStarProgress: () => { /* star mask removed */ },
     }));
 
-    if (!mounted) return null;
+    // On mobile the overlay is never shown — completion is handled by the
+    // isMobile+vapourActive useEffect above. Rendering the dark bg would
+    // produce a jarring flash with no benefit.
+    if (!mounted || isMobile) return null;
 
     return (
       <div

@@ -29,6 +29,14 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
   const [showGift,    setShowGift]    = useState(false);
   const activeRef = useRef(false);
 
+  // LiquidEffectAnimation is a Three.js CDN bundle — too heavy for mobile GPUs.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    setIsMobile(
+      window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 767
+    );
+  }, []);
+
   const slideIn = () => {
     const w = wrapRef.current;
     if (!w) return;
@@ -173,7 +181,7 @@ const CraftSection = forwardRef<CraftSectionHandle>((_, ref) => {
         <SectionNav navItems={["About", "Service", "Work"]} variant="light" />
 
         {/* ── Liquid background — sole background layer ── */}
-        <LiquidEffectAnimation />
+        {!isMobile && <LiquidEffectAnimation />}
 
         {/* ── Centre: static "Craft With Taste" title + contact popover button ── */}
         <div className={styles.craftCenter}>
