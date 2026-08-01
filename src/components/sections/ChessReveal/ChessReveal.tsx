@@ -175,40 +175,6 @@ function drawStatusBar(ctx: CanvasRenderingContext2D, W: number, H: number, alph
   ctx.restore();
 }
 
-function drawRings(
-  ctx: CanvasRenderingContext2D,
-  cx: number, cy: number,
-  W: number, _H: number,
-  progress: number,
-  time: number,
-) {
-  if (progress <= 0) return;
-  ctx.save();
-  const base = W * 0.32;
-  const rings = [
-    { rx: 1.05, ry: 0.22, spd:  0.20, color: [212, 255, 0],  lw: 1.8 },
-    { rx: 0.80, ry: 0.16, spd: -0.14, color: [0, 234, 255],  lw: 1.4 },
-    { rx: 0.60, ry: 0.12, spd:  0.10, color: [128, 64, 255], lw: 1.2 },
-    { rx: 1.28, ry: 0.28, spd: -0.08, color: [255, 68, 170], lw: 1.0 },
-  ];
-  rings.forEach((r, i) => {
-    const rot = time * r.spd + i * 0.72;
-    const [red, grn, blu] = r.color;
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(rot);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, base * r.rx * progress, base * r.ry * progress, 0, 0, Math.PI * 2);
-    ctx.strokeStyle  = `rgba(${red},${grn},${blu},${(0.7 * progress).toFixed(2)})`;
-    ctx.lineWidth    = r.lw;
-    ctx.globalAlpha  = progress;
-    ctx.shadowColor  = `rgb(${red},${grn},${blu})`;
-    ctx.shadowBlur   = 12;
-    ctx.stroke();
-    ctx.restore();
-  });
-  ctx.restore();
-}
 
 function drawBlueFill(
   ctx: CanvasRenderingContext2D,
@@ -446,10 +412,16 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     activate() {
       const s = stateRef.current;
       if (s.active) return;
-      s.active        = true;
-      s.virtualScroll = 0;
+      s.active = true;
+      // On mobile, skip phases A & B and land directly in Phase C so the user
+      // sees "YOUR SATISFACTION ALWAYS" immediately after scrolling past Work.
+      const isMobileActivate =
+        typeof window !== "undefined" &&
+        (window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 767);
+      const initVS = isMobileActivate ? Math.round(TOTAL * 0.95) : 0;
+      s.virtualScroll = initVS;
       window.dispatchEvent(new CustomEvent("chess-reveal-mode", { detail: { active: true } }));
-      window.dispatchEvent(new CustomEvent("chess-reveal-progress", { detail: { progress: 0 } }));
+      window.dispatchEvent(new CustomEvent("chess-reveal-progress", { detail: { progress: initVS / TOTAL } }));
       slideIn();
     },
     deactivate() {
@@ -661,12 +633,7 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
       /* ── 5. HUD brackets ──────────────────────────────────────── */
       drawCornerBrackets(ctx, W, H, introP * (1 - blueP * 0.5));
 
-      /* ── 6. Rings — skip on mobile (each ellipse triggers shadow blur) ── */
-      if (!isMobile) {
-        drawRings(ctx, cx, cy, W, H, morphP, s.time);
-      }
-
-      /* ── 7. Chess piece (hidden during Phase C) ────────────────── */
+      /* ── 6. Chess piece (hidden during Phase C) ────────────────── */
       // On mobile the viewport height is much shorter, so H * 0.52 would
       // produce a piece that fills more than half the screen. Cap at 28 % on
       // mobile so the pawn/queen remains clearly "icon-sized" rather than
