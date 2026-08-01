@@ -327,6 +327,13 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} ${pacifico.variable} ${bricolage.variable} h-full antialiased`}
     >
       <head>
+        {/* ── Explicit favicon links — ?v=3 busts any browser/CDN cache ── */}
+        <link rel="icon"             href="/favicon.ico?v=3"              sizes="any" />
+        <link rel="icon"             href="/favicon-32x32.png?v=3"        type="image/png" sizes="32x32" />
+        <link rel="icon"             href="/favicon-16x16.png?v=3"        type="image/png" sizes="16x16" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3"     sizes="180x180" />
+        <link rel="manifest"         href="/site.webmanifest?v=3" />
+        <meta name="theme-color"     content="#06021a" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
