@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import TargetCursor from "@/components/ui/TargetCursor";
 import ScrollBar from "@/components/ui/ScrollBar/ScrollBar";
 import HeroSplash from "@/components/ui/SplashCursor/HeroSplash";
@@ -36,6 +36,14 @@ const bricolage = Bricolage_Grotesque({
 });
 
 const SITE_URL = "https://techzilla.studio";
+
+export const viewport: Viewport = {
+  themeColor: "#06021a",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -126,16 +134,19 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/icon.png", type: "image/png", sizes: "1024x1024" },
-      { url: "/icon-dark-32x32.png", type: "image/png", sizes: "32x32", media: "(prefers-color-scheme: dark)" },
-      { url: "/icon-light-32x32.png", type: "image/png", sizes: "32x32", media: "(prefers-color-scheme: light)" },
+      { url: "/favicon.ico",                 sizes: "any" },
+      { url: "/favicon-16x16.png",           type: "image/png", sizes: "16x16"  },
+      { url: "/favicon-32x32.png",           type: "image/png", sizes: "32x32"  },
+      { url: "/android-chrome-192x192.png",  type: "image/png", sizes: "192x192"},
+      { url: "/android-chrome-512x512.png",  type: "image/png", sizes: "512x512"},
     ],
-    apple: [{ url: "/apple-icon.png", sizes: "1024x1024", type: "image/png" }],
-    shortcut: "/icon.png",
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    shortcut: "/favicon.ico",
   },
   alternates: {
     canonical: SITE_URL,
   },
+  manifest: "/site.webmanifest",
   other: {
     "google-site-verification": "",
   },
