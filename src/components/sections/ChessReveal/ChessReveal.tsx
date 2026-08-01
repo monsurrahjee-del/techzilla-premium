@@ -364,6 +364,16 @@ const ChessReveal = forwardRef<ChessRevealHandle>((_, ref) => {
     const s = stateRef.current;
     const previous = s.virtualScroll;
 
+    // On mobile, only Phase C is shown. Any backward scroll should dismiss
+    // chess immediately rather than revealing earlier phases (A & B).
+    const isMobileNow =
+      typeof window !== "undefined" &&
+      (window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 767);
+    if (isMobileNow && delta < 0) {
+      dismissChess();
+      return;
+    }
+
     setVirtualScroll(previous + delta);
     if (s.virtualScroll <= 0 && delta < 0) {
       dismissChess();
